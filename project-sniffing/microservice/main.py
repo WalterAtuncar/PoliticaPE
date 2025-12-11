@@ -23,7 +23,8 @@ import spacy
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import redis.asyncio as redis
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
-from pydantic import BaseSettings, BaseModel
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings
 import uvicorn
 
 # Configuración

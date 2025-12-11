@@ -14,7 +14,7 @@ class RawSocialPost(Base):
     created_at = Column(DateTime, nullable=True)
     scraped_at = Column(DateTime, default=func.now())
     engagement_metrics = Column(JSON, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    extra_metadata = Column('metadata', JSON, nullable=True)
     processed = Column(Boolean, default=False)
     sentiment_score = Column(Float, nullable=True)
     geographic_location = Column(String(100), nullable=True)
@@ -62,7 +62,7 @@ class GovernmentData(Base):
     scraped_at = Column(DateTime, default=func.now())
     url = Column(String(1000), nullable=False)
     department = Column(String(200), nullable=True)
-    metadata = Column(JSON, nullable=True)
+    extra_metadata = Column('metadata', JSON, nullable=True)
     processed = Column(Boolean, default=False)
     
     __table_args__ = (
@@ -108,7 +108,7 @@ class ScrapingLog(Base):
     started_at = Column(DateTime, default=func.now())
     completed_at = Column(DateTime, nullable=True)
     error_message = Column(Text, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    extra_metadata = Column('metadata', JSON, nullable=True)
     
     __table_args__ = (
         Index('idx_source_type', 'source', 'scraping_type'),

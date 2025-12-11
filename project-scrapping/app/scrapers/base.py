@@ -134,6 +134,8 @@ class BaseScraper(ABC):
             try:
                 # Check if item already exists (implement in subclasses)
                 if not self._item_exists(db, item_data, model_class):
+                    if 'metadata' in item_data and hasattr(model_class, 'extra_metadata'):
+                        item_data['extra_metadata'] = item_data.pop('metadata')
                     item = model_class(**item_data)
                     db.add(item)
                     saved_count += 1

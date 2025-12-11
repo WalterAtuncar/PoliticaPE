@@ -51,6 +51,32 @@ if settings.PROMETHEUS_ENABLED:
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
 
+@app.get("/rapidoc", response_class=HTMLResponse)
+async def rapidoc():
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset=\"utf-8\" />
+        <title>{settings.APP_NAME} API Explorer</title>
+        <script type=\"module\" src=\"https://unpkg.com/rapidoc/dist/rapidoc-min.js\"></script>
+        <style> body {{ margin: 0; font-family: Arial, sans-serif; }} </style>
+    </head>
+    <body>
+        <rapi-doc
+          spec-url=\"/openapi.json\"
+          theme=\"light\"
+          render-style=\"read\"
+          show-header=\"true\"
+          heading-text=\"{settings.APP_NAME}\" 
+          allow-authentication=\"true\"
+          use-path-in-nav-bar=\"true\"
+        ></rapi-doc>
+    </body>
+    </html>
+    """
+    return html_content
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup"""

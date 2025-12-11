@@ -1,0 +1,51 @@
+%% Mermaid — Flujo de Datos y Dependencias
+graph TD
+  subgraph Frontend
+    UI[Dashboard, Analytics, Monitoring]
+    Hooks[Hooks de datos]
+    WSClient[Cliente WebSocket]
+  end
+
+  subgraph Streaming
+    WS[WebSocket ws]
+    AnalyzerRT[Analisis en tiempo real NLP]
+    RTDB[(PostgreSQL realtime_data.live_streams)]
+    Metrics[Prometheus metrics]
+  end
+
+  subgraph Scrapping
+    API[FastAPI api/v1]
+    Celery[(Cola de tareas Celery)]
+    Scrapers[Scrapers noticias redes gobierno]
+    BatchAnalyzer[Analisis batch]
+    DB[(PostgreSQL public)]
+  end
+
+  subgraph Infra
+    Redis[(Redis broker)]
+    Prom[Prometheus]
+  end
+
+  UI -->|REST| API
+  UI -->|WebSocket| WS
+  Hooks --> WSClient
+  WSClient --> WS
+
+  WS --> AnalyzerRT --> RTDB
+  AnalyzerRT --> Metrics
+  Prom --> Metrics
+
+  API --> BatchAnalyzer --> DB
+  Celery --> Scrapers --> DB
+  Celery --> BatchAnalyzer
+  Redis --> Celery
+
+  DB --> API
+  RTDB --> WS
+
+  classDef store fill:#eef,stroke:#99f,stroke-width:1px;
+  classDef service fill:#efe,stroke:#9f9,stroke-width:1px;
+  classDef infra fill:#fee,stroke:#f99,stroke-width:1px;
+  class DB,RTDB store;
+  class API,WS,AnalyzerRT,BatchAnalyzer service;
+  class Redis,Prom,Metrics infra;
