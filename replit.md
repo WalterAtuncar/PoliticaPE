@@ -6,8 +6,14 @@ Multi-project platform for political analytics in Peru, consisting of three sub-
 - **project-scrapping**: FastAPI backend with web scraping, batch analysis, and REST API (Python)
 - **project-sniffing**: Real-time streaming microservice with WebSocket support (Python/FastAPI)
 
+## Plan de Trabajo
+Ver **PLAN_DE_TRABAJO.md** para el plan detallado de implementación con 112 tareas organizadas en 7 fases.
+
 ## Current State
-Frontend (project-react) is configured and running on port 5000.
+- Frontend (project-react): Configurado y funcionando en puerto 5000
+- Backend scrapping: Por configurar
+- Backend sniffing: Por configurar
+- Base de datos: Por crear
 
 ## Project Structure
 ```
