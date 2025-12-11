@@ -84,10 +84,14 @@ PostgreSQL with 27+ tables across schemas:
 - **Monitoring**: Prometheus metrics
 
 ## Recent Changes
-- 2025-12-11: Complete Replit integration
+- 2025-12-11: Complete Replit integration and frontend-backend connection
   - All 3 microservices configured and running
   - Simplified dependencies (removed Redis, Celery, heavy ML)
   - Database with 27 tables created and seeded
   - Real-time sentiment analysis working
   - WebSocket streaming configured
   - API endpoints fully functional
+  - Authentication endpoint added (POST /api/v1/auth/login)
+  - Frontend connected to real backend APIs
+  - useWebSocket hook integrated with Backend-Sniffing
+  - AuthContext updated to use backend authentication

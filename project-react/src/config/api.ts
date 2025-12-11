@@ -15,6 +15,7 @@ export const API_CONFIG = {
 
 export const ENDPOINTS = {
   HEALTH: '/health',
+  LOGIN: '/api/v1/auth/login',
   STATS: '/api/v1/data/stats',
   NEWS: '/api/v1/data/news',
   SOCIAL: '/api/v1/data/social',

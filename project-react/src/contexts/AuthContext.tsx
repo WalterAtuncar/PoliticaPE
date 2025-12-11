@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import { User, AuthState } from '../types';
+import { API_CONFIG, ENDPOINTS } from '../config/api';
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
@@ -49,26 +50,42 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (email: string, password: string, rememberMe = false) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (email === 'admin@politica.pe' && password === 'password123') {
-      const user: User = {
-        id: '1',
-        email,
-        name: 'Carlos Mendoza',
-        role: 'admin',
-        avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?w=100&h=100&fit=crop&crop=face',
-      };
-      
-      if (rememberMe) {
-        localStorage.setItem('user', JSON.stringify(user));
+    try {
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.LOGIN}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Error de autenticación');
       }
+
+      const data = await response.json();
       
-      dispatch({ type: 'SET_USER', payload: user });
-    } else {
+      if (data.success && data.user) {
+        const user: User = {
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.name,
+          role: data.user.role as 'admin' | 'analyst' | 'viewer',
+          avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?w=100&h=100&fit=crop&crop=face',
+        };
+        
+        if (rememberMe) {
+          localStorage.setItem('user', JSON.stringify(user));
+        }
+        
+        dispatch({ type: 'SET_USER', payload: user });
+      } else {
+        throw new Error('Error de autenticación');
+      }
+    } catch (error) {
       dispatch({ type: 'SET_LOADING', payload: false });
-      throw new Error('Credenciales inválidas');
+      throw error;
     }
   };
 
@@ -79,7 +96,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const forgotPassword = async (email: string) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
-    // Simulate password reset email
   };
 
   const register = async (email: string, password: string, name: string) => {
@@ -96,7 +112,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     dispatch({ type: 'SET_USER', payload: user });
   };
 
-  // Check for saved user on app start
   React.useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (savedUser) {
