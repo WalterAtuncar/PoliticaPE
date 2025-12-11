@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { API_CONFIG, ENDPOINTS } from '../config/api';
 import { 
   SocialPost, 
   SocialMetrics, 
@@ -906,70 +907,128 @@ export const useSocialData = (filters: SocialFilters) => {
   const [crisisAlerts, setCrisisAlerts] = useState<CrisisAlert[]>([]);
   const [listeningData, setListeningData] = useState<SocialListeningData>(generateMockSocialListeningData());
   const [isLoading, setIsLoading] = useState(true);
+  const [isUsingMockData, setIsUsingMockData] = useState(true);
 
-  // Initialize with mock data
-  useEffect(() => {
-    setPosts(generateMockPosts(50));
-    setInfluencers(generateMockInfluencers(20));
-    setHashtags(generateMockHashtags(15));
-    setViralContent(generateMockViralPosts(10));
-    setCompetitors(generateMockCompetitors(10));
-    setContentCalendar(generateMockContentCalendar(30));
-    setCrisisAlerts(generateMockCrisisAlerts(15));
-    
-    // Simulate loading
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
-  }, []);
+  const fetchRealData = async () => {
+    try {
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SOCIAL}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const realPosts: SocialPost[] = data.map((post: any) => ({
+            id: post.id || String(Math.random()),
+            platform: post.platform || 'twitter',
+            content: post.content || '',
+            author: post.author || 'Usuario',
+            handle: post.handle || `@usuario`,
+            authorAvatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?w=100&h=100&fit=crop&crop=face',
+            timestamp: new Date(post.created_at || Date.now()),
+            likes: post.likes_count || 0,
+            comments: post.comments_count || 0,
+            shares: post.shares_count || 0,
+            engagementRate: post.engagement_rate || 0,
+            sentiment: post.sentiment_score > 0.2 ? 'positive' : post.sentiment_score < -0.2 ? 'negative' : 'neutral',
+            sentimentScore: post.sentiment_score || 0,
+            region: post.detected_region || 'Nacional',
+            hashtags: post.hashtags || [],
+            mentions: post.mentions || [],
+            reach: post.reach || 1000,
+            impressions: post.impressions || 1500,
+            isVerified: post.is_verified || false,
+            isViral: post.is_viral || false,
+            isFakeNews: false,
+            fakeNewsScore: 0,
+            emotions: [],
+            userLiked: false,
+          }));
+          setAllPosts(realPosts);
+          setPosts(realPosts);
+          setIsUsingMockData(false);
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('Error fetching real social data:', error);
+      return false;
+    }
+  };
 
-  // Filter data based on selected filters
   useEffect(() => {
-    setIsLoading(true);
-    
-    // Simulate API call with delay
-    setTimeout(() => {
-      // Apply platform filter
-      const filteredPosts = generateMockPosts(50).filter(post => {
-        if (filters.platform !== 'all' && post.platform !== filters.platform) return false;
-        if (filters.sentiment !== 'all' && post.sentiment !== filters.sentiment) return false;
-        if (filters.region !== 'all' && post.region !== filters.region) return false;
-        if (filters.contentType !== 'all' && post.media) {
-          if (filters.contentType === 'image' && post.media[0]?.type !== 'image') return false;
-          if (filters.contentType === 'video' && post.media[0]?.type !== 'video') return false;
-        }
-        if (filters.keywords.length > 0) {
-          const content = post.content.toLowerCase();
-          return filters.keywords.some(keyword => content.includes(keyword.toLowerCase()));
-        }
-        return true;
-      });
+    const initializeData = async () => {
+      setIsLoading(true);
       
-      setPosts(filteredPosts);
-      setIsLoading(false);
-    }, 500);
-  }, [filters]);
-
-  // Refresh data function
-  const refreshData = useCallback(() => {
-    setIsLoading(true);
-    
-    // Simulate API call with delay
-    setTimeout(() => {
-      setPosts(generateMockPosts(50));
-      setMetrics(generateMockMetrics());
+      const hasRealData = await fetchRealData();
+      
+      if (!hasRealData) {
+        const mockPosts = generateMockPosts(50);
+        setAllPosts(mockPosts);
+        setPosts(mockPosts);
+        setIsUsingMockData(true);
+      }
+      
       setInfluencers(generateMockInfluencers(20));
       setHashtags(generateMockHashtags(15));
       setViralContent(generateMockViralPosts(10));
       setCompetitors(generateMockCompetitors(10));
-      setAudienceData(generateMockAudienceData());
       setContentCalendar(generateMockContentCalendar(30));
       setCrisisAlerts(generateMockCrisisAlerts(15));
-      setListeningData(generateMockSocialListeningData());
       
       setIsLoading(false);
-    }, 1000);
+    };
+    
+    initializeData();
+  }, []);
+
+  const [allPosts, setAllPosts] = useState<SocialPost[]>([]);
+
+  useEffect(() => {
+    if (allPosts.length === 0) return;
+    
+    setIsLoading(true);
+    
+    const filteredPosts = allPosts.filter(post => {
+      if (filters.platform !== 'all' && post.platform !== filters.platform) return false;
+      if (filters.sentiment !== 'all' && post.sentiment !== filters.sentiment) return false;
+      if (filters.region !== 'all' && post.region !== filters.region) return false;
+      if (filters.contentType !== 'all' && post.media) {
+        if (filters.contentType === 'image' && post.media[0]?.type !== 'image') return false;
+        if (filters.contentType === 'video' && post.media[0]?.type !== 'video') return false;
+      }
+      if (filters.keywords.length > 0) {
+        const content = post.content.toLowerCase();
+        return filters.keywords.some(keyword => content.includes(keyword.toLowerCase()));
+      }
+      return true;
+    });
+    
+    setPosts(filteredPosts);
+    setIsLoading(false);
+  }, [filters, allPosts]);
+
+  const refreshData = useCallback(async () => {
+    setIsLoading(true);
+    
+    const hasRealData = await fetchRealData();
+    
+    if (!hasRealData) {
+      const mockPosts = generateMockPosts(50);
+      setAllPosts(mockPosts);
+      setPosts(mockPosts);
+      setIsUsingMockData(true);
+    }
+    
+    setMetrics(generateMockMetrics());
+    setInfluencers(generateMockInfluencers(20));
+    setHashtags(generateMockHashtags(15));
+    setViralContent(generateMockViralPosts(10));
+    setCompetitors(generateMockCompetitors(10));
+    setAudienceData(generateMockAudienceData());
+    setContentCalendar(generateMockContentCalendar(30));
+    setCrisisAlerts(generateMockCrisisAlerts(15));
+    setListeningData(generateMockSocialListeningData());
+    
+    setIsLoading(false);
   }, []);
 
   return {
@@ -984,6 +1043,7 @@ export const useSocialData = (filters: SocialFilters) => {
     crisisAlerts,
     listeningData,
     isLoading,
+    isUsingMockData,
     refreshData,
   };
 };
