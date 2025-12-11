@@ -12,15 +12,15 @@
 ### 1.1 Base de Datos PostgreSQL
 | ID | Tarea | Estado |
 |----|-------|--------|
-| 1.1.1 | Crear base de datos PostgreSQL en Replit | POR_INICIAR |
-| 1.1.2 | Ejecutar script DDL para crear esquemas (public, realtime_data, identity, organization) | POR_INICIAR |
-| 1.1.3 | Verificar creación de todas las tablas e índices | POR_INICIAR |
-| 1.1.4 | Insertar datos semilla (regiones del Perú, roles base, tenant inicial) | POR_INICIAR |
+| 1.1.1 | Crear base de datos PostgreSQL en Replit | CULMINADO |
+| 1.1.2 | Ejecutar script DDL para crear esquemas (public, realtime_data, identity, organization) | CULMINADO |
+| 1.1.3 | Verificar creación de todas las tablas e índices (27 tablas creadas) | CULMINADO |
+| 1.1.4 | Insertar datos semilla (26 regiones, 4 roles, 7 permisos, 1 tenant, 1 usuario admin, 1 partido, 1 campaña) | CULMINADO |
 
 ### 1.2 Variables de Entorno y Secrets
 | ID | Tarea | Estado |
 |----|-------|--------|
-| 1.2.1 | Configurar DATABASE_URL como variable de entorno compartida | POR_INICIAR |
+| 1.2.1 | Configurar DATABASE_URL como variable de entorno compartida | CULMINADO |
 | 1.2.2 | Solicitar TWITTER_BEARER_TOKEN (opcional para scraping Twitter) | POR_INICIAR |
 | 1.2.3 | Solicitar YOUTUBE_API_KEY (opcional para scraping YouTube) | POR_INICIAR |
 | 1.2.4 | Solicitar FACEBOOK_ACCESS_TOKEN (opcional para scraping Facebook) | POR_INICIAR |
@@ -282,14 +282,14 @@
 
 | Fase | Total Tareas | Culminadas | En Progreso | Por Iniciar |
 |------|--------------|------------|-------------|-------------|
-| Fase 1: Infraestructura | 9 | 0 | 0 | 9 |
+| Fase 1: Infraestructura | 9 | 5 | 0 | 4 |
 | Fase 2: Backend Scrapping | 24 | 0 | 0 | 24 |
 | Fase 3: Backend Sniffing | 20 | 0 | 0 | 20 |
-| Fase 4: Frontend React | 25 | 4 | 0 | 21 |
+| Fase 4: Frontend React | 25 | 5 | 0 | 20 |
 | Fase 5: Frontend Sniffing | 12 | 0 | 0 | 12 |
 | Fase 6: Testing | 9 | 0 | 0 | 9 |
 | Fase 7: Deployment | 13 | 0 | 0 | 13 |
-| **TOTAL** | **112** | **4** | **0** | **108** |
+| **TOTAL** | **112** | **10** | **0** | **102** |
 
 ---
 
