@@ -4,7 +4,7 @@
 
 **Fecha de Inicio:** 2024-12-11  
 **Última Actualización:** 2024-12-11  
-**Estado General:** EN PROGRESO - Fase 2 y 3 COMPLETADAS
+**Estado General:** EN PROGRESO - Fase 4 EN CURSO (Integración Frontend-Backend)
 
 ---
 
@@ -56,6 +56,7 @@
 | 2.3.4 | Verificar endpoints de scraping (/api/v1/scraping/trigger/*) | CULMINADO |
 | 2.3.5 | Agregar endpoint de health check (/health) | CULMINADO |
 | 2.3.6 | Configurar CORS para permitir llamadas desde frontend | CULMINADO |
+| 2.3.7 | Crear endpoint de autenticación (/api/v1/auth/login) con bcrypt | CULMINADO |
 
 ### 2.4 Scrapers Funcionales
 | ID | Tarea | Estado | Notas |
@@ -158,7 +159,7 @@
 ### 4.3 Integración con Backend Sniffing (Tiempo Real)
 | ID | Tarea | Estado |
 |----|-------|--------|
-| 4.3.1 | Actualizar hook useWebSocket para conectar con backend real | PENDIENTE |
+| 4.3.1 | Actualizar hook useWebSocket para conectar con backend real | CULMINADO |
 | 4.3.2 | Actualizar hook useRealtimeData para datos reales | PENDIENTE |
 | 4.3.3 | Conectar MonitoringPage con WebSocket real | PENDIENTE |
 | 4.3.4 | Conectar AlertsPanel con datos reales de crisis | PENDIENTE |
@@ -181,11 +182,12 @@
 ### 4.5 Autenticación
 | ID | Tarea | Estado |
 |----|-------|--------|
-| 4.5.1 | Implementar autenticación real (no mock) | PENDIENTE |
-| 4.5.2 | Conectar login con tabla identity.users | PENDIENTE |
-| 4.5.3 | Implementar registro de usuarios | PENDIENTE |
-| 4.5.4 | Implementar recuperación de contraseña | PENDIENTE |
-| 4.5.5 | Implementar manejo de sesiones | PENDIENTE |
+| 4.5.1 | Implementar autenticación real (no mock) | CULMINADO |
+| 4.5.2 | Conectar login con tabla identity.users | CULMINADO |
+| 4.5.3 | Validación segura de contraseñas con bcrypt | CULMINADO |
+| 4.5.4 | Implementar registro de usuarios | PENDIENTE |
+| 4.5.5 | Implementar recuperación de contraseña | PENDIENTE |
+| 4.5.6 | Implementar manejo de sesiones/tokens | PENDIENTE |
 
 ### 4.6 Workflow y Deployment
 | ID | Tarea | Estado |
@@ -213,7 +215,7 @@
 |----|-------|--------|
 | 6.1.1 | Test: Scraping de noticias → API → Frontend | PENDIENTE |
 | 6.1.2 | Test: Datos en tiempo real → WebSocket → Dashboard | PENDIENTE |
-| 6.1.3 | Test: Autenticación completa (login/logout/registro) | PENDIENTE |
+| 6.1.3 | Test: Autenticación completa (login/logout/registro) | CULMINADO (login verificado) |
 | 6.1.4 | Test: Gestión de campañas CRUD completo | PENDIENTE |
 | 6.1.5 | Test: Análisis geográfico con datos reales | PENDIENTE |
 
@@ -261,15 +263,15 @@
 | Fase | Total Tareas | Culminadas | Omitidas | Pendientes |
 |------|--------------|------------|----------|------------|
 | Fase 1: Infraestructura | 9 | 5 | 4 | 0 |
-| Fase 2: Backend Scrapping | 24 | 17 | 2 | 5 |
+| Fase 2: Backend Scrapping | 25 | 18 | 2 | 5 |
 | Fase 3: Backend Sniffing | 18 | 18 | 0 | 0 |
-| Fase 4: Frontend React | 26 | 7 | 0 | 19 |
+| Fase 4: Frontend React | 27 | 11 | 0 | 16 |
 | Fase 5: Frontend Sniffing | 12 | 0 | 12 | 0 |
-| Fase 6: Testing | 9 | 0 | 0 | 9 |
+| Fase 6: Testing | 9 | 1 | 0 | 8 |
 | Fase 7: Deployment | 13 | 2 | 0 | 11 |
-| **TOTAL** | **111** | **49** | **18** | **44** |
+| **TOTAL** | **113** | **55** | **18** | **40** |
 
-**Progreso Total: 44% completado (60% considerando omitidas)**
+**Progreso Total: 49% completado (65% considerando omitidas)**
 
 ---
 
@@ -285,13 +287,22 @@
 - **Email:** admin@politica.pe
 - **Password:** password123
 
+### Endpoints de API Funcionales
+- `POST /api/v1/auth/login` - Autenticación con bcrypt
+- `GET /api/v1/data/stats` - Estadísticas de datos
+- `GET /api/v1/data/news` - Noticias
+- `GET /api/v1/analysis/sentiment` - Análisis de sentimiento
+- `POST /api/analyze` - Análisis en tiempo real (Backend Sniffing)
+- `WS /ws/stream` - Streaming WebSocket
+
 ---
 
-## Próximos Pasos (Fase 4)
+## Próximos Pasos (Prioridad)
 
 1. **4.2.2-4.2.5**: Integrar datos reales del Backend Scrapping en el frontend
-2. **4.3.1-4.3.5**: Conectar WebSocket con el Backend Sniffing
-3. **4.5.1-4.5.5**: Implementar autenticación real con la base de datos
+2. **4.3.2-4.3.5**: Completar integración de datos en tiempo real
+3. **4.4.1-4.4.10**: Verificar todos los módulos del dashboard
+4. **7.2.1-7.2.5**: Configurar y publicar en Replit
 
 ---
 
@@ -302,11 +313,15 @@
 - **Sin Kafka**: Reemplazado por WebSocket directo con broadcasting
 - **Sin modelos ML pesados**: Análisis de sentimiento basado en reglas (palabras clave)
 - **Puerto 8080 para Sniffing**: Cambiado de 8001 porque 8001 no está disponible en Replit
+- **Autenticación con bcrypt**: Validación segura de contraseñas
 
 ### Archivos Modificados/Creados
 - `project-scrapping/requirements-replit.txt` - Dependencias simplificadas
 - `project-scrapping/app/config.py` - Configuración para Replit
+- `project-scrapping/app/api/endpoints/auth.py` - Endpoint de autenticación con bcrypt
 - `project-scrapping/app/api/endpoints/scraping.py` - Sin Celery
 - `project-sniffing/microservice/main.py` - Versión simplificada sin Kafka/Redis
 - `project-sniffing/microservice/requirements-replit.txt` - Dependencias simplificadas
 - `project-react/src/config/api.ts` - Configuración de endpoints de API
+- `project-react/src/contexts/AuthContext.tsx` - Autenticación con backend real
+- `project-react/src/hooks/useWebSocket.ts` - WebSocket con Backend Sniffing
