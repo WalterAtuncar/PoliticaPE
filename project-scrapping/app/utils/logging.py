@@ -1,4 +1,5 @@
 import sys
+import os
 import logging
 from loguru import logger
 from app.config import settings
@@ -6,10 +7,8 @@ from app.config import settings
 def setup_logging():
     """Setup loguru logging configuration"""
     
-    # Remove default handler
     logger.remove()
     
-    # Add console handler
     logger.add(
         sys.stdout,
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
@@ -17,17 +16,25 @@ def setup_logging():
         colorize=True
     )
     
-    # Add file handler
-    logger.add(
-        settings.LOG_FILE,
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-        level=settings.LOG_LEVEL,
-        rotation="10 MB",
-        retention="7 days",
-        compression="zip"
-    )
+    log_dir = os.path.dirname(settings.LOG_FILE)
+    if log_dir and not os.path.exists(log_dir):
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+        except Exception:
+            pass
     
-    # Intercept standard logging
+    try:
+        logger.add(
+            settings.LOG_FILE,
+            format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+            level=settings.LOG_LEVEL,
+            rotation="10 MB",
+            retention="7 days",
+            compression="zip"
+        )
+    except Exception as e:
+        logger.warning(f"Could not create log file: {e}")
+    
     class InterceptHandler(logging.Handler):
         def emit(self, record):
             try:
@@ -42,7 +49,6 @@ def setup_logging():
             
             logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
     
-    # Replace standard logging
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
     
     logger.info("Logging system initialized")

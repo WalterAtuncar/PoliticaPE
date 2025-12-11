@@ -6,11 +6,11 @@ class Settings(BaseSettings):
     # Application
     APP_NAME: str = "Political Data Scraper"
     VERSION: str = "1.0.0"
-    DEBUG: bool = False
-    ENVIRONMENT: str = "production"
+    DEBUG: bool = True
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     
-    # Database - Configuración actualizada para tu BD
-    DATABASE_URL: str = "postgresql://postgres:123456@localhost:5432/politiscope_db"
+    # Database - Use Replit's DATABASE_URL
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://localhost:5432/politiscope_db")
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"

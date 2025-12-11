@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "python-3.12", "postgresql-16"]
+modules = ["nodejs-20", "postgresql-16", "python-3.11"]
 [agent]
 expertMode = true
 
@@ -17,6 +17,14 @@ author = "agent"
 task = "workflow.run"
 args = "Frontend"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Backend-Scrapping"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Backend-Sniffing"
+
 [[workflows.workflow]]
 name = "Frontend"
 author = "agent"
@@ -29,9 +37,41 @@ waitForPort = 5000
 [workflows.workflow.metadata]
 outputType = "webview"
 
+[[workflows.workflow]]
+name = "Backend-Scrapping"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd project-scrapping && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+waitForPort = 8000
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Backend-Sniffing"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd project-sniffing/microservice && python -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload"
+waitForPort = 8080
+
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
 
 [deployment]
 deploymentTarget = "autoscale"
