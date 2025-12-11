@@ -22,9 +22,6 @@
     "react-hot-toast": "^2.4.1",
     "react-leaflet": "^4.2.1",
     "leaflet": "^1.9.4",
-    "react-twitter-embed": "^4.0.4",
-    "react-instagram-embed": "^3.0.0",
-    "react-facebook": "^9.0.12",
     "react-youtube": "^10.1.0"
   },
   "devDependencies": {
