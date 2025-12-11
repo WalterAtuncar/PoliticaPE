@@ -1,8 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -12,8 +10,16 @@ import {
   AreaChart,
 } from 'recharts';
 import { Card } from '../ui/Card';
+import { API_CONFIG, ENDPOINTS } from '../../config/api';
 
-const data = [
+interface TrendDataPoint {
+  name: string;
+  sentiment: number;
+  mentions: number;
+  engagement: number;
+}
+
+const mockData: TrendDataPoint[] = [
   { name: 'Ene', sentiment: 65, mentions: 1200, engagement: 8.2 },
   { name: 'Feb', sentiment: 59, mentions: 1100, engagement: 7.8 },
   { name: 'Mar', sentiment: 72, mentions: 1350, engagement: 9.1 },
@@ -23,6 +29,30 @@ const data = [
 ];
 
 export const TrendChart: React.FC = () => {
+  const [data, setData] = useState<TrendDataPoint[]>(mockData);
+
+  useEffect(() => {
+    const fetchTrends = async () => {
+      try {
+        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRENDS}`);
+        if (response.ok) {
+          const trendsData = await response.json();
+          if (trendsData.trends && Array.isArray(trendsData.trends) && trendsData.trends.length > 0) {
+            const formattedData = trendsData.trends.map((t: any) => ({
+              name: t.period ?? t.month ?? t.name ?? 'N/A',
+              sentiment: t.sentiment ?? t.sentiment_score ?? 50,
+              mentions: t.mentions ?? t.count ?? 0,
+              engagement: t.engagement ?? t.engagement_rate ?? 0,
+            }));
+            setData(formattedData);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching trends:', error);
+      }
+    };
+    fetchTrends();
+  }, []);
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}

@@ -1,9 +1,58 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '../ui/Card';
 import { mockGeographicData } from '../../data/mockData';
+import { API_CONFIG, ENDPOINTS } from '../../config/api';
+
+interface RegionData {
+  ubigeo: string;
+  region: string;
+  mentions: number;
+  sentiment: {
+    positive: number;
+    negative: number;
+    neutral: number;
+  };
+  engagement: number;
+}
 
 export const GeographicMap: React.FC = () => {
+  const [regionData, setRegionData] = useState<RegionData[]>(mockGeographicData);
+
+  useEffect(() => {
+    const fetchRegionData = async () => {
+      try {
+        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SENTIMENT}`);
+        if (response.ok) {
+          const sentimentData = await response.json();
+          if (sentimentData.by_region && Array.isArray(sentimentData.by_region) && sentimentData.by_region.length > 0) {
+            const formattedData: RegionData[] = sentimentData.by_region.map((r: any, index: number) => {
+              const sentimentValue = r.sentiment ?? 0;
+              const calculatedPositive = Math.max(0, Math.min(100, (sentimentValue + 1) * 25));
+              const calculatedNegative = Math.max(0, Math.min(100, (1 - sentimentValue) * 25));
+              const calculatedNeutral = Math.max(0, 100 - calculatedPositive - calculatedNegative);
+              
+              return {
+                ubigeo: r.ubigeo ?? String(index + 1).padStart(2, '0'),
+                region: r.region ?? `Región ${index + 1}`,
+                mentions: r.mentions ?? r.count ?? 0,
+                sentiment: {
+                  positive: r.positive ?? calculatedPositive,
+                  negative: r.negative ?? calculatedNegative,
+                  neutral: r.neutral ?? calculatedNeutral,
+                },
+                engagement: r.engagement ?? 0,
+              };
+            });
+            setRegionData(formattedData);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching region data:', error);
+      }
+    };
+    fetchRegionData();
+  }, []);
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -32,7 +81,7 @@ export const GeographicMap: React.FC = () => {
         </div>
 
         <div className="space-y-4">
-          {mockGeographicData.map((region, index) => (
+          {regionData.map((region, index) => (
             <motion.div
               key={region.ubigeo}
               initial={{ opacity: 0, x: -20 }}
