@@ -9,16 +9,10 @@ interface SocialFeedProps {
   filters: MonitoringFilters;
 }
 
-const platformIcons = {
+const platformIcons: Record<string, string> = {
   twitter: '🐦',
   facebook: '📘',
   instagram: '📷',
-};
-
-const platformColors = {
-  twitter: '#1DA1F2',
-  facebook: '#4267B2',
-  instagram: '#E4405F',
 };
 
 const sentimentColors = {
