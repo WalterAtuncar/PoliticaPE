@@ -26,7 +26,7 @@ All three projects are now running and integrated:
 │   ├── src/
 │   │   ├── components/     # UI components (analytics, campaigns, monitoring, etc.)
 │   │   ├── contexts/       # React contexts (Auth, Theme)
-│   │   ├── hooks/          # Data hooks (useRealtimeData, useWebSocket, etc.)
+│   │   ├── hooks/          # Data hooks (useRealtimeData, useWebSocket, useDashboardData, etc.)
 │   │   ├── config/         # API configuration
 │   │   └── types/          # TypeScript definitions
 │   └── vite.config.ts      # Port 5000, all hosts allowed
@@ -59,6 +59,7 @@ All three projects are now running and integrated:
 - `GET /api/v1/data/social` - Social posts
 - `POST /api/v1/scraping/trigger/news` - Trigger news scraping
 - `GET /api/v1/analysis/sentiment` - Sentiment analysis
+- `GET /api/v1/analysis/trends` - Trend analysis
 - `GET /docs` - API documentation
 
 ### Backend Sniffing (port 8080)
@@ -84,14 +85,63 @@ PostgreSQL with 27+ tables across schemas:
 - **Monitoring**: Prometheus metrics
 
 ## Recent Changes
-- 2025-12-11: Complete Replit integration and frontend-backend connection
-  - All 3 microservices configured and running
-  - Simplified dependencies (removed Redis, Celery, heavy ML)
-  - Database with 27 tables created and seeded
-  - Real-time sentiment analysis working
-  - WebSocket streaming configured
-  - API endpoints fully functional
-  - Authentication endpoint added (POST /api/v1/auth/login)
-  - Frontend connected to real backend APIs
-  - useWebSocket hook integrated with Backend-Sniffing
-  - AuthContext updated to use backend authentication
+
+### 2025-12-25: Phase 4 - Frontend Data Integration (In Progress)
+**Completed:**
+- Task 1: Integrated real news data from backend
+  - Created `useDashboardData.ts` hook for dashboard metrics
+  - Updated `useSocialData.ts` for real social data with fallback
+  - Fixed division by zero in percentage calculations
+  - Fixed filters overwriting real data (allPosts pattern)
+
+- Task 2: Updated useRealtimeData for real data
+  - Integrated backend API calls (stats, sentiment, news, metrics, crisis-alerts)
+  - Added social posts fetching from `/api/v1/data/social` and `/api/recent`
+  - Normalized platform and sentiment values with safe fallbacks
+  - Uses nullish coalescing to preserve zero values
+
+- Task 3: Connected monitoring components with real data
+  - SocialFeed receives posts from useRealtimeData
+  - AlertsPanel shows real crisis alerts
+  - SentimentMeter displays real sentiment data
+  - NewsStream shows real news articles
+  - Fixed WebSocket hook type issue (NodeJS.Timeout)
+
+- Task 4: Dashboard verified with real data (In Progress)
+  - Dashboard.tsx uses useDashboardData hook
+  - TrendChart.tsx fetches from `/api/v1/analysis/trends`
+  - GeographicMap.tsx fetches regional data from sentiment API
+  - RealtimeAlerts.tsx uses useWebSocket for real-time alerts
+  - All components use nullish coalescing for proper fallbacks
+
+**Pending:**
+- Task 5: Complete authentication (sessions and tokens)
+- Task 6: Configure production build
+
+### 2025-12-11: Complete Replit Integration
+- All 3 microservices configured and running
+- Simplified dependencies (removed Redis, Celery, heavy ML)
+- Database with 27 tables created and seeded
+- Real-time sentiment analysis working
+- WebSocket streaming configured
+- API endpoints fully functional
+- Authentication endpoint added (POST /api/v1/auth/login)
+- Frontend connected to real backend APIs
+- useWebSocket hook integrated with Backend-Sniffing
+- AuthContext updated to use backend authentication
+
+## Key Frontend Hooks
+
+| Hook | Purpose | Data Source |
+|------|---------|-------------|
+| `useDashboardData` | Main dashboard metrics | `/api/v1/data/stats`, `/api/v1/analysis/sentiment` |
+| `useRealtimeData` | Monitoring page data | Multiple APIs + WebSocket |
+| `useWebSocket` | Real-time alerts/posts | WebSocket `/ws/stream` |
+| `useSocialData` | Social analytics | `/api/v1/data/social` |
+
+## Data Flow Pattern
+1. Hooks attempt to fetch real data from backend APIs
+2. If backend has data, it's transformed to frontend types
+3. If no data or error, falls back to mock data
+4. `isUsingMockData` flag indicates data source to UI
+5. Nullish coalescing (`??`) used to preserve zero values
