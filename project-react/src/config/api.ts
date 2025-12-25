@@ -1,16 +1,9 @@
-const isProduction = import.meta.env.PROD;
-const replitDomain = import.meta.env.VITE_REPLIT_DOMAIN || window.location.host;
+const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 
 export const API_CONFIG = {
-  SCRAPPING_BASE_URL: isProduction 
-    ? `https://${replitDomain}:8000` 
-    : 'http://localhost:8000',
-  SNIFFING_BASE_URL: isProduction 
-    ? `https://${replitDomain}:8080` 
-    : 'http://localhost:8080',
-  SNIFFING_WS_URL: isProduction 
-    ? `wss://${replitDomain}:8080` 
-    : 'ws://localhost:8080',
+  SCRAPPING_BASE_URL: '',
+  SNIFFING_BASE_URL: '',
+  SNIFFING_WS_URL: `${wsProtocol}//${window.location.host}`,
 };
 
 export const ENDPOINTS = {
