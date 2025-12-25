@@ -19,9 +19,26 @@ All three projects are now running and integrated:
 - Email: admin@politica.pe
 - Password: password123
 
+## Progress Summary (from PLAN_DE_TRABAJO.md)
+
+| Phase | Total | Done | Omit | Pending |
+|-------|-------|------|------|---------|
+| Phase 1: Infrastructure | 9 | 9 | 0 | 0 |
+| Phase 2: Backend Scrapping | 27 | 18 | 2 | 7 |
+| Phase 3: Backend Sniffing | 18 | 18 | 0 | 0 |
+| Phase 4: Frontend React | 27 | 11 | 0 | 16 |
+| Phase 5: Frontend Sniffing | 12 | 0 | 12 | 0 |
+| Phase 6: Testing | 9 | 1 | 0 | 8 |
+| Phase 7: Deployment | 13 | 2 | 0 | 11 |
+| Phase 8: Parties Research | 5 | 4 | 0 | 1 |
+| **TOTAL** | **120** | **63** | **14** | **43** |
+
+**Progress: 52% completed (65% including omitted)**
+
 ## Project Structure
 ```
 /
+├── PLAN_DE_TRABAJO.md      # Detailed work plan with task tracking
 ├── project-react/          # Frontend dashboard
 │   ├── src/
 │   │   ├── components/     # UI components (analytics, campaigns, monitoring, etc.)
@@ -32,7 +49,7 @@ All three projects are now running and integrated:
 │   └── vite.config.ts      # Port 5000, all hosts allowed
 ├── project-scrapping/      # Batch processing backend
 │   ├── app/
-│   │   ├── api/endpoints/  # REST endpoints (data, scraping, analysis)
+│   │   ├── api/endpoints/  # REST endpoints (data, scraping, analysis, auth)
 │   │   ├── models.py       # SQLAlchemy models
 │   │   ├── schemas.py      # Pydantic schemas
 │   │   └── services/       # Business logic (sentiment, analysis)
@@ -41,7 +58,12 @@ All three projects are now running and integrated:
 │   └── microservice/
 │       ├── main.py         # FastAPI app with WebSocket
 │       └── requirements-replit.txt
-├── db/                     # Database DDL scripts
+├── db/                     # Database DDL and seed scripts
+│   ├── ddl_postgres_final.sql
+│   ├── seed_parties.py     # 9 political parties data
+│   ├── seed_government.py  # Government data
+│   ├── seed_samples.py     # Sample data
+│   └── deploy.py           # Database deployment script
 └── docs/                   # Technical documentation
 ```
 
@@ -54,9 +76,11 @@ All three projects are now running and integrated:
 
 ### Backend Scrapping (port 8000)
 - `GET /health` - Health check
+- `POST /api/v1/auth/login` - Authentication with bcrypt
 - `GET /api/v1/data/stats` - Data statistics
 - `GET /api/v1/data/news` - News articles
 - `GET /api/v1/data/social` - Social posts
+- `GET /api/v1/data/government` - Government data
 - `POST /api/v1/scraping/trigger/news` - Trigger news scraping
 - `GET /api/v1/analysis/sentiment` - Sentiment analysis
 - `GET /api/v1/analysis/trends` - Trend analysis
@@ -73,46 +97,33 @@ All three projects are now running and integrated:
 
 ## Database
 PostgreSQL with 27+ tables across schemas:
-- `public`: Core tables (news_articles, raw_social_posts, government_data)
+- `public`: Core tables (news_articles, raw_social_posts, government_data, political_parties)
 - `realtime_data`: Live streaming data (live_streams)
 - `identity`: Users and authentication
 - `organization`: Tenants and campaigns
 
 ## Technologies
 - **Frontend**: React 18, Vite, TypeScript, TailwindCSS, Framer Motion, Recharts, Leaflet
-- **Backend**: FastAPI, SQLAlchemy, Pydantic, uvicorn
+- **Backend**: FastAPI, SQLAlchemy, Pydantic, uvicorn, bcrypt
 - **Database**: PostgreSQL (Neon-backed)
 - **Monitoring**: Prometheus metrics
 
 ## Recent Changes
 
-### 2025-12-25: Phase 4 - Frontend Data Integration (In Progress)
+### 2025-12-25: Dev Team Commit (a671a9d6)
+- Added `PLAN_DE_TRABAJO.md` with detailed task tracking
+- Added database seed scripts for political parties (9 parties)
+- Added seed scripts for government and sample data
+- Updated `useRealtimeData.ts` with real API integration
+- Added `update_parties_schema.py` for party data structure
+
+### 2025-12-25: Phase 4 - Frontend Data Integration
 **Completed:**
-- Task 1: Integrated real news data from backend
-  - Created `useDashboardData.ts` hook for dashboard metrics
-  - Updated `useSocialData.ts` for real social data with fallback
-  - Fixed division by zero in percentage calculations
-  - Fixed filters overwriting real data (allPosts pattern)
-
-- Task 2: Updated useRealtimeData for real data
-  - Integrated backend API calls (stats, sentiment, news, metrics, crisis-alerts)
-  - Added social posts fetching from `/api/v1/data/social` and `/api/recent`
-  - Normalized platform and sentiment values with safe fallbacks
-  - Uses nullish coalescing to preserve zero values
-
-- Task 3: Connected monitoring components with real data
-  - SocialFeed receives posts from useRealtimeData
-  - AlertsPanel shows real crisis alerts
-  - SentimentMeter displays real sentiment data
-  - NewsStream shows real news articles
-  - Fixed WebSocket hook type issue (NodeJS.Timeout)
-
-- Task 4: Dashboard verified with real data (In Progress)
-  - Dashboard.tsx uses useDashboardData hook
-  - TrendChart.tsx fetches from `/api/v1/analysis/trends`
-  - GeographicMap.tsx fetches regional data from sentiment API
-  - RealtimeAlerts.tsx uses useWebSocket for real-time alerts
-  - All components use nullish coalescing for proper fallbacks
+- Task 1-4: Integrated real news, social, sentiment data from backend
+- Created `useDashboardData.ts` hook for dashboard metrics
+- Connected all monitoring components with real data
+- TrendChart and GeographicMap fetch from backend APIs
+- Uses nullish coalescing (`??`) for proper zero value handling
 
 **Pending:**
 - Task 5: Complete authentication (sessions and tokens)
@@ -124,11 +135,7 @@ PostgreSQL with 27+ tables across schemas:
 - Database with 27 tables created and seeded
 - Real-time sentiment analysis working
 - WebSocket streaming configured
-- API endpoints fully functional
-- Authentication endpoint added (POST /api/v1/auth/login)
-- Frontend connected to real backend APIs
-- useWebSocket hook integrated with Backend-Sniffing
-- AuthContext updated to use backend authentication
+- Authentication with bcrypt added
 
 ## Key Frontend Hooks
 
@@ -145,3 +152,10 @@ PostgreSQL with 27+ tables across schemas:
 3. If no data or error, falls back to mock data
 4. `isUsingMockData` flag indicates data source to UI
 5. Nullish coalescing (`??`) used to preserve zero values
+
+## Design Decisions
+- **No Redis/Celery**: Replaced by FastAPI BackgroundTasks
+- **No Kafka**: Replaced by direct WebSocket broadcasting
+- **No heavy ML models**: Rule-based sentiment analysis (keywords)
+- **Port 8080 for Sniffing**: Port 8001 not available in Replit
+- **bcrypt authentication**: Secure password validation
