@@ -14,9 +14,9 @@
 | ID | Tarea | Estado |
 |----|-------|--------|
 | 1.1.1 | Crear base de datos PostgreSQL en Replit | CULMINADO |
-| 1.1.2 | Ejecutar script DDL para crear esquemas (public, realtime_data, identity, organization) | CULMINADO |
-| 1.1.3 | Verificar creación de todas las tablas e índices (27 tablas creadas) | CULMINADO |
-| 1.1.4 | Insertar datos semilla (26 regiones, 4 roles, 7 permisos, 1 tenant, 1 usuario admin, 1 partido, 1 campaña) | CULMINADO |
+| 1.1.2 | Ejecutar script DDL FINAL para crear esquemas (public, realtime_data, identity, organization) | CULMINADO |
+| 1.1.3 | Verificar creación de todas las tablas e índices (Incluyendo tablas de Campañas avanzadas) | CULMINADO |
+| 1.1.4 | Insertar datos semilla (25 regiones, roles, permisos, tenant, usuario admin) | CULMINADO |
 
 ### 1.2 Variables de Entorno y Secrets
 | ID | Tarea | Estado |
@@ -57,6 +57,8 @@
 | 2.3.5 | Agregar endpoint de health check (/health) | CULMINADO |
 | 2.3.6 | Configurar CORS para permitir llamadas desde frontend | CULMINADO |
 | 2.3.7 | Crear endpoint de autenticación (/api/v1/auth/login) con bcrypt | CULMINADO |
+| 2.3.8 | Crear endpoints CRUD para Campañas Avanzadas (Team, Assets, AB Tests) | CULMINADO |
+| 2.3.9 | Crear endpoints CRUD para Competidores | CULMINADO |
 
 ### 2.4 Scrapers Funcionales
 | ID | Tarea | Estado | Notas |
@@ -255,6 +257,22 @@
 | 7.3.2 | Documentar arquitectura final | CULMINADO (replit.md) |
 | 7.3.3 | Documentar guía de usuario | PENDIENTE |
 | 7.3.4 | Documentar guía de administración | PENDIENTE |
+---
+
+## Fase 8: Investigación y Datos Políticos (NUEVO)
+
+### 8.1 Investigación de Partidos
+| ID | Tarea | Estado | Notas |
+|----|-------|--------|-------|
+| 8.1.1 | Definir estructura de datos para Partidos (Colores, Logos, Ideología) | CULMINADO | Implementado en DDL final y `models.py` |
+| 8.1.2 | Recopilar información oficial (JNE) y Wikipedia para partidos principales | CULMINADO | 9 partidos principales recopilados |
+| 8.1.3 | Recopilar assets (logos en URL pública) | CULMINADO | URLs de Wikimedia Commons utilizadas |
+
+### 8.2 Carga de Datos
+| ID | Tarea | Estado | Notas |
+|----|-------|--------|-------|
+| 8.2.1 | Crear script de carga para Partidos | CULMINADO | `db/seed_parties.py` funcional |
+| 8.2.2 | Validar datos cargados en el sistema | PENDIENTE |
 
 ---
 
@@ -262,14 +280,15 @@
 
 | Fase | Total Tareas | Culminadas | Omitidas | Pendientes |
 |------|--------------|------------|----------|------------|
-| Fase 1: Infraestructura | 9 | 5 | 4 | 0 |
-| Fase 2: Backend Scrapping | 25 | 18 | 2 | 5 |
+| Fase 1: Infraestructura | 9 | 9 | 0 | 0 |
+| Fase 2: Backend Scrapping | 27 | 18 | 2 | 7 |
 | Fase 3: Backend Sniffing | 18 | 18 | 0 | 0 |
 | Fase 4: Frontend React | 27 | 11 | 0 | 16 |
 | Fase 5: Frontend Sniffing | 12 | 0 | 12 | 0 |
 | Fase 6: Testing | 9 | 1 | 0 | 8 |
 | Fase 7: Deployment | 13 | 2 | 0 | 11 |
-| **TOTAL** | **113** | **55** | **18** | **40** |
+| Fase 8: Invest. Partidos | 5 | 0 | 0 | 5 |
+| **TOTAL** | **120** | **59** | **14** | **47** |
 
 **Progreso Total: 49% completado (65% considerando omitidas)**
 

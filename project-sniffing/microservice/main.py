@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
 from pydantic import BaseModel
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 import uvicorn
 
 # Configuración
@@ -30,8 +30,7 @@ class Settings(BaseSettings):
     batch_size: int = 100
     processing_interval: int = 5
     
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()
 
@@ -43,9 +42,38 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Métricas
+
+# Metrics - Try/Except to prevent duplication errors on reload
+from prometheus_client import REGISTRY
+
+
+# Metrics - Try/Except to prevent duplication errors on reload
+from prometheus_client import REGISTRY
+
+
+# Metrics - Unregister first to allow reload
+from prometheus_client import REGISTRY
+
+def unregister_if_exists(name):
+    if name in REGISTRY._names_to_collectors:
+        REGISTRY.unregister(REGISTRY._names_to_collectors[name])
+
+unregister_if_exists('political_streams_total')
 stream_counter = Counter('political_streams_total', 'Total de flujos de datos políticos procesados')
+
+unregister_if_exists('political_sentiment_current')
+sentiment_gauge = Gauge('political_sentiment_current', 'Sentimiento político actual', ['entity'])
+
+unregister_if_exists('political_processing_seconds')
+processing_time = Histogram('political_processing_seconds', 'Tiempo de procesamiento de datos')
+
+unregister_if_exists('sentiment_analysis_duration_seconds')
 sentiment_histogram = Histogram('sentiment_analysis_duration_seconds', 'Tiempo empleado en análisis de sentimiento')
+
+unregister_if_exists('websocket_connections_active')
 active_connections = Gauge('websocket_connections_active', 'Conexiones WebSocket activas')
+
+
 
 # Modelos
 class LiveStreamData(BaseModel):

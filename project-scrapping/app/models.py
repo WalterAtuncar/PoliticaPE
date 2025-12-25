@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, Boolean, Float, Index
+from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, Boolean, Float, Index, Date, ForeignKey, Numeric
 from sqlalchemy.sql import func
 from app.database import Base
 import uuid
@@ -115,3 +115,104 @@ class ScrapingLog(Base):
         Index('idx_started_at', 'started_at'),
         Index('idx_status', 'status'),
     )
+
+# --- ORGANIZATION Models ---
+
+class Campaign(Base):
+    __tablename__ = "campaigns"
+    __table_args__ = {'schema': 'organization'}
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False)
+    party_id = Column(String, nullable=False)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    election = Column(String, nullable=False) # Enum in DB
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=True)
+    status = Column(String(20), default='active')
+    region_code = Column(String(10), nullable=True)
+    
+    objective = Column(String(50), nullable=True)
+    target_demographics = Column(JSON, nullable=True)
+    budget_details = Column(JSON, nullable=True)
+    performance_metrics = Column(JSON, nullable=True)
+    crisis_protocol = Column(JSON, nullable=True)
+    budget = Column(Numeric(14,2), default=0)
+    
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+class CampaignTeamMember(Base):
+    __tablename__ = "campaign_team_members"
+    __table_args__ = {'schema': 'organization'}
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False)
+    campaign_id = Column(String, ForeignKey("organization.campaigns.id"), nullable=False)
+    user_id = Column(String, nullable=True)
+    name = Column(String(200), nullable=False)
+    email = Column(String(255), nullable=True)
+    role = Column(String(50), nullable=False)
+    permissions = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+class CampaignAsset(Base):
+    __tablename__ = "campaign_assets"
+    __table_args__ = {'schema': 'organization'}
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False)
+    campaign_id = Column(String, ForeignKey("organization.campaigns.id"), nullable=False)
+    name = Column(String(200), nullable=False)
+    type = Column(String(50), nullable=False)
+    url = Column(String(1000), nullable=False)
+    size_bytes = Column(Integer, nullable=True)
+    tags = Column(JSON, nullable=True)
+    approval_status = Column(String(20), default='pending')
+    uploaded_by = Column(String, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+class ABTest(Base):
+    __tablename__ = "ab_tests"
+    __table_args__ = {'schema': 'organization'}
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False)
+    campaign_id = Column(String, ForeignKey("organization.campaigns.id"), nullable=False)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String(20), default='draft')
+    start_date = Column(DateTime, nullable=True)
+    end_date = Column(DateTime, nullable=True)
+    target_regions = Column(JSON, nullable=True)
+    results_summary = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+class ABTestVariant(Base):
+    __tablename__ = "ab_test_variants"
+    __table_args__ = {'schema': 'organization'}
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    test_id = Column(String, ForeignKey("organization.ab_tests.id"), nullable=False)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    creative_url = Column(String(1000), nullable=True)
+    message_copy = Column(Text, nullable=True)
+    traffic_allocation = Column(Integer, default=50)
+    metrics = Column(JSON, nullable=True)
+
+class CompetitorCampaign(Base):
+    __tablename__ = "competitor_campaigns"
+    __table_args__ = {'schema': 'organization'}
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False)
+    competitor_name = Column(String(200), nullable=False)
+    campaign_name = Column(String(200), nullable=False)
+    detected_at = Column(DateTime, default=func.now())
+    regions = Column(JSON, nullable=True)
+    estimated_budget = Column(Numeric(14,2), nullable=True)
+    sentiment_score = Column(Numeric(4,3), nullable=True)
+    key_messages = Column(JSON, nullable=True)
+    platforms = Column(JSON, nullable=True)

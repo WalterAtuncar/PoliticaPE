@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, date
 
 class NewsArticleResponse(BaseModel):
     id: str
@@ -110,3 +110,120 @@ class TrendAnalysisResponse(BaseModel):
     period_days: int
     keyword_trends: Dict[str, List[Dict[str, Any]]]
     correlation_matrix: Dict[str, Dict[str, float]]
+
+# --- CAMPAIGN SCHEMAS ---
+
+class CampaignBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    election: str
+    start_date: date
+    end_date: Optional[date] = None
+    status: str = "active"
+    region_code: Optional[str] = None
+    objective: Optional[str] = None
+    target_demographics: Optional[Dict[str, Any]] = None
+    budget_details: Optional[Dict[str, Any]] = None
+    performance_metrics: Optional[Dict[str, Any]] = None
+    crisis_protocol: Optional[Dict[str, Any]] = None
+    budget: float = 0.0
+
+class CampaignCreate(CampaignBase):
+    tenant_id: str
+    party_id: str
+
+class CampaignUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    end_date: Optional[date] = None
+    budget_details: Optional[Dict[str, Any]] = None
+    performance_metrics: Optional[Dict[str, Any]] = None
+    crisis_protocol: Optional[Dict[str, Any]] = None
+
+class CampaignResponse(CampaignBase):
+    id: str
+    tenant_id: str
+    party_id: str
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class CampaignTeamMemberBase(BaseModel):
+    name: str
+    email: Optional[str] = None
+    role: str
+    permissions: Optional[Dict[str, Any]] = None
+
+class CampaignTeamMemberCreate(CampaignTeamMemberBase):
+    user_id: Optional[str] = None
+
+class CampaignTeamMemberResponse(CampaignTeamMemberBase):
+    id: str
+    campaign_id: str
+    user_id: Optional[str]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class CampaignAssetBase(BaseModel):
+    name: str
+    type: str
+    url: str
+    size_bytes: Optional[int] = None
+    tags: Optional[List[str]] = None
+
+class CampaignAssetCreate(CampaignAssetBase):
+    pass
+
+class CampaignAssetResponse(CampaignAssetBase):
+    id: str
+    campaign_id: str
+    approval_status: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class ABTestBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    status: str = "draft"
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    target_regions: Optional[List[str]] = None
+
+class ABTestCreate(ABTestBase):
+    pass
+
+class ABTestResponse(ABTestBase):
+    id: str
+    campaign_id: str
+    results_summary: Optional[Dict[str, Any]]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class CompetitorCampaignBase(BaseModel):
+    competitor_name: str
+    campaign_name: str
+    regions: Optional[List[str]] = None
+    estimated_budget: Optional[float] = None
+    sentiment_score: Optional[float] = None
+    key_messages: Optional[List[str]] = None
+    platforms: Optional[List[str]] = None
+
+class CompetitorCampaignCreate(CompetitorCampaignBase):
+    tenant_id: str
+
+class CompetitorCampaignResponse(CompetitorCampaignBase):
+    id: str
+    tenant_id: str
+    detected_at: datetime
+    
+    class Config:
+        from_attributes = True

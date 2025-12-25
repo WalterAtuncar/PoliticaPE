@@ -1,15 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { API_CONFIG, ENDPOINTS } from '../config/api';
-import { 
-  SocialPost, 
-  Alert, 
-  MentionData, 
-  HashtagData, 
-  NewsItem, 
-  SentimentData, 
-  InfluencerData, 
+import {
+  SocialPost,
+  Alert,
+  MentionData,
+  HashtagData,
+  NewsItem,
+  SentimentData,
+  InfluencerData,
   DetectedEvent,
-  MonitoringFilters 
+  MonitoringFilters
 } from '../types/monitoring';
 
 interface RealtimeData {
@@ -127,14 +127,14 @@ const defaultSocialPosts: SocialPost[] = [
 
 export const useRealtimeData = (filters: MonitoringFilters): RealtimeData => {
   const [data, setData] = useState<RealtimeData>({
-    socialPosts: defaultSocialPosts,
+    socialPosts: [],
     alerts: [],
-    mentions: defaultMentions,
-    hashtags: defaultHashtags,
+    mentions: [],
+    hashtags: [],
     news: [],
-    sentiment: defaultSentiment,
-    influencers: defaultInfluencers,
-    events: defaultEvents,
+    sentiment: defaultSentiment, // Keep sentiment default structure for null safety
+    influencers: [],
+    events: [],
     isConnected: false,
     latency: 0,
     lastUpdate: new Date(),
@@ -142,7 +142,7 @@ export const useRealtimeData = (filters: MonitoringFilters): RealtimeData => {
 
   const fetchBackendData = useCallback(async () => {
     const startTime = Date.now();
-    
+
     try {
       const [statsRes, sentimentRes, newsRes, metricsRes, crisisRes, socialRes, recentRes] = await Promise.allSettled([
         fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.STATS}`),
@@ -278,10 +278,10 @@ export const useRealtimeData = (filters: MonitoringFilters): RealtimeData => {
 
       setData(prev => ({
         ...prev,
-        news: newsItems.length > 0 ? newsItems : prev.news,
+        news: newsItems,
         sentiment: updatedSentiment,
-        alerts: newAlerts.length > 0 ? newAlerts : prev.alerts,
-        socialPosts: socialPosts.length > 0 ? socialPosts : prev.socialPosts,
+        alerts: newAlerts,
+        socialPosts: socialPosts,
         isConnected: true,
         latency,
         lastUpdate: new Date(),
@@ -296,11 +296,11 @@ export const useRealtimeData = (filters: MonitoringFilters): RealtimeData => {
   useEffect(() => {
     fetchBackendData();
     setData(prev => ({ ...prev, isConnected: true }));
-    
+
     if (!filters.autoRefresh) return;
-    
+
     const interval = setInterval(fetchBackendData, filters.refreshRate * 1000);
-    
+
     return () => {
       clearInterval(interval);
     };
