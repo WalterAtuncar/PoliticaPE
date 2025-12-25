@@ -139,10 +139,13 @@ def seed_parties(cur, tenant_id):
                 INSERT INTO organization.parties 
                 (tenant_id, name, short_name, slug, color, logo_url, website, founded_date, ideology, spectrum)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (tenant_id, slug) DO UPDATE SET
-                    name = EXCLUDED.name,
+                ON CONFLICT (tenant_id, name) DO UPDATE SET
+                    short_name = EXCLUDED.short_name,
+                    slug = EXCLUDED.slug,
                     color = EXCLUDED.color,
                     logo_url = EXCLUDED.logo_url,
+                    website = EXCLUDED.website,
+                    founded_date = EXCLUDED.founded_date,
                     ideology = EXCLUDED.ideology,
                     spectrum = EXCLUDED.spectrum
                 RETURNING id;
@@ -150,10 +153,13 @@ def seed_parties(cur, tenant_id):
                 tenant_id, p['name'], p['short_name'], p['slug'], p['color'], 
                 p['logo_url'], p['website'], p['founded_date'], p['ideology'], p['spectrum']
             ))
-            if cur.fetchone():
+            result = cur.fetchone()
+            if result:
                 inserted += 1
+                log(f"    + {p['name']} ({p['short_name']})")
         except Exception as e:
             log(f"  Error inserting {p['name']}: {e}")
+            cur.connection.rollback()
     
     log(f"  Inserted/Updated {inserted} parties")
     return inserted
