@@ -57,48 +57,43 @@ def test_credentials():
     }
 
 def test_token_validity(creds):
-    """Test 1: Verify the access token is valid using debug_token endpoint"""
+    """Test 1: Verify the access token is valid by calling /me endpoint"""
     print("🔄 Test 1: Verificando validez del token...")
     
-    app_token = f"{creds['app_id']}|{creds['app_secret']}"
+    result = call_graph_api("me", {
+        "access_token": creds["graph_token"],
+        "fields": "id,name"
+    })
     
-    result = call_graph_api("debug_token", {
+    if not result["success"]:
+        error_code = result.get("error_code")
+        print(f"❌ Token inválido: {result.get('error_message')}")
+        if error_code == 190:
+            print("   💡 El token ha expirado. Genera uno nuevo en Graph API Explorer")
+        return False
+    
+    print("✅ Token VÁLIDO")
+    print(f"   Usuario: {result['data'].get('name', 'Unknown')}")
+    print(f"   ID: {result['data'].get('id')}")
+    
+    app_token = f"{creds['app_id']}|{creds['app_secret']}"
+    debug_result = call_graph_api("debug_token", {
         "input_token": creds["graph_token"],
         "access_token": app_token
     })
     
-    if not result["success"]:
-        print(f"❌ Error al verificar token: {result.get('error_message')}")
-        if result.get("error_code") == 190:
-            print("   💡 El token ha expirado. Genera uno nuevo en Graph API Explorer")
-        return False
-    
-    data = result["data"].get("data", {})
-    
-    if not data.get("is_valid"):
-        print("❌ Token INVÁLIDO")
-        error_msg = data.get("error", {}).get("message", "Unknown")
-        print(f"   Error: {error_msg}")
-        return False
-    
-    print("✅ Token VÁLIDO")
-    
-    scopes = data.get("scopes", [])
-    print(f"   Permisos: {', '.join(scopes) if scopes else 'Ninguno'}")
-    
-    expires_at = data.get("expires_at", 0)
-    if expires_at == 0:
-        print("   Expiración: Nunca (token de larga duración)")
-    else:
-        from datetime import datetime
-        exp_date = datetime.fromtimestamp(expires_at)
-        print(f"   Expiración: {exp_date.strftime('%Y-%m-%d %H:%M')}")
-    
-    required_perms = ["pages_show_list", "pages_read_engagement"]
-    missing_perms = [p for p in required_perms if p not in scopes]
-    if missing_perms:
-        print(f"   ⚠️ Permisos faltantes: {', '.join(missing_perms)}")
-        print("   💡 Agrega estos permisos en Graph API Explorer y genera nuevo token")
+    if debug_result["success"]:
+        data = debug_result["data"].get("data", {})
+        scopes = data.get("scopes", [])
+        print(f"   Permisos: {', '.join(scopes) if scopes else 'No disponible'}")
+        
+        expires_at = data.get("expires_at", 0)
+        if expires_at == 0:
+            print("   Expiración: Nunca (token de larga duración)")
+        elif expires_at:
+            from datetime import datetime
+            exp_date = datetime.fromtimestamp(expires_at)
+            print(f"   Expiración: {exp_date.strftime('%Y-%m-%d %H:%M')}")
     
     return True
 
