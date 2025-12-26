@@ -81,5 +81,5 @@ externalPort = 8080
 [deployment]
 deploymentTarget = "static"
 run = ["bash", "-c", "npx serve -s project-react/dist -l 5000"]
-build = ["bash", "-c", "cd project-react && npm install && npm run build"]
+build = ["bash", "-c", "cd project-react && npm install && npx vite build"]
 publicDir = "project-react/dist"
