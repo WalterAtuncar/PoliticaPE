@@ -9,10 +9,58 @@ import logo from '../../assets/logo.png';
 
 interface LoginFormProps {
   onForgotPassword: () => void;
-  onRegister: () => void;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onForgotPassword, onRegister }) => {
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.12,
+      delayChildren: 0.1
+    }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring",
+      stiffness: 100,
+      damping: 12
+    }
+  }
+};
+
+const logoVariants = {
+  hidden: { opacity: 0, scale: 0.5, rotate: -10 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    rotate: 0,
+    transition: {
+      type: "spring",
+      stiffness: 200,
+      damping: 15,
+      duration: 0.8
+    }
+  },
+  hover: {
+    scale: 1.05,
+    rotate: [0, -5, 5, 0],
+    transition: {
+      rotate: {
+        duration: 0.5,
+        ease: "easeInOut"
+      }
+    }
+  }
+};
+
+export const LoginForm: React.FC<LoginFormProps> = ({ onForgotPassword }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -55,33 +103,48 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onForgotPassword, onRegist
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
       className="w-full max-w-md mx-auto"
     >
       <div className="text-center mb-8">
-        <img src={logo} alt="PoliticaPE Logo" className="w-[120px] h-[120px] mx-auto mb-4" />
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+        <motion.img 
+          src={logo} 
+          alt="PoliticaPE Logo" 
+          className="w-[120px] h-[120px] mx-auto mb-4"
+          variants={logoVariants}
+          whileHover="hover"
+        />
+        <motion.h1 
+          variants={itemVariants}
+          className="text-3xl font-bold text-gray-900 dark:text-white mb-2"
+        >
           Política PE
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
+        </motion.h1>
+        <motion.p 
+          variants={itemVariants}
+          className="text-gray-600 dark:text-gray-400"
+        >
           Plataforma de monitoreo y análisis<br />
           político peruano en tiempo real
-        </p>
+        </motion.p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <Input
-          label="Email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          error={errors.email}
-          icon={<Mail />}
-          placeholder="tu@email.com"
-        />
+        <motion.div variants={itemVariants}>
+          <Input
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            error={errors.email}
+            icon={<Mail />}
+            placeholder="tu@email.com"
+          />
+        </motion.div>
 
-        <div className="relative">
+        <motion.div variants={itemVariants} className="relative">
           <Input
             label="Contraseña"
             type={showPassword ? 'text' : 'password'}
@@ -91,17 +154,22 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onForgotPassword, onRegist
             icon={<Lock />}
             placeholder="••••••••"
           />
-          <button
+          <motion.button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
             className="absolute right-3 top-8 text-gray-400 hover:text-gray-600"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
           >
             {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
 
-        <div className="flex items-center justify-between">
-          <label className="flex items-center">
+        <motion.div 
+          variants={itemVariants}
+          className="flex items-center justify-between"
+        >
+          <label className="flex items-center cursor-pointer">
             <input
               type="checkbox"
               checked={rememberMe}
@@ -112,24 +180,32 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onForgotPassword, onRegist
               Recordarme
             </span>
           </label>
-          <button
+          <motion.button
             type="button"
             onClick={onForgotPassword}
             className="text-sm text-blue-600 hover:text-blue-500 font-medium"
+            whileHover={{ scale: 1.05, x: 3 }}
+            whileTap={{ scale: 0.95 }}
           >
             ¿Olvidaste tu contraseña?
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
 
-        <Button
-          type="submit"
-          variant="primary"
-          size="lg"
-          isLoading={isLoading}
-          className="w-full"
+        <motion.div
+          variants={itemVariants}
+          whileHover={{ scale: 1.02, boxShadow: "0 10px 30px rgba(59, 130, 246, 0.3)" }}
+          whileTap={{ scale: 0.98 }}
         >
-          Iniciar Sesión
-        </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            isLoading={isLoading}
+            className="w-full"
+          >
+            Iniciar Sesión
+          </Button>
+        </motion.div>
       </form>
 
     </motion.div>
