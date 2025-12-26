@@ -23,8 +23,8 @@ interface SidebarProps {
 }
 
 const menuItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: Home },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { id: 'dashboard', label: 'Panel Principal', icon: Home },
+  { id: 'analytics', label: 'Analítica', icon: BarChart3 },
   { id: 'geographic', label: 'Análisis Geográfico', icon: Globe },
   { id: 'monitoring', label: 'Monitoreo Tiempo Real', icon: Activity },
   { id: 'recommendations', label: 'Recomendaciones IA', icon: Brain },
@@ -57,7 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <div>
                 <h1 className="font-bold text-gray-900 dark:text-white">PolíticaPE</h1>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Analytics Platform</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Plataforma de Análisis</p>
               </div>
             )}
           </motion.div>

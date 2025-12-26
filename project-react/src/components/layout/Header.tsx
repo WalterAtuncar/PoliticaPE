@@ -20,8 +20,8 @@ interface HeaderProps {
 }
 
 const sectionTitles = {
-  dashboard: 'Dashboard',
-  analytics: 'Analytics Avanzado',
+  dashboard: 'Panel Principal',
+  analytics: 'Analítica Avanzada',
   geographic: 'Análisis Geográfico',
   monitoring: 'Monitoreo en Tiempo Real',
   recommendations: 'Recomendaciones IA',
