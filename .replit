@@ -79,6 +79,7 @@ localPort = 8080
 externalPort = 8080
 
 [deployment]
-deploymentTarget = "autoscale"
+deploymentTarget = "static"
 run = ["bash", "-c", "npx serve -s project-react/dist -l 5000"]
-build = ["bash", "-c", "npm install --prefix project-react && npm run build --prefix project-react"]
+build = ["bash", "-c", "cd project-react && npm install && npm run build"]
+publicDir = "project-react/dist"
