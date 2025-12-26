@@ -62,10 +62,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onForgotPassword, onRegist
       <div className="text-center mb-8">
         <img src={logo} alt="PoliticaPE Logo" className="w-24 h-24 mx-auto mb-4" />
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Análisis Político Perú
+          Política PE
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Plataforma de monitoreo y análisis político en tiempo real
+          Plataforma de monitoreo y análisis<br />
+          político peruano en tiempo real
         </p>
       </div>
 
