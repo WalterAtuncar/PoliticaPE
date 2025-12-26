@@ -80,5 +80,5 @@ externalPort = 8080
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["npm", "--prefix", "project-react", "run", "preview", "--", "--host", "0.0.0.0", "--port", "5000"]
-build = ["npm", "--prefix", "project-react", "run", "build"]
+run = ["bash", "-c", "cd project-react && npx serve -s dist -l 5000"]
+build = ["bash", "-c", "cd project-react && npm run build"]

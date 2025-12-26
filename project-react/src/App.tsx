@@ -1,11 +1,14 @@
 import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useAuth } from './contexts/AuthContext';
 import { AuthPage } from './pages/AuthPage';
 import { MainApp } from './pages/MainApp';
+import { TermsOfServicePage } from './pages/TermsOfServicePage';
+import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 
-const AppContent: React.FC = () => {
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -19,16 +22,35 @@ const AppContent: React.FC = () => {
     );
   }
 
-  return isAuthenticated ? <MainApp /> : <AuthPage />;
+  return isAuthenticated ? <>{children}</> : <AuthPage />;
 };
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/terms" element={<TermsOfServicePage />} />
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
+      <Route 
+        path="/*" 
+        element={
+          <ProtectedRoute>
+            <MainApp />
+          </ProtectedRoute>
+        } 
+      />
+    </Routes>
+  );
+}
 
 function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </ThemeProvider>
+    <BrowserRouter>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   );
 }
 
