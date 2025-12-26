@@ -134,3 +134,42 @@ async def get_task_status(task_id: str):
         "result": None,
         "traceback": None
     }
+
+@router.get("/test/youtube")
+async def test_youtube_api():
+    """Test YouTube API connection and search"""
+    from app.scrapers.social_scrapers import YouTubeScraper
+    
+    scraper = YouTubeScraper()
+    
+    if not scraper.api_key:
+        return {
+            "status": "error",
+            "message": "YOUTUBE_API_KEY no está configurado",
+            "api_key_configured": False
+        }
+    
+    try:
+        videos = scraper._search_videos("política perú", max_results=5)
+        
+        return {
+            "status": "success",
+            "message": "Conexión a YouTube API exitosa",
+            "api_key_configured": True,
+            "videos_found": len(videos),
+            "sample_videos": [
+                {
+                    "id": v.get("post_id"),
+                    "author": v.get("author"),
+                    "content": v.get("content", "")[:100] + "..." if len(v.get("content", "")) > 100 else v.get("content", ""),
+                    "created_at": str(v.get("created_at"))
+                }
+                for v in videos[:3]
+            ]
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Error al conectar con YouTube API: {str(e)}",
+            "api_key_configured": True
+        }

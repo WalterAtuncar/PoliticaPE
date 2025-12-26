@@ -120,6 +120,14 @@ class TwitterScraper(BaseScraper):
             model_class.post_id == item_data['post_id']
         ).first()
         return existing is not None
+    
+    def _parse_content(self, response) -> List[Dict[str, Any]]:
+        """Parse Twitter API response"""
+        try:
+            data = response.json()
+            return self._parse_twitter_response(data)
+        except:
+            return []
 
 class FacebookScraper(BaseScraper):
     """Facebook Graph API scraper"""
@@ -215,6 +223,14 @@ class FacebookScraper(BaseScraper):
             model_class.post_id == item_data['post_id']
         ).first()
         return existing is not None
+    
+    def _parse_content(self, response) -> List[Dict[str, Any]]:
+        """Parse Facebook API response"""
+        try:
+            data = response.json()
+            return self._parse_facebook_response(data)
+        except:
+            return []
 
 class InstagramScraper(BaseScraper):
     """Instagram Basic Display API scraper"""
@@ -309,6 +325,14 @@ class InstagramScraper(BaseScraper):
             model_class.post_id == item_data['post_id']
         ).first()
         return existing is not None
+    
+    def _parse_content(self, response) -> List[Dict[str, Any]]:
+        """Parse Instagram API response"""
+        try:
+            data = response.json()
+            return self._parse_instagram_response(data)
+        except:
+            return []
 
 class YouTubeScraper(BaseScraper):
     """YouTube Data API v3 scraper"""
@@ -412,3 +436,11 @@ class YouTubeScraper(BaseScraper):
             model_class.post_id == item_data['post_id']
         ).first()
         return existing is not None
+    
+    def _parse_content(self, response) -> List[Dict[str, Any]]:
+        """Parse YouTube API response"""
+        try:
+            data = response.json()
+            return self._parse_youtube_response(data)
+        except:
+            return []
