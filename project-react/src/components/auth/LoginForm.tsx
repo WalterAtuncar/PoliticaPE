@@ -129,18 +129,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onForgotPassword, onRegist
         </Button>
       </form>
 
-      <div className="mt-6 text-center">
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          ¿No tienes una cuenta?{' '}
-          <button
-            onClick={onRegister}
-            className="text-blue-600 hover:text-blue-500 font-medium"
-          >
-            Regístrate aquí
-          </button>
-        </p>
-      </div>
-
     </motion.div>
   );
 };
