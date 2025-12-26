@@ -13,6 +13,7 @@ import {
   Users,
   MessageSquare
 } from 'lucide-react';
+import logo from '../../assets/logo.png';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -52,9 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             animate={{ opacity: isCollapsed ? 0 : 1 }}
             className="flex items-center space-x-3"
           >
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <BarChart3 className="h-5 w-5 text-white" />
-            </div>
+            <img src={logo} alt="PoliticaPE Logo" className="w-10 h-10 object-contain" />
             {!isCollapsed && (
               <div>
                 <h1 className="font-bold text-gray-900 dark:text-white">PolíticaPE</h1>

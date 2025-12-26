@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import toast from 'react-hot-toast';
+import logo from '../../assets/logo.png';
 
 interface LoginFormProps {
   onForgotPassword: () => void;
@@ -59,6 +60,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onForgotPassword, onRegist
       className="w-full max-w-md mx-auto"
     >
       <div className="text-center mb-8">
+        <img src={logo} alt="PoliticaPE Logo" className="w-24 h-24 mx-auto mb-4" />
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
           Análisis Político Perú
         </h1>
