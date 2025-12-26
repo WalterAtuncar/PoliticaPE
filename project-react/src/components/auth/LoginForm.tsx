@@ -12,8 +12,8 @@ interface LoginFormProps {
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({ onForgotPassword, onRegister }) => {
-  const [email, setEmail] = useState('admin@politica.pe');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
@@ -141,15 +141,6 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onForgotPassword, onRegist
         </p>
       </div>
 
-      <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-        <p className="text-sm text-blue-800 dark:text-blue-300 font-medium mb-2">
-          Credenciales de demo:
-        </p>
-        <p className="text-xs text-blue-700 dark:text-blue-400">
-          Email: admin@politica.pe<br />
-          Contraseña: password123
-        </p>
-      </div>
     </motion.div>
   );
 };
