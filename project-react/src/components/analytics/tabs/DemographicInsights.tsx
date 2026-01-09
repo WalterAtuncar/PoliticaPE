@@ -181,6 +181,9 @@ export const DemographicInsights: React.FC<DemographicInsightsProps> = ({ filter
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Engagement por Región
             </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+              Datos combinados de Twitter y YouTube
+            </p>
             {hasRegions ? (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={regions} layout="vertical">
@@ -194,8 +197,16 @@ export const DemographicInsights: React.FC<DemographicInsightsProps> = ({ filter
                       borderRadius: '8px',
                       color: '#F9FAFB',
                     }}
+                    formatter={(value: number, name: string, props: { payload: { posts?: number; likes?: number } }) => {
+                      if (name === 'Engagement Rate') {
+                        return [`${value.toFixed(1)}`, 'Engagement Rate'];
+                      }
+                      return [value, name];
+                    }}
+                    labelFormatter={(label) => `Región: ${label}`}
                   />
-                  <Bar dataKey="engagement" fill="#8B5CF6" name="Engagement" />
+                  <Bar dataKey="engagement" fill="#8B5CF6" name="Engagement Rate" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="posts" fill="#3B82F6" name="Posts" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

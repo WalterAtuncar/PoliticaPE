@@ -91,7 +91,8 @@ class YouTubeScraper:
                             "thumbnail": snippet.get("thumbnails", {}).get("high", {}).get("url"),
                             "video_url": f"https://www.youtube.com/watch?v={video_id}"
                         },
-                        "geographic_location": "Perú"
+                        "geographic_location": "Perú",
+                        "region": "Nacional"
                     }
                     videos.append(processed_video)
                 

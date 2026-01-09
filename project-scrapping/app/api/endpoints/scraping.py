@@ -156,6 +156,7 @@ async def run_youtube_scraping(db_url: str, query: str = None, max_results: int 
                 engagement_metrics=video["engagement_metrics"],
                 extra_metadata=video.get("metadata"),
                 geographic_location=video.get("geographic_location"),
+                region=video.get("region", "Nacional"),
                 sentiment_score=sentiment_score,
                 processed=True
             )
