@@ -110,6 +110,29 @@ PostgreSQL with 27+ tables across schemas:
 
 ## Recent Changes
 
+### 2026-01-09: Complete Mock Data Elimination
+**Backend Analysis Endpoints:**
+- Added 7 new analysis endpoints: `/analysis/time-series`, `/analysis/platform-breakdown`, `/analysis/share-of-voice`, `/analysis/top-posts`, `/analysis/trending-topics`, `/analysis/regional-engagement`, `/analysis/engagement`
+- All endpoints extract real data from `NewsArticle` and `RawSocialPost` tables
+- Share of voice uses keyword matching for parties/political figures
+
+**Frontend Hooks Architecture:**
+- Created `useAdvancedAnalytics.ts` with 7 specialized hooks for analytics data
+- Cleaned all data hooks removing mock fallbacks: `useNewsData`, `useDashboardData`, `useSocialData`, `useAnalyticsData`, `useGovernmentData`
+- All hooks handle loading/error/empty states properly
+
+**Analytics Components Updated:**
+- `TrendAnalysis`, `EngagementMetrics`, `ShareOfVoice`, `DemographicInsights` consume real data
+- Components display "no data available" messages when backend returns empty arrays
+- `GeographicMap` and `Header` updated to fetch real data from APIs
+
+**Mock Data Infrastructure Removed:**
+- Deleted `mockData.ts` file completely
+- Removed all imports and references to mock data
+- Platform now uses ONLY real database data
+
+**Data Policy:** NO mock data under any circumstances - empty states shown when no data available
+
 ### 2026-01-09: Production Deployment Configuration
 **Reverse Proxy Gateway:**
 - Added httpx-based proxy routes in scrapping backend for sniffing service endpoints
