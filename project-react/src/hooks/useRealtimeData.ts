@@ -26,16 +26,6 @@ interface RealtimeData {
   lastUpdate: Date;
 }
 
-const defaultMentions: MentionData[] = [
-  { id: '1', name: 'Dina Boluarte', party: 'Independiente', count: 2100, trend: -15, sentiment: -0.15 },
-  { id: '2', name: 'Keiko Fujimori', party: 'Fuerza Popular', count: 1850, trend: -8, sentiment: -0.22 },
-  { id: '3', name: 'Congreso', party: 'Institucional', count: 1200, trend: 25, sentiment: 0.08 },
-];
-
-const defaultHashtags: HashtagData[] = [
-  { id: '1', tag: 'PeruPolitica', count: 1250, trend: 45, sentiment: 0.15, reach: 85000 },
-  { id: '2', tag: 'Congreso', count: 980, trend: 22, sentiment: -0.08, reach: 65000 },
-];
 
 const defaultSentiment: SentimentData = {
   national: 0.18,
@@ -47,83 +37,6 @@ const defaultSentiment: SentimentData = {
   ],
 };
 
-const defaultInfluencers: InfluencerData[] = [
-  {
-    id: '1',
-    name: 'Analista Politico',
-    handle: '@analistaperu',
-    avatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?w=100&h=100&fit=crop&crop=face',
-    followers: 125000,
-    posts: 45,
-    mentions: 890,
-    engagement: 12.5,
-    influence: 9,
-    trend: 15,
-    recentActivity: 'Comentó sobre la coyuntura política',
-  },
-];
-
-const defaultEvents: DetectedEvent[] = [];
-
-const defaultSocialPosts: SocialPost[] = [
-  {
-    id: '1',
-    platform: 'twitter',
-    content: 'Análisis del panorama político actual en el Perú. La situación económica sigue siendo tema central en la agenda.',
-    author: 'Analista Político',
-    authorAvatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?w=100&h=100&fit=crop&crop=face',
-    timestamp: new Date(),
-    likes: 245,
-    comments: 89,
-    shares: 45,
-    engagement: 8.5,
-    sentiment: 'neutral',
-    region: 'Lima',
-    hashtags: ['PeruPolitica', 'Economia'],
-    mentions: ['congreso'],
-    reach: 15000,
-    influence: 7,
-    isViral: false,
-  },
-  {
-    id: '2',
-    platform: 'facebook',
-    content: 'Nueva propuesta legislativa genera debate en redes sociales. Ciudadanos expresan opiniones diversas.',
-    author: 'Observatorio Político',
-    authorAvatar: 'https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg?w=100&h=100&fit=crop&crop=face',
-    timestamp: new Date(Date.now() - 300000),
-    likes: 567,
-    comments: 234,
-    shares: 123,
-    engagement: 12.3,
-    sentiment: 'positive',
-    region: 'Arequipa',
-    hashtags: ['Congreso', 'Debate'],
-    mentions: ['legislacion'],
-    reach: 45000,
-    influence: 8,
-    isViral: true,
-  },
-  {
-    id: '3',
-    platform: 'instagram',
-    content: 'Encuesta revela tendencias de opinión pública sobre gestión gubernamental.',
-    author: 'Datos Perú',
-    authorAvatar: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?w=100&h=100&fit=crop&crop=face',
-    timestamp: new Date(Date.now() - 600000),
-    likes: 890,
-    comments: 156,
-    shares: 78,
-    engagement: 6.7,
-    sentiment: 'negative',
-    region: 'Cusco',
-    hashtags: ['Encuesta', 'Opinion'],
-    mentions: ['gobierno'],
-    reach: 28000,
-    influence: 6,
-    isViral: false,
-  },
-];
 
 export const useRealtimeData = (filters: MonitoringFilters): RealtimeData => {
   const [data, setData] = useState<RealtimeData>({
@@ -144,9 +57,9 @@ export const useRealtimeData = (filters: MonitoringFilters): RealtimeData => {
     const startTime = Date.now();
 
     try {
-      const [statsRes, sentimentRes, newsRes, metricsRes, crisisRes, socialRes, recentRes] = await Promise.allSettled([
+      const [, sentimentRes, newsRes, , crisisRes, socialRes, recentRes] = await Promise.allSettled([
         fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.STATS}`),
-        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SENTIMENT}`),
+        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SENTIMENT}?source_type=news`),
         fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.NEWS}?limit=10`),
         fetch(`${API_CONFIG.SNIFFING_BASE_URL}${ENDPOINTS.METRICS}`),
         fetch(`${API_CONFIG.SNIFFING_BASE_URL}/api/crisis-alerts`),
@@ -159,7 +72,8 @@ export const useRealtimeData = (filters: MonitoringFilters): RealtimeData => {
       let newsItems: NewsItem[] = [];
       if (newsRes.status === 'fulfilled' && newsRes.value.ok) {
         const newsData = await newsRes.value.json();
-        newsItems = (newsData.articles || []).map((article: any) => ({
+        const newsArray = Array.isArray(newsData) ? newsData : (newsData.articles || []);
+        newsItems = newsArray.map((article: any) => ({
           id: article.id || String(Math.random()),
           title: article.title,
           summary: article.content?.substring(0, 150) || '',
@@ -221,10 +135,15 @@ export const useRealtimeData = (filters: MonitoringFilters): RealtimeData => {
       let socialPosts: SocialPost[] = [];
       if (socialRes.status === 'fulfilled' && socialRes.value.ok) {
         const socialData = await socialRes.value.json();
-        socialPosts = (socialData.posts || [])
+        const socialArray = Array.isArray(socialData) ? socialData : (socialData.posts || []);
+        socialPosts = socialArray
           .filter((post: any) => post && (post.content || post.text))
           .map((post: any) => {
+            const metrics = post.engagement_metrics || {};
             const postId = post.id || String(Date.now() + Math.random());
+            const likes = metrics.likes ?? post.likes ?? Math.floor(Math.random() * 500) + 10;
+            const comments = metrics.comments ?? post.comments ?? Math.floor(Math.random() * 100) + 5;
+            const shares = metrics.shares ?? post.shares ?? Math.floor(Math.random() * 50) + 2;
             return {
               id: postId,
               platform: normalizePlatform(post.platform),
@@ -232,17 +151,17 @@ export const useRealtimeData = (filters: MonitoringFilters): RealtimeData => {
               author: post.author || post.username || 'Usuario',
               authorAvatar: post.avatar || `https://i.pravatar.cc/100?u=${postId}`,
               timestamp: new Date(post.created_at || post.timestamp || Date.now()),
-              likes: typeof post.likes === 'number' ? post.likes : Math.floor(Math.random() * 500) + 10,
-              comments: typeof post.comments === 'number' ? post.comments : Math.floor(Math.random() * 100) + 5,
-              shares: typeof post.shares === 'number' ? post.shares : Math.floor(Math.random() * 50) + 2,
+              likes,
+              comments,
+              shares,
               engagement: typeof post.engagement_rate === 'number' ? post.engagement_rate : Math.random() * 10 + 1,
               sentiment: normalizeSentiment(post.sentiment_score),
-              region: post.region || 'Lima',
+              region: post.geographic_location || post.region || 'Lima',
               hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
               mentions: Array.isArray(post.mentions) ? post.mentions : [],
               reach: typeof post.reach === 'number' ? post.reach : Math.floor(Math.random() * 20000) + 1000,
               influence: typeof post.influence === 'number' ? post.influence : Math.floor(Math.random() * 10) + 1,
-              isViral: Boolean(post.is_viral) || (typeof post.engagement === 'number' && post.engagement > 1000),
+              isViral: Boolean(post.is_viral) || (likes + comments + shares > 1000),
             };
           });
       }

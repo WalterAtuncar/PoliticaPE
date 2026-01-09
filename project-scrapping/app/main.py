@@ -1,18 +1,28 @@
-from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi import FastAPI, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import logging
 from loguru import logger
 import sys
+import os
+import httpx
+import websockets
+import asyncio
 
 from app.config import settings
 from app.database import init_db
 from app.api import api_router
 from app.monitoring import setup_metrics, metrics_middleware
 from app.utils.logging import setup_logging
+
+FRONTEND_DIST_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "project-react", "dist")
+SNIFFING_URL = os.getenv("SNIFFING_URL", "http://localhost:8080")
+SNIFFING_WS_URL = os.getenv("SNIFFING_WS_URL", "ws://localhost:8080")
+SERVE_FRONTEND = os.getenv("SERVE_FRONTEND", "false").lower() == "true"
 
 # Setup logging
 setup_logging()
@@ -94,9 +104,12 @@ async def shutdown_event():
     """Cleanup on application shutdown"""
     logger.info("Shutting down application")
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 async def root():
-    """Root endpoint with service information"""
+    """Root endpoint - serves SPA in production or service info in dev"""
+    if SERVE_FRONTEND and os.path.exists(os.path.join(FRONTEND_DIST_PATH, "index.html")):
+        return FileResponse(os.path.join(FRONTEND_DIST_PATH, "index.html"))
+    
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -132,7 +145,7 @@ async def root():
     </body>
     </html>
     """
-    return html_content
+    return HTMLResponse(content=html_content)
 
 @app.get("/health")
 @limiter.limit(f"{settings.RATE_LIMIT_CALLS}/minute")
@@ -144,6 +157,111 @@ async def health_check(request: Request):
         "version": settings.VERSION,
         "environment": settings.ENVIRONMENT
     }
+
+@app.api_route("/api/metrics", methods=["GET"])
+async def proxy_metrics():
+    """Proxy to sniffing service metrics"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{SNIFFING_URL}/api/metrics", timeout=10.0)
+            return JSONResponse(content=response.json(), status_code=response.status_code)
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        logger.error(f"Sniffing service unavailable: {e}")
+        return JSONResponse(content={"active_streams": 0, "processed_count": 0, "avg_sentiment": 0.0, "crisis_alerts": 0, "trending_topics": 0, "processing_rate": 0.0}, status_code=200)
+    except Exception as e:
+        logger.error(f"Error proxying to sniffing: {e}")
+        return JSONResponse(content={"error": "Proxy error"}, status_code=502)
+
+@app.api_route("/api/analyze", methods=["POST"])
+async def proxy_analyze(request: Request):
+    """Proxy to sniffing service analyze"""
+    try:
+        body = await request.json()
+        async with httpx.AsyncClient() as client:
+            response = await client.post(f"{SNIFFING_URL}/api/analyze", json=body, timeout=10.0)
+            return JSONResponse(content=response.json(), status_code=response.status_code)
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        logger.error(f"Sniffing service unavailable: {e}")
+        raise HTTPException(status_code=503, detail="Sniffing service unavailable")
+    except Exception as e:
+        logger.error(f"Error proxying to sniffing: {e}")
+        raise HTTPException(status_code=502, detail="Proxy error")
+
+@app.api_route("/api/recent", methods=["GET"])
+async def proxy_recent(request: Request):
+    """Proxy to sniffing service recent items"""
+    try:
+        params = dict(request.query_params)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{SNIFFING_URL}/api/recent", params=params, timeout=10.0)
+            return JSONResponse(content=response.json(), status_code=response.status_code)
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        logger.error(f"Sniffing service unavailable: {e}")
+        return JSONResponse(content={"recent_items": [], "total": 0}, status_code=200)
+    except Exception as e:
+        logger.error(f"Error proxying to sniffing: {e}")
+        return JSONResponse(content={"error": "Proxy error"}, status_code=502)
+
+@app.api_route("/api/crisis-alerts", methods=["GET"])
+async def proxy_crisis_alerts():
+    """Proxy to sniffing service crisis alerts"""
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{SNIFFING_URL}/api/crisis-alerts", timeout=10.0)
+            return JSONResponse(content=response.json(), status_code=response.status_code)
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        logger.error(f"Sniffing service unavailable: {e}")
+        return JSONResponse(content={"crisis_alerts": [], "total": 0}, status_code=200)
+    except Exception as e:
+        logger.error(f"Error proxying to sniffing: {e}")
+        return JSONResponse(content={"error": "Proxy error"}, status_code=502)
+
+@app.websocket("/ws/stream")
+async def proxy_websocket(websocket: WebSocket):
+    """Proxy WebSocket to sniffing service"""
+    await websocket.accept()
+    try:
+        async with websockets.connect(f"{SNIFFING_WS_URL}/ws/stream") as ws_upstream:
+            async def receive_from_client():
+                while True:
+                    try:
+                        data = await websocket.receive_text()
+                        await ws_upstream.send(data)
+                    except WebSocketDisconnect:
+                        break
+                    except Exception:
+                        break
+            
+            async def receive_from_upstream():
+                while True:
+                    try:
+                        data = await ws_upstream.recv()
+                        await websocket.send_text(data)
+                    except Exception:
+                        break
+            
+            await asyncio.gather(receive_from_client(), receive_from_upstream())
+    except Exception as e:
+        logger.error(f"WebSocket proxy error: {e}")
+        try:
+            await websocket.close()
+        except:
+            pass
+
+if SERVE_FRONTEND and os.path.exists(FRONTEND_DIST_PATH):
+    assets_path = os.path.join(FRONTEND_DIST_PATH, "assets")
+    if os.path.exists(assets_path):
+        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+    
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Serve SPA for all non-API routes"""
+        if full_path.startswith("api/") or full_path.startswith("ws/"):
+            raise HTTPException(status_code=404, detail="Not found")
+        file_path = os.path.join(FRONTEND_DIST_PATH, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(FRONTEND_DIST_PATH, "index.html"))
 
 if __name__ == "__main__":
     import uvicorn

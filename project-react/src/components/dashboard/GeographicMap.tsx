@@ -22,7 +22,7 @@ export const GeographicMap: React.FC = () => {
   useEffect(() => {
     const fetchRegionData = async () => {
       try {
-        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SENTIMENT}`);
+        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SENTIMENT}?source_type=news`);
         if (response.ok) {
           const sentimentData = await response.json();
           if (sentimentData.by_region && Array.isArray(sentimentData.by_region) && sentimentData.by_region.length > 0) {
