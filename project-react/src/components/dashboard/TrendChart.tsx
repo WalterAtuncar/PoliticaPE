@@ -10,7 +10,8 @@ import {
   AreaChart,
 } from 'recharts';
 import { Card } from '../ui/Card';
-import { API_CONFIG, ENDPOINTS } from '../../config/api';
+import { API_CONFIG } from '../../config/api';
+import { Loader2, TrendingUp } from 'lucide-react';
 
 interface TrendDataPoint {
   name: string;
@@ -19,40 +20,90 @@ interface TrendDataPoint {
   engagement: number;
 }
 
-const mockData: TrendDataPoint[] = [
-  { name: 'Ene', sentiment: 65, mentions: 1200, engagement: 8.2 },
-  { name: 'Feb', sentiment: 59, mentions: 1100, engagement: 7.8 },
-  { name: 'Mar', sentiment: 72, mentions: 1350, engagement: 9.1 },
-  { name: 'Abr', sentiment: 68, mentions: 1280, engagement: 8.7 },
-  { name: 'May', sentiment: 70, mentions: 1420, engagement: 9.5 },
-  { name: 'Jun', sentiment: 75, mentions: 1580, engagement: 10.2 },
-];
-
 export const TrendChart: React.FC = () => {
-  const [data, setData] = useState<TrendDataPoint[]>(mockData);
+  const [data, setData] = useState<TrendDataPoint[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchTrends = async () => {
+      setIsLoading(true);
       try {
-        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRENDS}`);
+        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/time-series?days=180`);
         if (response.ok) {
-          const trendsData = await response.json();
-          if (trendsData.trends && Array.isArray(trendsData.trends) && trendsData.trends.length > 0) {
-            const formattedData = trendsData.trends.map((t: any) => ({
-              name: t.period ?? t.month ?? t.name ?? 'N/A',
-              sentiment: t.sentiment ?? t.sentiment_score ?? 50,
-              mentions: t.mentions ?? t.count ?? 0,
-              engagement: t.engagement ?? t.engagement_rate ?? 0,
-            }));
+          const timeSeriesData = await response.json();
+          if (Array.isArray(timeSeriesData) && timeSeriesData.length > 0) {
+            const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            const monthlyData: Record<string, { sentiment: number[], mentions: number[], engagement: number[] }> = {};
+            
+            timeSeriesData.forEach((item: Record<string, unknown>) => {
+              const date = new Date(String(item.date));
+              const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+              
+              if (!monthlyData[monthKey]) {
+                monthlyData[monthKey] = { sentiment: [], mentions: [], engagement: [] };
+              }
+              
+              monthlyData[monthKey].sentiment.push(Number(item.sentiment ?? 0));
+              monthlyData[monthKey].mentions.push(Number(item.mentions ?? 0));
+              monthlyData[monthKey].engagement.push(Number(item.engagement ?? 0));
+            });
+
+            const formattedData: TrendDataPoint[] = Object.entries(monthlyData)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .slice(-6)
+              .map(([key, values]) => {
+                const month = key.split('-')[1];
+                return {
+                  name: monthNames[parseInt(month)],
+                  sentiment: values.sentiment.length > 0 
+                    ? Math.round(values.sentiment.reduce((a, b) => a + b, 0) / values.sentiment.length) 
+                    : 0,
+                  mentions: values.mentions.reduce((a, b) => a + b, 0),
+                  engagement: values.engagement.length > 0 
+                    ? parseFloat((values.engagement.reduce((a, b) => a + b, 0) / values.engagement.length).toFixed(1))
+                    : 0,
+                };
+              });
+
             setData(formattedData);
           }
         }
       } catch (error) {
         console.error('Error fetching trends:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchTrends();
   }, []);
+
+  if (isLoading) {
+    return (
+      <Card glass className="p-6">
+        <div className="flex items-center justify-center h-[350px]">
+          <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+          <span className="ml-2 text-gray-600 dark:text-gray-400">Cargando tendencias...</span>
+        </div>
+      </Card>
+    );
+  }
+
+  if (data.length === 0) {
+    return (
+      <Card glass className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Tendencias Mensuales
+          </h3>
+        </div>
+        <div className="flex flex-col items-center justify-center h-[300px] text-gray-500">
+          <TrendingUp className="h-8 w-8 mb-2" />
+          <span>No hay datos de tendencias disponibles</span>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
