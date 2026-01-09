@@ -7,7 +7,8 @@ import {
   Shield, 
   HardDrive, 
   Settings, 
-  Activity
+  Activity,
+  Database
 } from 'lucide-react';
 
 interface SettingsTabsProps {
@@ -22,6 +23,12 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
   alertsCount = 0
 }) => {
   const tabs = [
+    {
+      id: 'scraping',
+      name: 'Importar Datos',
+      icon: Database,
+      description: 'Importar de Twitter, YouTube y más'
+    },
     {
       id: 'users',
       name: 'Usuarios y Accesos',

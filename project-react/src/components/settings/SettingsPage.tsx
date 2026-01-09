@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { SettingsHeader } from './SettingsHeader';
 import { SettingsTabs } from './SettingsTabs';
 import { UsersManagement } from './tabs/UsersManagement';
+import ScrapingPanel from './tabs/ScrapingPanel';
 import { SettingsFilters } from '../../types/settings';
 import { useSettings } from '../../hooks/useSettings';
 
@@ -20,7 +21,7 @@ const initialFilters: SettingsFilters = {
 
 export const SettingsPage: React.FC = () => {
   const [filters, setFilters] = useState<SettingsFilters>(initialFilters);
-  const [activeTab, setActiveTab] = useState('users');
+  const [activeTab, setActiveTab] = useState('scraping');
 
   const {
     users,
@@ -36,6 +37,8 @@ export const SettingsPage: React.FC = () => {
 
   const renderTabContent = () => {
     switch (activeTab) {
+      case 'scraping':
+        return <ScrapingPanel />;
       case 'users':
         return (
           <UsersManagement
