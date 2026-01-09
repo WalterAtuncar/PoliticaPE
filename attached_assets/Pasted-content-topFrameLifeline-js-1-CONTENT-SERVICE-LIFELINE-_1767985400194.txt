@@ -1,0 +1,22 @@
+content_topFrameLifeline.js:1 CONTENT <-> SERVICE LIFELINE: TIMEOUT
+content_topFrameLifeline.js:1 CONTENT <-> SERVICE LIFELINE: CONNECT
+content_topFrameLifeline.js:1 CONTENT <-> SERVICE LIFELINE: MESSAGE {initTimeStamp: 1767976457850}
+useWebSocket.ts:132 WebSocket connection to 'wss://a40d0c8c-ff1d-42b7-8f66-d68d6b130012-00-3rl55hlj7ca9i.janeway.replit.dev/ws/stream' failed: WebSocket is closed before the connection is established.
+(anonymous) @ useWebSocket.ts:132
+safelyCallDestroy @ chunk-GKJBSOWT.js?v=01713f33:16748
+commitHookEffectListUnmount @ chunk-GKJBSOWT.js?v=01713f33:16875
+invokePassiveEffectUnmountInDEV @ chunk-GKJBSOWT.js?v=01713f33:18363
+invokeEffectsInDev @ chunk-GKJBSOWT.js?v=01713f33:19701
+commitDoubleInvokeEffectsInDEV @ chunk-GKJBSOWT.js?v=01713f33:19682
+flushPassiveEffectsImpl @ chunk-GKJBSOWT.js?v=01713f33:19503
+flushPassiveEffects @ chunk-GKJBSOWT.js?v=01713f33:19447
+(anonymous) @ chunk-GKJBSOWT.js?v=01713f33:19328
+workLoop @ chunk-GKJBSOWT.js?v=01713f33:197
+flushWork @ chunk-GKJBSOWT.js?v=01713f33:176
+performWorkUntilDeadline @ chunk-GKJBSOWT.js?v=01713f33:384
+injected.js:37 WebSocket error: Event {isTrusted: true, type: 'error', target: WebSocket, currentTarget: WebSocket, eventPhase: 2, …}isTrusted: truebubbles: falsecancelBubble: falsecancelable: falsecomposed: falsecurrentTarget: nulldefaultPrevented: falseeventPhase: 0returnValue: truesrcElement: WebSocket {url: 'wss://a40d0c8c-ff1d-42b7-8f66-d68d6b130012-00-3rl55hlj7ca9i.janeway.replit.dev/ws/stream', readyState: 3, bufferedAmount: 0, onopen: ƒ, onerror: ƒ, …}target: WebSocket {url: 'wss://a40d0c8c-ff1d-42b7-8f66-d68d6b130012-00-3rl55hlj7ca9i.janeway.replit.dev/ws/stream', readyState: 3, bufferedAmount: 0, onopen: ƒ, onerror: ƒ, …}timeStamp: 30223.89999985695type: "error"[[Prototype]]: Event
+(anonymous) @ injected.js:37
+wsRef.current.onerror @ useWebSocket.ts:95
+injected.js:37 WebSocket disconnected
+injected.js:37 WebSocket connected to sniffing service
+injected.js:37 WebSocket connected to sniffing service
