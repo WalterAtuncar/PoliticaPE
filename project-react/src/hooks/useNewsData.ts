@@ -21,39 +21,8 @@ interface NewsData {
   total: number;
   isLoading: boolean;
   error: string | null;
-  isUsingMockData: boolean;
+  hasData: boolean;
 }
-
-const mockArticles: NewsArticle[] = [
-  {
-    id: 'mock-1',
-    title: 'Gobierno anuncia nuevas medidas económicas',
-    content: 'El gobierno presentó un paquete de medidas para reactivar la economía...',
-    source: 'El Comercio',
-    url: 'https://elcomercio.pe/example',
-    published_at: new Date().toISOString(),
-    scraped_at: new Date().toISOString(),
-    sentiment_score: 0.45,
-    category: 'Economía',
-    author: null,
-    tags: ['economía', 'gobierno'],
-    political_entities: null,
-  },
-  {
-    id: 'mock-2',
-    title: 'Congreso debate reforma electoral',
-    content: 'Los parlamentarios discuten cambios importantes en el sistema electoral...',
-    source: 'RPP',
-    url: 'https://rpp.pe/example',
-    published_at: new Date().toISOString(),
-    scraped_at: new Date().toISOString(),
-    sentiment_score: -0.12,
-    category: 'Política',
-    author: null,
-    tags: ['congreso', 'reforma'],
-    political_entities: null,
-  },
-];
 
 export const useNewsData = (limit: number = 20) => {
   const [data, setData] = useState<NewsData>({
@@ -61,7 +30,7 @@ export const useNewsData = (limit: number = 20) => {
     total: 0,
     isLoading: true,
     error: null,
-    isUsingMockData: false,
+    hasData: false,
   });
 
   const fetchNews = useCallback(async () => {
@@ -77,34 +46,23 @@ export const useNewsData = (limit: number = 20) => {
       }
       
       const result = await response.json();
-      
       const articles = Array.isArray(result) ? result : (result.articles || []);
       
-      if (articles.length > 0) {
-        setData({
-          articles: articles.slice(0, limit),
-          total: articles.length,
-          isLoading: false,
-          error: null,
-          isUsingMockData: false,
-        });
-      } else {
-        setData({
-          articles: mockArticles,
-          total: mockArticles.length,
-          isLoading: false,
-          error: null,
-          isUsingMockData: true,
-        });
-      }
+      setData({
+        articles: articles.slice(0, limit),
+        total: articles.length,
+        isLoading: false,
+        error: null,
+        hasData: articles.length > 0,
+      });
     } catch (error) {
       console.error('Error fetching news:', error);
       setData({
-        articles: mockArticles,
-        total: mockArticles.length,
+        articles: [],
+        total: 0,
         isLoading: false,
         error: error instanceof Error ? error.message : 'Error desconocido',
-        isUsingMockData: true,
+        hasData: false,
       });
     }
   }, [limit]);

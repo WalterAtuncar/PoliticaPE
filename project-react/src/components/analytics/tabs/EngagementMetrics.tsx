@@ -1,16 +1,31 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Heart, MessageCircle, Share, Eye, AlertCircle, Loader2 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
+import { Heart, MessageCircle, Share, Eye, Loader2, TrendingUp } from 'lucide-react';
 import { Card } from '../../ui/Card';
 import { AnalyticsFilters } from '../AnalyticsPage';
-import { useSocialData } from '../../../hooks/useSocialData';
+import { useEngagementSummary, usePlatformBreakdown, useTopPosts, useRegionalEngagement } from '../../../hooks/useAdvancedAnalytics';
 
 interface EngagementMetricsProps {
   filters: AnalyticsFilters;
 }
 
 export const EngagementMetrics: React.FC<EngagementMetricsProps> = ({ filters }) => {
-  const { posts, isLoading, isUsingMockData } = useSocialData();
+  const periodDays = filters.timeRange === '7d' ? 7 : filters.timeRange === '30d' ? 30 : 90;
+  const { engagement, isLoading: engagementLoading, hasData: hasEngagement } = useEngagementSummary(periodDays);
+  const { platforms, isLoading: platformLoading, hasData: hasPlatforms } = usePlatformBreakdown(periodDays);
+  const { posts: topPosts, isLoading: postsLoading, hasData: hasPosts } = useTopPosts(periodDays, 5);
+  const { regions, isLoading: regionsLoading, hasData: hasRegions } = useRegionalEngagement(periodDays);
+
+  const isLoading = engagementLoading || platformLoading || postsLoading || regionsLoading;
 
   if (isLoading) {
     return (
@@ -21,12 +36,16 @@ export const EngagementMetrics: React.FC<EngagementMetricsProps> = ({ filters })
     );
   }
 
-  const hasData = posts && posts.length > 0 && !isUsingMockData;
+  const totalLikes = engagement?.total_engagement?.likes ?? 0;
+  const totalShares = engagement?.total_engagement?.shares ?? 0;
+  const totalComments = engagement?.total_engagement?.comments ?? 0;
+  const totalViews = engagement?.total_engagement?.views ?? 0;
 
-  const totalLikes = hasData ? posts.reduce((acc, p) => acc + (p.engagement?.likes ?? 0), 0) : 0;
-  const totalShares = hasData ? posts.reduce((acc, p) => acc + (p.engagement?.shares ?? 0), 0) : 0;
-  const totalComments = hasData ? posts.reduce((acc, p) => acc + (p.engagement?.comments ?? 0), 0) : 0;
-  const totalReach = hasData ? posts.reduce((acc, p) => acc + (p.engagement?.reach ?? 0), 0) : 0;
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return num.toString();
+  };
 
   return (
     <div className="space-y-6">
@@ -44,10 +63,10 @@ export const EngagementMetrics: React.FC<EngagementMetricsProps> = ({ filters })
                   Total Likes
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {hasData ? (totalLikes >= 1000 ? `${(totalLikes/1000).toFixed(1)}K` : totalLikes) : '--'}
+                  {formatNumber(totalLikes)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {hasData ? 'De todas las plataformas' : 'Sin datos'}
+                  {hasEngagement ? 'Datos reales' : 'Sin datos'}
                 </p>
               </div>
               <Heart className="h-8 w-8 text-red-500" />
@@ -67,10 +86,10 @@ export const EngagementMetrics: React.FC<EngagementMetricsProps> = ({ filters })
                   Compartidos
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {hasData ? (totalShares >= 1000 ? `${(totalShares/1000).toFixed(1)}K` : totalShares) : '--'}
+                  {formatNumber(totalShares)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {hasData ? 'Total compartidos' : 'Sin datos'}
+                  Total compartidos
                 </p>
               </div>
               <Share className="h-8 w-8 text-blue-500" />
@@ -90,10 +109,10 @@ export const EngagementMetrics: React.FC<EngagementMetricsProps> = ({ filters })
                   Comentarios
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {hasData ? (totalComments >= 1000 ? `${(totalComments/1000).toFixed(1)}K` : totalComments) : '--'}
+                  {formatNumber(totalComments)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {hasData ? 'Total comentarios' : 'Sin datos'}
+                  Total comentarios
                 </p>
               </div>
               <MessageCircle className="h-8 w-8 text-green-500" />
@@ -113,10 +132,10 @@ export const EngagementMetrics: React.FC<EngagementMetricsProps> = ({ filters })
                   Alcance Total
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {hasData ? (totalReach >= 1000 ? `${(totalReach/1000).toFixed(1)}K` : totalReach) : '--'}
+                  {formatNumber(totalViews)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {hasData ? 'Personas alcanzadas' : 'Sin datos'}
+                  Visualizaciones
                 </p>
               </div>
               <Eye className="h-8 w-8 text-purple-500" />
@@ -125,74 +144,80 @@ export const EngagementMetrics: React.FC<EngagementMetricsProps> = ({ filters })
         </motion.div>
       </div>
 
-      {/* Platform Comparison */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-      >
-        <Card glass className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Engagement por Plataforma
-          </h3>
-          {hasData ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {['twitter', 'facebook', 'instagram'].map((platform) => {
-                const platformPosts = posts.filter(p => p.platform.toLowerCase() === platform);
-                const platformLikes = platformPosts.reduce((acc, p) => acc + (p.engagement?.likes ?? 0), 0);
-                return (
-                  <div key={platform} className="p-4 bg-white/50 dark:bg-gray-800/50 rounded-lg">
-                    <h4 className="font-medium text-gray-900 dark:text-white capitalize mb-2">
-                      {platform}
-                    </h4>
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                      {platformPosts.length}
-                    </p>
-                    <p className="text-sm text-gray-500">publicaciones</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      {platformLikes} likes totales
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12">
-              <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-gray-600 dark:text-gray-400 text-center">
-                No hay datos de engagement disponibles.
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
-                Los datos aparecerán cuando se recopilen publicaciones de redes sociales.
-              </p>
-            </div>
-          )}
-        </Card>
-      </motion.div>
+      {/* Platform Comparison & Regional Engagement */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <Card glass className="p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Engagement por Plataforma
+            </h3>
+            {hasPlatforms ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={platforms}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                  <XAxis dataKey="platform" stroke="#6B7280" fontSize={12} />
+                  <YAxis stroke="#6B7280" fontSize={12} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(17, 24, 39, 0.8)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: '#F9FAFB',
+                    }}
+                  />
+                  <Bar dataKey="likes" fill="#EF4444" name="Likes" />
+                  <Bar dataKey="shares" fill="#3B82F6" name="Shares" />
+                  <Bar dataKey="comments" fill="#10B981" name="Comments" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-gray-500">
+                No hay datos de plataformas disponibles
+              </div>
+            )}
+          </Card>
+        </motion.div>
 
-      {/* Top Influencers */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6 }}
-      >
-        <Card glass className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-            Influencers Más Activos
-          </h3>
-          <div className="flex flex-col items-center justify-center py-12">
-            <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
-            <p className="text-gray-600 dark:text-gray-400 text-center">
-              El análisis de influencers estará disponible cuando se procesen suficientes publicaciones.
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
-              Se identificarán automáticamente los usuarios con mayor engagement.
-            </p>
-          </div>
-        </Card>
-      </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <Card glass className="p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Engagement por Región
+            </h3>
+            {hasRegions ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={regions} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                  <XAxis type="number" stroke="#6B7280" fontSize={12} />
+                  <YAxis dataKey="region" type="category" stroke="#6B7280" fontSize={12} width={80} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(17, 24, 39, 0.8)',
+                      border: 'none',
+                      borderRadius: '8px',
+                      color: '#F9FAFB',
+                    }}
+                  />
+                  <Bar dataKey="engagement" fill="#8B5CF6" name="Engagement Rate" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-gray-500">
+                No hay datos regionales disponibles
+              </div>
+            )}
+          </Card>
+        </motion.div>
+      </div>
 
-      {/* Viral Posts */}
+      {/* Top Posts */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -200,47 +225,58 @@ export const EngagementMetrics: React.FC<EngagementMetricsProps> = ({ filters })
       >
         <Card glass className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-            Posts Más Virales
+            Posts con Mayor Engagement
           </h3>
-          {hasData && posts.length > 0 ? (
+          {hasPosts ? (
             <div className="space-y-4">
-              {posts
-                .sort((a, b) => ((b.engagement?.likes ?? 0) + (b.engagement?.shares ?? 0)) - ((a.engagement?.likes ?? 0) + (a.engagement?.shares ?? 0)))
-                .slice(0, 5)
-                .map((post, index) => (
-                  <motion.div
-                    key={post.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 * index }}
-                    className="p-4 bg-white/50 dark:bg-gray-800/50 rounded-lg border border-gray-200/50 dark:border-gray-600/50"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          @{post.author}
-                        </span>
-                        <span className="text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2 py-1 rounded">
-                          {post.platform}
-                        </span>
-                      </div>
+              {topPosts.map((post, index) => (
+                <motion.div
+                  key={post.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.1 * index }}
+                  className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200/50 dark:border-gray-600/50"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        @{post.author}
+                      </span>
+                      <span className="text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2 py-1 rounded">
+                        {post.platform}
+                      </span>
                     </div>
-                    <p className="text-gray-700 dark:text-gray-300 text-sm line-clamp-2">
-                      {post.content}
-                    </p>
-                    <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500">
-                      <span>{post.engagement?.likes ?? 0} likes</span>
-                      <span>{post.engagement?.shares ?? 0} shares</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {post.timestamp ? new Date(post.timestamp).toLocaleDateString() : 'Sin fecha'}
+                    </span>
+                  </div>
+                  <p className="text-gray-700 dark:text-gray-300 mb-3 text-sm leading-relaxed">
+                    {post.content}
+                  </p>
+                  <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+                    <div className="flex items-center space-x-1">
+                      <Heart className="h-4 w-4" />
+                      <span>{post.engagement.likes}</span>
                     </div>
-                  </motion.div>
-                ))}
+                    <div className="flex items-center space-x-1">
+                      <Share className="h-4 w-4" />
+                      <span>{post.engagement.shares}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <MessageCircle className="h-4 w-4" />
+                      <span>{post.engagement.comments}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <TrendingUp className="h-4 w-4" />
+                      <span>Total: {post.engagement.total}</span>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-12">
-              <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-gray-600 dark:text-gray-400 text-center">
-                No hay publicaciones virales para mostrar.
-              </p>
+            <div className="flex items-center justify-center h-32 text-gray-500">
+              No hay posts con engagement disponibles
             </div>
           )}
         </Card>

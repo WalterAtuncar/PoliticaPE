@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Bell, 
@@ -12,11 +12,20 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { mockAlerts } from '../../data/mockData';
+import { API_CONFIG } from '../../config/api';
 
 interface HeaderProps {
   isCollapsed: boolean;
   activeSection: string;
+}
+
+interface Alert {
+  id: string;
+  title: string;
+  message: string;
+  severity: 'low' | 'medium' | 'high';
+  timestamp: Date;
+  isRead: boolean;
 }
 
 const sectionTitles = {
@@ -35,12 +44,36 @@ const sectionTitles = {
 export const Header: React.FC<HeaderProps> = ({ isCollapsed, activeSection }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const { user, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
 
-  const unreadAlerts = mockAlerts.filter(alert => !alert.isRead).length;
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const response = await fetch(`${API_CONFIG.SNIFFING_BASE_URL}/api/crisis-alerts`);
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data)) {
+            setAlerts(data.slice(0, 10).map((alert: Record<string, unknown>) => ({
+              id: String(alert.id ?? ''),
+              title: String(alert.title ?? 'Alerta'),
+              message: String(alert.description ?? ''),
+              severity: String(alert.severity ?? 'low') as 'low' | 'medium' | 'high',
+              timestamp: new Date(String(alert.detected_at ?? new Date())),
+              isRead: false,
+            })));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching alerts:', error);
+      }
+    };
+    fetchAlerts();
+  }, []);
 
-  // Close dropdowns when clicking outside
+  const unreadAlerts = alerts.filter(alert => !alert.isRead).length;
+
   React.useEffect(() => {
     const handleClickOutside = () => {
       setShowNotifications(false);
@@ -61,7 +94,6 @@ export const Header: React.FC<HeaderProps> = ({ isCollapsed, activeSection }) =>
       style={{ left: isCollapsed ? '80px' : '280px' }}
     >
       <div className="h-full px-6 flex items-center justify-between">
-        {/* Breadcrumbs */}
         <div className="flex items-center space-x-2 text-sm">
           <span className="text-gray-500 dark:text-gray-400">Inicio</span>
           <ChevronRight className="h-4 w-4 text-gray-400" />
@@ -70,9 +102,7 @@ export const Header: React.FC<HeaderProps> = ({ isCollapsed, activeSection }) =>
           </span>
         </div>
 
-        {/* Right side */}
         <div className="flex items-center space-x-4">
-          {/* Search */}
           <div className="relative hidden md:block">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
@@ -82,7 +112,6 @@ export const Header: React.FC<HeaderProps> = ({ isCollapsed, activeSection }) =>
             />
           </div>
 
-          {/* Theme Toggle */}
           <motion.button
             onClick={(e) => {
               e.stopPropagation();
@@ -106,7 +135,6 @@ export const Header: React.FC<HeaderProps> = ({ isCollapsed, activeSection }) =>
             </motion.div>
           </motion.button>
 
-          {/* Notifications */}
           <div className="relative">
             <button
               onClick={(e) => {
@@ -140,38 +168,43 @@ export const Header: React.FC<HeaderProps> = ({ isCollapsed, activeSection }) =>
                   <h3 className="font-semibold text-gray-900 dark:text-white">Notificaciones</h3>
                 </div>
                 <div className="max-h-96 overflow-y-auto">
-                  {mockAlerts.slice(0, 5).map((alert) => (
-                    <div
-                      key={alert.id}
-                      className={`p-4 border-b border-gray-200/50 dark:border-gray-700/50 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors ${
-                        !alert.isRead ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''
-                      }`}
-                    >
-                      <div className="flex items-start space-x-3">
-                        <div className={`w-2 h-2 rounded-full mt-2 ${
-                          alert.severity === 'high' ? 'bg-red-500' :
-                          alert.severity === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                        }`} />
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900 dark:text-white text-sm">
-                            {alert.title}
-                          </p>
-                          <p className="text-gray-600 dark:text-gray-400 text-xs mt-1">
-                            {alert.message}
-                          </p>
-                          <p className="text-gray-500 dark:text-gray-500 text-xs mt-2">
-                            {alert.timestamp.toLocaleTimeString()}
-                          </p>
+                  {alerts.length > 0 ? (
+                    alerts.slice(0, 5).map((alert) => (
+                      <div
+                        key={alert.id}
+                        className={`p-4 border-b border-gray-200/50 dark:border-gray-700/50 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors ${
+                          !alert.isRead ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''
+                        }`}
+                      >
+                        <div className="flex items-start space-x-3">
+                          <div className={`w-2 h-2 rounded-full mt-2 ${
+                            alert.severity === 'high' ? 'bg-red-500' :
+                            alert.severity === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                          }`} />
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900 dark:text-white text-sm">
+                              {alert.title}
+                            </p>
+                            <p className="text-gray-600 dark:text-gray-400 text-xs mt-1">
+                              {alert.message}
+                            </p>
+                            <p className="text-gray-500 dark:text-gray-500 text-xs mt-2">
+                              {alert.timestamp.toLocaleTimeString()}
+                            </p>
+                          </div>
                         </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="p-8 text-center text-gray-500">
+                      No hay notificaciones
                     </div>
-                  ))}
+                  )}
                 </div>
               </motion.div>
             )}
           </div>
 
-          {/* User Menu */}
           <div className="relative">
             <button
               onClick={(e) => {

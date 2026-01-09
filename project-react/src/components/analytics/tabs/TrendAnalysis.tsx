@@ -1,9 +1,18 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { TrendingUp, Calendar, AlertTriangle, Target, AlertCircle, Loader2 } from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
+import { TrendingUp, Calendar, AlertTriangle, Target, Loader2 } from 'lucide-react';
 import { Card } from '../../ui/Card';
 import { AnalyticsFilters } from '../AnalyticsPage';
-import { useAnalyticsData } from '../../../hooks/useAnalyticsData';
+import { useTimeSeries, useTrendingTopics } from '../../../hooks/useAdvancedAnalytics';
 
 interface TrendAnalysisProps {
   filters: AnalyticsFilters;
@@ -11,7 +20,10 @@ interface TrendAnalysisProps {
 
 export const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ filters }) => {
   const periodDays = filters.timeRange === '7d' ? 7 : filters.timeRange === '30d' ? 30 : 90;
-  const { trends, isLoading } = useAnalyticsData('news', periodDays);
+  const { data: timeSeriesData, totalMentions, averageSentiment, isLoading: timeLoading } = useTimeSeries(periodDays);
+  const { topics, isLoading: topicsLoading, hasData: hasTopics } = useTrendingTopics(periodDays, 10);
+
+  const isLoading = timeLoading || topicsLoading;
 
   if (isLoading) {
     return (
@@ -22,7 +34,8 @@ export const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ filters }) => {
     );
   }
 
-  const hasData = trends && trends.trending_topics && trends.trending_topics.length > 0;
+  const trendDirection = averageSentiment > 0.05 ? 'Positiva' : averageSentiment < -0.05 ? 'Negativa' : 'Neutral';
+  const trendColor = averageSentiment > 0.05 ? 'text-green-600' : averageSentiment < -0.05 ? 'text-red-600' : 'text-gray-600';
 
   return (
     <div className="space-y-6">
@@ -39,14 +52,14 @@ export const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ filters }) => {
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   Tendencia General
                 </p>
-                <p className="text-2xl font-bold text-gray-500 dark:text-gray-400">
-                  --
+                <p className={`text-2xl font-bold ${trendColor} dark:${trendColor.replace('600', '400')}`}>
+                  {averageSentiment > 0 ? '↗' : averageSentiment < 0 ? '↘' : '→'} {trendDirection}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Pendiente de análisis
+                  Sentiment: {averageSentiment > 0 ? '+' : ''}{averageSentiment.toFixed(2)}
                 </p>
               </div>
-              <TrendingUp className="h-8 w-8 text-gray-400" />
+              <TrendingUp className={`h-8 w-8 ${trendColor.replace('text-', 'text-')}`} />
             </div>
           </Card>
         </motion.div>
@@ -60,13 +73,13 @@ export const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ filters }) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Eventos Detectados
+                  Total Menciones
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {trends?.trending_topics?.length ?? 0}
+                  {totalMentions.toLocaleString()}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Temas identificados
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                  Últimos {periodDays} días
                 </p>
               </div>
               <Calendar className="h-8 w-8 text-blue-500" />
@@ -83,13 +96,13 @@ export const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ filters }) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Período Analizado
+                  Temas Identificados
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {periodDays}d
+                  {topics.length}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Últimos días
+                <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                  Temas tendencia
                 </p>
               </div>
               <Target className="h-8 w-8 text-purple-500" />
@@ -106,13 +119,13 @@ export const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ filters }) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Estado
+                  Período Analizado
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {hasData ? 'Activo' : 'Sin datos'}
+                  {periodDays}d
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Análisis de tendencias
+                <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                  Datos en tiempo real
                 </p>
               </div>
               <AlertTriangle className="h-8 w-8 text-orange-500" />
@@ -121,63 +134,60 @@ export const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ filters }) => {
         </motion.div>
       </div>
 
-      {/* Trending Topics */}
+      {/* Time Series Chart */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
       >
         <Card glass className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-            Temas Tendencia
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Evolución Temporal - Menciones y Sentiment
           </h3>
-          {hasData ? (
-            <div className="space-y-4">
-              {trends.trending_topics.map((topic: { topic: string; count: number; sentiment: number }, index: number) => (
-                <motion.div
-                  key={topic.topic}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 * index }}
-                  className="p-4 bg-white/50 dark:bg-gray-800/50 rounded-lg border border-gray-200/50 dark:border-gray-600/50"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-900 dark:text-white">
-                        {topic.topic}
-                      </h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {topic.count} menciones
-                      </p>
-                    </div>
-                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      topic.sentiment > 0 
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                        : topic.sentiment < 0
-                        ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                        : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
-                    }`}>
-                      {topic.sentiment > 0 ? '+' : ''}{topic.sentiment.toFixed(2)}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+          {timeSeriesData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={timeSeriesData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                <XAxis dataKey="date" stroke="#6B7280" fontSize={12} />
+                <YAxis yAxisId="left" stroke="#6B7280" fontSize={12} />
+                <YAxis yAxisId="right" orientation="right" stroke="#6B7280" fontSize={12} domain={[-1, 1]} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'rgba(17, 24, 39, 0.8)',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: '#F9FAFB',
+                  }}
+                />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="mentions"
+                  stroke="#3B82F6"
+                  strokeWidth={3}
+                  dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
+                  name="Menciones"
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="sentiment"
+                  stroke="#10B981"
+                  strokeWidth={3}
+                  dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
+                  name="Sentiment"
+                />
+              </LineChart>
+            </ResponsiveContainer>
           ) : (
-            <div className="flex flex-col items-center justify-center py-12">
-              <AlertCircle className="h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-gray-600 dark:text-gray-400 text-center">
-                No hay datos de tendencias disponibles para el período seleccionado.
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
-                Los datos aparecerán cuando se procesen noticias y publicaciones.
-              </p>
+            <div className="flex items-center justify-center h-64 text-gray-500">
+              No hay datos de series temporales disponibles
             </div>
           )}
         </Card>
       </motion.div>
 
-      {/* Political Events Info */}
+      {/* Trending Topics */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -185,39 +195,46 @@ export const TrendAnalysis: React.FC<TrendAnalysisProps> = ({ filters }) => {
       >
         <Card glass className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-            Eventos Políticos Significativos
+            Temas Tendencia
           </h3>
-          <div className="flex flex-col items-center justify-center py-12">
-            <Calendar className="h-12 w-12 text-gray-400 mb-4" />
-            <p className="text-gray-600 dark:text-gray-400 text-center">
-              Los eventos políticos se detectarán automáticamente cuando haya suficiente actividad.
-            </p>
-            <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
-              El sistema identifica picos de actividad y correlaciones con eventos noticiosos.
-            </p>
-          </div>
-        </Card>
-      </motion.div>
-
-      {/* Cyclical Analysis Info */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7 }}
-      >
-        <Card glass className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-            Análisis de Ciclos Estacionales
-          </h3>
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <h4 className="font-medium text-blue-900 dark:text-blue-300 mb-2">
-              Información
-            </h4>
-            <p className="text-sm text-blue-800 dark:text-blue-400">
-              El análisis de ciclos estacionales requiere datos históricos de al menos 3 meses para identificar patrones. 
-              Esta sección se activará cuando se acumule suficiente información.
-            </p>
-          </div>
+          {hasTopics ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {topics.map((topic, index) => (
+                <motion.div
+                  key={topic.topic}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.1 * index }}
+                  className="p-4 bg-white/50 dark:bg-gray-800/50 rounded-lg border border-gray-200/50 dark:border-gray-600/50"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-gray-900 dark:text-white capitalize">
+                      {topic.topic}
+                    </h4>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      topic.sentiment > 0 
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                        : topic.sentiment < 0
+                        ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
+                    }`}>
+                      {topic.sentiment > 0 ? '+' : ''}{topic.sentiment.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">Menciones</span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {topic.count.toLocaleString()}
+                    </span>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-32 text-gray-500">
+              No hay temas tendencia disponibles para el período seleccionado
+            </div>
+          )}
         </Card>
       </motion.div>
     </div>

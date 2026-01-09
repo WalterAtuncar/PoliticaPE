@@ -24,50 +24,15 @@ interface DashboardData {
   metrics: PoliticalMetric[];
   isLoading: boolean;
   error: string | null;
-  isUsingMockData: boolean;
+  hasData: boolean;
 }
-
-const mockMetrics: PoliticalMetric[] = [
-  {
-    id: '1',
-    name: 'Sentimiento Positivo',
-    value: 68,
-    change: 5.2,
-    trend: 'up',
-    period: 'Últimas 24h',
-  },
-  {
-    id: '2',
-    name: 'Menciones Sociales',
-    value: 12847,
-    change: -2.1,
-    trend: 'down',
-    period: 'Esta semana',
-  },
-  {
-    id: '3',
-    name: 'Engagement Político',
-    value: 8.9,
-    change: 12.5,
-    trend: 'up',
-    period: 'Este mes',
-  },
-  {
-    id: '4',
-    name: 'Alcance Total',
-    value: 245680,
-    change: 8.7,
-    trend: 'up',
-    period: 'Últimas 24h',
-  },
-];
 
 export const useDashboardData = (): DashboardData => {
   const [data, setData] = useState<DashboardData>({
-    metrics: mockMetrics,
+    metrics: [],
     isLoading: true,
     error: null,
-    isUsingMockData: true,
+    hasData: false,
   });
 
   const fetchData = useCallback(async () => {
@@ -101,8 +66,8 @@ export const useDashboardData = (): DashboardData => {
           {
             id: '1',
             name: 'Sentimiento Positivo',
-            value: sentiment?.positive_percentage ?? 68,
-            change: sentiment?.trend ?? 5.2,
+            value: sentiment?.positive_percentage ?? 0,
+            change: sentiment?.trend ?? 0,
             trend: (sentiment?.trend ?? 0) >= 0 ? 'up' : 'down',
             period: 'Últimas 24h',
           },
@@ -138,23 +103,23 @@ export const useDashboardData = (): DashboardData => {
           metrics: realMetrics,
           isLoading: false,
           error: null,
-          isUsingMockData: false,
+          hasData: true,
         });
       } else {
         setData({
-          metrics: mockMetrics,
+          metrics: [],
           isLoading: false,
           error: null,
-          isUsingMockData: true,
+          hasData: false,
         });
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
       setData({
-        metrics: mockMetrics,
+        metrics: [],
         isLoading: false,
         error: error instanceof Error ? error.message : 'Error desconocido',
-        isUsingMockData: true,
+        hasData: false,
       });
     }
   }, []);

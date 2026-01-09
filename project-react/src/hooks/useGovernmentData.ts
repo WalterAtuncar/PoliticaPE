@@ -18,33 +18,8 @@ interface GovernmentData {
   total: number;
   isLoading: boolean;
   error: string | null;
-  isUsingMockData: boolean;
+  hasData: boolean;
 }
-
-const mockGovernmentData: GovernmentDataItem[] = [
-  {
-    id: 'mock-gov-1',
-    source: 'MEF',
-    data_type: 'Indicador',
-    title: 'Indicadores Económicos Regionales',
-    content: { value: 45000, summary: 'Datos económicos' },
-    published_at: new Date().toISOString(),
-    scraped_at: new Date().toISOString(),
-    url: 'https://mef.gob.pe/example',
-    department: 'Lima',
-  },
-  {
-    id: 'mock-gov-2',
-    source: 'INEI',
-    data_type: 'Estadística',
-    title: 'Censo de Población y Vivienda',
-    content: { value: 35000000, summary: 'Población total' },
-    published_at: new Date().toISOString(),
-    scraped_at: new Date().toISOString(),
-    url: 'https://inei.gob.pe/example',
-    department: 'Nacional',
-  },
-];
 
 export const useGovernmentData = (limit: number = 50) => {
   const [data, setData] = useState<GovernmentData>({
@@ -52,7 +27,7 @@ export const useGovernmentData = (limit: number = 50) => {
     total: 0,
     isLoading: true,
     error: null,
-    isUsingMockData: false,
+    hasData: false,
   });
 
   const fetchGovernmentData = useCallback(async () => {
@@ -70,31 +45,21 @@ export const useGovernmentData = (limit: number = 50) => {
       const result = await response.json();
       const items = Array.isArray(result) ? result : (result.items || []);
       
-      if (items.length > 0) {
-        setData({
-          items: items.slice(0, limit),
-          total: items.length,
-          isLoading: false,
-          error: null,
-          isUsingMockData: false,
-        });
-      } else {
-        setData({
-          items: mockGovernmentData,
-          total: mockGovernmentData.length,
-          isLoading: false,
-          error: null,
-          isUsingMockData: true,
-        });
-      }
+      setData({
+        items: items.slice(0, limit),
+        total: items.length,
+        isLoading: false,
+        error: null,
+        hasData: items.length > 0,
+      });
     } catch (error) {
       console.error('Error fetching government data:', error);
       setData({
-        items: mockGovernmentData,
-        total: mockGovernmentData.length,
+        items: [],
+        total: 0,
         isLoading: false,
         error: error instanceof Error ? error.message : 'Error desconocido',
-        isUsingMockData: true,
+        hasData: false,
       });
     }
   }, [limit]);

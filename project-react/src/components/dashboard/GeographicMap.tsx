@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '../ui/Card';
-import { mockGeographicData } from '../../data/mockData';
 import { API_CONFIG, ENDPOINTS } from '../../config/api';
+import { Loader2, MapPin } from 'lucide-react';
 
 interface RegionData {
   ubigeo: string;
@@ -17,42 +17,71 @@ interface RegionData {
 }
 
 export const GeographicMap: React.FC = () => {
-  const [regionData, setRegionData] = useState<RegionData[]>(mockGeographicData);
+  const [regionData, setRegionData] = useState<RegionData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasData, setHasData] = useState(false);
 
   useEffect(() => {
     const fetchRegionData = async () => {
+      setIsLoading(true);
       try {
         const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SENTIMENT}?source_type=news`);
         if (response.ok) {
           const sentimentData = await response.json();
           if (sentimentData.by_region && Array.isArray(sentimentData.by_region) && sentimentData.by_region.length > 0) {
-            const formattedData: RegionData[] = sentimentData.by_region.map((r: any, index: number) => {
-              const sentimentValue = r.sentiment ?? 0;
+            const formattedData: RegionData[] = sentimentData.by_region.map((r: Record<string, unknown>, index: number) => {
+              const sentimentValue = Number(r.sentiment ?? 0);
               const calculatedPositive = Math.max(0, Math.min(100, (sentimentValue + 1) * 25));
               const calculatedNegative = Math.max(0, Math.min(100, (1 - sentimentValue) * 25));
               const calculatedNeutral = Math.max(0, 100 - calculatedPositive - calculatedNegative);
               
               return {
-                ubigeo: r.ubigeo ?? String(index + 1).padStart(2, '0'),
-                region: r.region ?? `Región ${index + 1}`,
-                mentions: r.mentions ?? r.count ?? 0,
+                ubigeo: String(r.ubigeo ?? String(index + 1).padStart(2, '0')),
+                region: String(r.region ?? `Región ${index + 1}`),
+                mentions: Number(r.mentions ?? r.count ?? 0),
                 sentiment: {
-                  positive: r.positive ?? calculatedPositive,
-                  negative: r.negative ?? calculatedNegative,
-                  neutral: r.neutral ?? calculatedNeutral,
+                  positive: Number(r.positive ?? calculatedPositive),
+                  negative: Number(r.negative ?? calculatedNegative),
+                  neutral: Number(r.neutral ?? calculatedNeutral),
                 },
-                engagement: r.engagement ?? 0,
+                engagement: Number(r.engagement ?? 0),
               };
             });
             setRegionData(formattedData);
+            setHasData(true);
           }
         }
       } catch (error) {
         console.error('Error fetching region data:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchRegionData();
   }, []);
+
+  if (isLoading) {
+    return (
+      <Card glass className="p-6">
+        <div className="flex items-center justify-center h-48">
+          <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+          <span className="ml-2 text-gray-600 dark:text-gray-400">Cargando datos regionales...</span>
+        </div>
+      </Card>
+    );
+  }
+
+  if (!hasData || regionData.length === 0) {
+    return (
+      <Card glass className="p-6">
+        <div className="flex flex-col items-center justify-center h-48 text-gray-500">
+          <MapPin className="h-8 w-8 mb-2" />
+          <span>No hay datos regionales disponibles</span>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -98,7 +127,6 @@ export const GeographicMap: React.FC = () => {
                 </div>
               </div>
               
-              {/* Sentiment Bar */}
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 mb-2">
                 <div className="h-3 rounded-full flex overflow-hidden">
                   <div
