@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { ENDPOINTS } from '../config/api';
+import { ENDPOINTS, API_CONFIG, fetchFromScrapping } from '../config/api';
 
 interface ScrapingLog {
   id: string;
@@ -37,7 +37,7 @@ export function useScrapingControl() {
 
     try {
       const endpoint = platform === 'twitter' ? ENDPOINTS.TRIGGER_TWITTER : ENDPOINTS.TRIGGER_YOUTUBE;
-      const response = await fetch(`${endpoint}?max_results=${maxResults}`, {
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${endpoint}?max_results=${maxResults}`, {
         method: 'POST',
       });
 
@@ -63,8 +63,7 @@ export function useScrapingControl() {
   const testConnection = useCallback(async (platform: 'twitter' | 'youtube') => {
     try {
       const endpoint = platform === 'twitter' ? ENDPOINTS.TEST_TWITTER : ENDPOINTS.TEST_YOUTUBE;
-      const response = await fetch(endpoint);
-      return await response.json();
+      return await fetchFromScrapping(endpoint);
     } catch (err) {
       return { status: 'error', message: 'Error de conexión' };
     }
@@ -72,11 +71,8 @@ export function useScrapingControl() {
 
   const fetchLogs = useCallback(async () => {
     try {
-      const response = await fetch(`${ENDPOINTS.SCRAPING_LOGS}?limit=10`);
-      if (response.ok) {
-        const data = await response.json();
-        setLogs(data);
-      }
+      const data = await fetchFromScrapping(`${ENDPOINTS.SCRAPING_LOGS}?limit=10`);
+      setLogs(data);
     } catch (err) {
       console.error('Error fetching logs:', err);
     }

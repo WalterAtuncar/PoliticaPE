@@ -33,6 +33,16 @@ export async function fetchFromScrapping(endpoint: string) {
   return response.json();
 }
 
+export async function postToScrapping(endpoint: string, body?: object) {
+  const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${endpoint}`, {
+    method: 'POST',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+  return response.json();
+}
+
 export async function fetchFromSniffing(endpoint: string) {
   const response = await fetch(`${API_CONFIG.SNIFFING_BASE_URL}${endpoint}`);
   if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
