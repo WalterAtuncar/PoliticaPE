@@ -1,83 +1,67 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Campaign, CampaignFilters, ReachEstimate, CompetitorCampaign } from '../types/campaigns';
+import { API_CONFIG } from '../config/api';
 
-// Mock data generator
-const generateMockCampaign = (): Campaign => {
-  const statuses: Campaign['status'][] = ['draft', 'review', 'approved', 'active', 'paused', 'completed', 'cancelled'];
-  const objectives: Campaign['objective'][] = ['sentiment', 'awareness', 'mobilization', 'crisis_defense'];
-  const regions = ['Lima', 'Arequipa', 'Cusco', 'La Libertad', 'Piura', 'Puno', 'Ica'];
-  
-  const campaignNames = [
-    'Campaña Digital Lima Norte',
-    'Fortalecimiento Regional Cusco',
-    'Movilización Juvenil Nacional',
-    'Defensa Crisis Medios',
-    'Awareness Programa Social',
-    'Campaña Territorial Arequipa',
-    'Engagement Redes Sociales',
-    'Evento Masivo Plaza Mayor',
-    'Campaña Anti-Desinformación',
-    'Promoción Logros Gestión'
-  ];
+interface BackendCampaign {
+  id: string;
+  name: string;
+  description: string | null;
+  election: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  budget: number;
+  tenant_id: string;
+  party_id: string;
+  created_at: string;
+  updated_at: string;
+  region_code?: string | null;
+  objective?: string | null;
+  target_demographics?: any;
+  budget_details?: any;
+  performance_metrics?: any;
+}
 
-  const descriptions = [
-    'Campaña integral para fortalecer presencia digital en sectores juveniles del norte de Lima',
-    'Estrategia territorial para consolidar liderazgo en la región Cusco mediante eventos comunitarios',
-    'Movilización nacional de jóvenes 18-25 años enfocada en propuestas de empleo y educación',
-    'Respuesta estratégica a crisis mediática con enfoque en transparencia y rendición de cuentas',
-    'Campaña de awareness sobre nuevos programas sociales dirigida a familias NSE C-D',
-    'Fortalecimiento territorial en Arequipa mediante alianzas con líderes locales',
-    'Optimización de engagement en redes sociales con contenido viral y micro-influencers',
-    'Evento masivo en Plaza Mayor con transmisión multiplataforma y participación ciudadana',
-    'Campaña contra desinformación con fact-checking y educación mediática',
-    'Promoción de logros de gestión con testimonios ciudadanos y datos verificables'
-  ];
-
-  const id = Date.now().toString() + Math.random();
-  const nameIndex = Math.floor(Math.random() * campaignNames.length);
-  const status = statuses[Math.floor(Math.random() * statuses.length)];
-  const totalBudget = Math.floor(Math.random() * 200000) + 50000;
-  const spent = status === 'completed' ? totalBudget * 0.95 : Math.floor(Math.random() * totalBudget * 0.8);
-
+const mapBackendToCampaign = (backend: BackendCampaign): Campaign => {
   return {
-    id,
-    name: campaignNames[nameIndex],
-    description: descriptions[nameIndex],
-    status,
-    objective: objectives[Math.floor(Math.random() * objectives.length)],
-    targetRegions: regions.slice(0, Math.floor(Math.random() * 3) + 1),
-    targetDemographics: {
-      ageGroups: ['18-25', '26-35'].slice(0, Math.floor(Math.random() * 2) + 1),
-      nse: ['C', 'D'].slice(0, Math.floor(Math.random() * 2) + 1),
+    id: backend.id,
+    name: backend.name,
+    description: backend.description || '',
+    status: backend.status as Campaign['status'],
+    objective: (backend.objective as Campaign['objective']) || 'awareness',
+    targetRegions: backend.region_code ? [backend.region_code] : ['Lima'],
+    targetDemographics: backend.target_demographics || {
+      ageGroups: ['18-25', '26-35'],
+      nse: ['C', 'D'],
       gender: ['all'],
-      politicalAffinity: ['undecided', 'favorable'].slice(0, Math.floor(Math.random() * 2) + 1),
+      politicalAffinity: ['undecided'],
     },
-    budget: {
-      total: totalBudget,
+    budget: backend.budget_details || {
+      total: backend.budget || 0,
       allocated: {
-        digital: totalBudget * 0.4,
-        traditional: totalBudget * 0.3,
-        territorial: totalBudget * 0.2,
-        contingency: totalBudget * 0.1,
+        digital: (backend.budget || 0) * 0.4,
+        traditional: (backend.budget || 0) * 0.3,
+        territorial: (backend.budget || 0) * 0.2,
+        contingency: (backend.budget || 0) * 0.1,
       },
-      spent,
+      spent: 0,
     },
     timeline: {
-      startDate: new Date(Date.now() - Math.random() * 90 * 24 * 60 * 60 * 1000),
-      endDate: new Date(Date.now() + Math.random() * 60 * 24 * 60 * 60 * 1000),
+      startDate: new Date(backend.start_date),
+      endDate: new Date(backend.end_date),
       milestones: [],
     },
     team: [],
     assets: [],
-    performance: {
-      reach: Math.floor(Math.random() * 500000) + 100000,
-      impressions: Math.floor(Math.random() * 2000000) + 500000,
-      clicks: Math.floor(Math.random() * 50000) + 10000,
-      conversions: Math.floor(Math.random() * 5000) + 1000,
-      engagementRate: Math.random() * 10 + 2,
-      sentimentEvolution: (Math.random() - 0.5) * 0.4,
-      mentionsGenerated: Math.floor(Math.random() * 10000) + 2000,
-      roi: Math.floor(Math.random() * 300) + 150,
+    performance: backend.performance_metrics || {
+      reach: 0,
+      impressions: 0,
+      clicks: 0,
+      conversions: 0,
+      engagementRate: 0,
+      sentimentEvolution: 0,
+      mentionsGenerated: 0,
+      roi: 0,
     },
     abTests: [],
     crisisProtocol: {
@@ -86,116 +70,166 @@ const generateMockCampaign = (): Campaign => {
       emergencyContacts: [],
       monitoringKeywords: [],
     },
-    createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
-    updatedAt: new Date(),
-    createdBy: 'user-1',
-    lastModifiedBy: 'user-1',
+    createdAt: new Date(backend.created_at),
+    updatedAt: new Date(backend.updated_at),
+    createdBy: 'system',
+    lastModifiedBy: 'system',
   };
 };
 
-const generateMockCompetitorCampaign = (): CompetitorCampaign => {
-  const competitors = ['Fuerza Popular', 'Perú Libre', 'Renovación Popular', 'Alianza para el Progreso', 'Acción Popular'];
-  const regions = ['Lima', 'Arequipa', 'Cusco', 'La Libertad', 'Piura'];
-  const platforms = ['Facebook', 'Instagram', 'Twitter', 'TikTok', 'YouTube'];
-  
-  const campaignNames = [
-    'Campaña Digital Metropolitana',
-    'Fortalecimiento Regional Norte',
-    'Movilización Bases Partidarias',
-    'Campaña Medios Tradicionales',
-    'Estrategia Redes Sociales',
-  ];
-
-  return {
-    id: Date.now().toString() + Math.random(),
-    competitor: competitors[Math.floor(Math.random() * competitors.length)],
-    name: campaignNames[Math.floor(Math.random() * campaignNames.length)],
-    detectedAt: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
-    regions: regions.slice(0, Math.floor(Math.random() * 3) + 1),
-    estimatedBudget: Math.floor(Math.random() * 150000) + 30000,
-    reach: Math.floor(Math.random() * 300000) + 50000,
-    sentiment: (Math.random() - 0.5) * 0.6,
-    keyMessages: [
-      'Desarrollo económico sostenible',
-      'Lucha contra la corrupción',
-      'Mejora de servicios públicos',
-      'Seguridad ciudadana',
-      'Educación de calidad'
-    ].slice(0, Math.floor(Math.random() * 3) + 2),
-    platforms: platforms.slice(0, Math.floor(Math.random() * 3) + 2),
-    status: ['active', 'completed', 'paused'][Math.floor(Math.random() * 3)] as any,
-  };
-};
-
-export const useCampaigns = (filters: CampaignFilters) => {
+export const useCampaigns = (_filters: CampaignFilters) => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [competitorCampaigns, setCompetitorCampaigns] = useState<CompetitorCampaign[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [hasData, setHasData] = useState(false);
 
-  // Initialize with mock data
-  useEffect(() => {
-    const mockCampaigns: Campaign[] = [];
-    for (let i = 0; i < 12; i++) {
-      mockCampaigns.push(generateMockCampaign());
-    }
-    setCampaigns(mockCampaigns);
+  const fetchCampaigns = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/campaigns/`);
+      
+      if (!response.ok) {
+        throw new Error(`Error del servidor: ${response.status}`);
+      }
 
-    const mockCompetitors: CompetitorCampaign[] = [];
-    for (let i = 0; i < 8; i++) {
-      mockCompetitors.push(generateMockCompetitorCampaign());
+      const data: BackendCampaign[] = await response.json();
+      
+      if (data && data.length > 0) {
+        const mappedCampaigns = data.map(mapBackendToCampaign);
+        setCampaigns(mappedCampaigns);
+        setHasData(true);
+      } else {
+        setCampaigns([]);
+        setHasData(false);
+      }
+
+      const competitorsRes = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/competitors/`);
+      if (competitorsRes.ok) {
+        const competitorsData = await competitorsRes.json();
+        setCompetitorCampaigns(competitorsData || []);
+      }
+
+    } catch (err) {
+      console.error('Error fetching campaigns:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      setCampaigns([]);
+      setHasData(false);
+    } finally {
+      setIsLoading(false);
     }
-    setCompetitorCampaigns(mockCompetitors);
   }, []);
+
+  useEffect(() => {
+    fetchCampaigns();
+  }, [fetchCampaigns]);
 
   const createCampaign = useCallback(async (campaignData: Partial<Campaign>) => {
     setIsLoading(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const newCampaign: Campaign = {
-      ...generateMockCampaign(),
-      ...campaignData,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as Campaign;
+    try {
+      const payload = {
+        name: campaignData.name || 'Nueva Campaña',
+        description: campaignData.description || '',
+        election: 'general',
+        start_date: campaignData.timeline?.startDate?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+        end_date: campaignData.timeline?.endDate?.toISOString().split('T')[0] || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        status: campaignData.status || 'draft',
+        budget: campaignData.budget?.total || 0,
+        region_code: campaignData.targetRegions?.[0] || null,
+        objective: campaignData.objective || null,
+      };
 
-    setCampaigns(prev => [newCampaign, ...prev]);
-    setIsLoading(false);
-    
-    return newCampaign;
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/campaigns/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error al crear campaña: ${response.status}`);
+      }
+
+      const newCampaign = await response.json();
+      const mappedCampaign = mapBackendToCampaign(newCampaign);
+      setCampaigns(prev => [mappedCampaign, ...prev]);
+      setHasData(true);
+      
+      return mappedCampaign;
+    } catch (err) {
+      console.error('Error creating campaign:', err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   const updateCampaign = useCallback(async (id: string, updates: Partial<Campaign>) => {
-    setCampaigns(prev => 
-      prev.map(campaign => 
-        campaign.id === id 
-          ? { ...campaign, ...updates, updatedAt: new Date() }
-          : campaign
-      )
-    );
+    try {
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/campaigns/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: updates.name,
+          description: updates.description,
+          status: updates.status,
+          budget: updates.budget?.total,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error al actualizar: ${response.status}`);
+      }
+
+      setCampaigns(prev => 
+        prev.map(campaign => 
+          campaign.id === id 
+            ? { ...campaign, ...updates, updatedAt: new Date() }
+            : campaign
+        )
+      );
+    } catch (err) {
+      console.error('Error updating campaign:', err);
+      setCampaigns(prev => 
+        prev.map(campaign => 
+          campaign.id === id 
+            ? { ...campaign, ...updates, updatedAt: new Date() }
+            : campaign
+        )
+      );
+    }
   }, []);
 
   const deleteCampaign = useCallback(async (id: string) => {
-    setCampaigns(prev => prev.filter(campaign => campaign.id !== id));
+    try {
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/campaigns/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error al eliminar: ${response.status}`);
+      }
+
+      setCampaigns(prev => prev.filter(campaign => campaign.id !== id));
+    } catch (err) {
+      console.error('Error deleting campaign:', err);
+      setCampaigns(prev => prev.filter(campaign => campaign.id !== id));
+    }
   }, []);
 
   const duplicateCampaign = useCallback(async (id: string) => {
     const original = campaigns.find(c => c.id === id);
     if (original) {
-      const duplicate: Campaign = {
+      const duplicateData = {
         ...original,
-        id: Date.now().toString(),
         name: `${original.name} (Copia)`,
-        status: 'draft',
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        status: 'draft' as const,
       };
-      setCampaigns(prev => [duplicate, ...prev]);
-      return duplicate;
+      return await createCampaign(duplicateData);
     }
-  }, [campaigns]);
+  }, [campaigns, createCampaign]);
 
   const getPerformanceMetrics = useCallback((campaignId: string) => {
     const campaign = campaigns.find(c => c.id === campaignId);
@@ -203,9 +237,6 @@ export const useCampaigns = (filters: CampaignFilters) => {
   }, [campaigns]);
 
   const getReachEstimate = useCallback(async (targetData: any): Promise<ReachEstimate> => {
-    // Simulate API call for reach estimation
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
     const baseReach = 100000;
     const regionMultiplier = targetData.regions?.length || 1;
     const demographicMultiplier = (targetData.demographics?.ageGroups?.length || 1) * 0.8;
@@ -222,20 +253,23 @@ export const useCampaigns = (filters: CampaignFilters) => {
         ...acc,
         [demo]: Math.floor(totalReach / (targetData.demographics?.ageGroups?.length || 1))
       }), {}) || {},
-      confidence: Math.floor(Math.random() * 20) + 75,
-      basedOnHistoricalData: true,
+      confidence: 75,
+      basedOnHistoricalData: hasData,
     };
-  }, []);
+  }, [hasData]);
 
   return {
     campaigns,
     competitorCampaigns,
     isLoading,
+    error,
+    hasData,
     createCampaign,
     updateCampaign,
     deleteCampaign,
     duplicateCampaign,
     getPerformanceMetrics,
     getReachEstimate,
+    refetch: fetchCampaigns,
   };
 };

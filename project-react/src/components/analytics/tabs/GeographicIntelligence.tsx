@@ -1,36 +1,27 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Users, TrendingUp, Eye } from 'lucide-react';
+import { MapPin, Users, TrendingUp, Eye, AlertCircle, Loader2 } from 'lucide-react';
 import { Card } from '../../ui/Card';
 import { AnalyticsFilters } from '../AnalyticsPage';
+import { useGeographicData } from '../../../hooks/useGeographicData';
 
 interface GeographicIntelligenceProps {
   filters: AnalyticsFilters;
 }
 
-const peruRegions = [
-  { id: '150000', name: 'Lima', sentiment: 0.15, mentions: 4520, engagement: 8.9, population: 10628470 },
-  { id: '040000', name: 'Arequipa', sentiment: 0.28, mentions: 1180, engagement: 7.2, population: 1382730 },
-  { id: '080000', name: 'Cusco', sentiment: 0.34, mentions: 1250, engagement: 6.8, population: 1357075 },
-  { id: '130000', name: 'La Libertad', sentiment: -0.12, mentions: 980, engagement: 6.1, population: 1905301 },
-  { id: '200000', name: 'Piura', sentiment: 0.08, mentions: 750, engagement: 5.9, population: 2047954 },
-  { id: '210000', name: 'Puno', sentiment: -0.05, mentions: 650, engagement: 5.2, population: 1237997 },
-  { id: '110000', name: 'Ica', sentiment: 0.22, mentions: 580, engagement: 6.5, population: 850765 },
-  { id: '220000', name: 'San Martín', sentiment: 0.18, mentions: 420, engagement: 5.8, population: 899648 },
-];
-
-const selectedRegionData = {
-  name: 'Lima',
-  provinces: [
-    { name: 'Lima', sentiment: 0.12, mentions: 3200, districts: 43 },
-    { name: 'Callao', sentiment: 0.18, mentions: 890, districts: 7 },
-    { name: 'Cañete', sentiment: 0.25, mentions: 180, districts: 16 },
-    { name: 'Huarochirí', sentiment: 0.08, mentions: 120, districts: 32 },
-    { name: 'Yauyos', sentiment: 0.15, mentions: 85, districts: 33 },
-  ],
-};
-
 export const GeographicIntelligence: React.FC<GeographicIntelligenceProps> = ({ filters }) => {
+  const periodDays = filters.timeRange === '7d' ? 7 : filters.timeRange === '30d' ? 30 : 90;
+  const { 
+    regions, 
+    totalRegions, 
+    activeRegions, 
+    totalPopulation, 
+    coveredPopulation, 
+    leadingRegion, 
+    isLoading, 
+    hasData 
+  } = useGeographicData(periodDays);
+  
   const [selectedRegion, setSelectedRegion] = useState<string>('150000');
   const [viewLevel, setViewLevel] = useState<'department' | 'province' | 'district'>('department');
 
@@ -45,8 +36,33 @@ export const GeographicIntelligence: React.FC<GeographicIntelligenceProps> = ({ 
     return Math.min(Math.abs(sentiment) * 2, 1);
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <span className="ml-2 text-gray-600 dark:text-gray-400">Cargando datos geográficos...</span>
+      </div>
+    );
+  }
+
+  const coveragePercent = totalPopulation > 0 ? Math.round((coveredPopulation / totalPopulation) * 100) : 0;
+  const formatPopulation = (pop: number) => {
+    if (pop >= 1000000) return `${(pop / 1000000).toFixed(1)}M`;
+    if (pop >= 1000) return `${(pop / 1000).toFixed(0)}K`;
+    return pop.toString();
+  };
+
   return (
     <div className="space-y-6">
+      {!hasData && (
+        <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <AlertCircle className="h-4 w-4 text-blue-600" />
+          <span className="text-sm text-blue-700 dark:text-blue-300">
+            No hay datos geográficos disponibles para el período seleccionado. Los datos aparecerán cuando se procesen publicaciones con ubicación.
+          </span>
+        </div>
+      )}
+
       {/* Geographic Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <motion.div
@@ -61,10 +77,10 @@ export const GeographicIntelligence: React.FC<GeographicIntelligenceProps> = ({ 
                   Regiones Activas
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  24/25
+                  {activeRegions}/{totalRegions}
                 </p>
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                  96% cobertura
+                  {Math.round((activeRegions / totalRegions) * 100)}% cobertura
                 </p>
               </div>
               <MapPin className="h-8 w-8 text-blue-500" />
@@ -84,10 +100,10 @@ export const GeographicIntelligence: React.FC<GeographicIntelligenceProps> = ({ 
                   Población Cubierta
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  28.5M
+                  {formatPopulation(coveredPopulation)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  89% del total nacional
+                  {coveragePercent}% del total nacional
                 </p>
               </div>
               <Users className="h-8 w-8 text-green-500" />
@@ -107,10 +123,10 @@ export const GeographicIntelligence: React.FC<GeographicIntelligenceProps> = ({ 
                   Región Líder
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  Cusco
+                  {leadingRegion?.name ?? 'N/A'}
                 </p>
                 <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                  +0.34 sentiment
+                  {leadingRegion ? `${leadingRegion.sentiment >= 0 ? '+' : ''}${leadingRegion.sentiment.toFixed(2)} sentiment` : 'Sin datos'}
                 </p>
               </div>
               <TrendingUp className="h-8 w-8 text-purple-500" />
@@ -177,7 +193,7 @@ export const GeographicIntelligence: React.FC<GeographicIntelligenceProps> = ({ 
             {/* Simplified Peru Map Representation */}
             <div className="relative bg-gradient-to-br from-blue-50 to-green-50 dark:from-gray-800 dark:to-gray-700 rounded-lg p-8 min-h-[400px]">
               <div className="grid grid-cols-3 gap-4 h-full">
-                {peruRegions.slice(0, 9).map((region, index) => (
+                {regions.slice(0, 9).map((region, index) => (
                   <motion.div
                     key={region.id}
                     initial={{ opacity: 0, scale: 0.8 }}
@@ -239,7 +255,7 @@ export const GeographicIntelligence: React.FC<GeographicIntelligenceProps> = ({ 
             
             {viewLevel === 'department' && (
               <div className="space-y-4">
-                {peruRegions
+                {regions
                   .filter(region => region.id === selectedRegion)
                   .map(region => (
                     <div key={region.id} className="space-y-3">
@@ -287,37 +303,11 @@ export const GeographicIntelligence: React.FC<GeographicIntelligenceProps> = ({ 
               </div>
             )}
 
-            {viewLevel === 'province' && selectedRegion === '150000' && (
+            {viewLevel === 'province' && (
               <div className="space-y-3">
-                <h4 className="font-medium text-gray-900 dark:text-white mb-3">
-                  Provincias de Lima
-                </h4>
-                {selectedRegionData.provinces.map((province, index) => (
-                  <motion.div
-                    key={province.name}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 * index }}
-                    className="p-3 bg-white/50 dark:bg-gray-800/50 rounded-lg border border-gray-200/50 dark:border-gray-600/50"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {province.name}
-                      </span>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        province.sentiment > 0 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                      }`}>
-                        {province.sentiment > 0 ? '+' : ''}{province.sentiment.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                      <span>{province.mentions} menciones</span>
-                      <span>{province.districts} distritos</span>
-                    </div>
-                  </motion.div>
-                ))}
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Los datos a nivel de provincia aparecerán cuando estén disponibles en el backend.
+                </p>
               </div>
             )}
           </Card>
@@ -359,7 +349,7 @@ export const GeographicIntelligence: React.FC<GeographicIntelligenceProps> = ({ 
                 </tr>
               </thead>
               <tbody>
-                {peruRegions
+                {regions
                   .sort((a, b) => b.mentions - a.mentions)
                   .map((region, index) => (
                     <motion.tr
