@@ -56,7 +56,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({ metric, index }) => {
             </p>
             <p className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
               {formatValue(metric.value)}
-              {metric.id === '1' || metric.id === '3' ? '%' : ''}
+              {metric.id === '1' ? '%' : ''}
             </p>
             <div className="flex items-center space-x-1">
               {getTrendIcon()}
