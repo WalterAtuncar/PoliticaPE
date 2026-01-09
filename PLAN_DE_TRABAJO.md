@@ -3,7 +3,7 @@
 ## Plataforma de Análisis Político para Perú
 
 **Fecha de Inicio:** 2024-12-11  
-**Última Actualización:** 2024-12-11  
+**Última Actualización:** 2025-12-26  
 **Estado General:** EN PROGRESO - Fase 4 EN CURSO (Integración Frontend-Backend)
 
 ---
@@ -68,8 +68,11 @@
 | 2.4.3 | Probar scraper de Gestión | PENDIENTE | Estructura lista |
 | 2.4.4 | Probar scraper de ONPE (datos electorales) | PENDIENTE | Estructura lista |
 | 2.4.5 | Probar scraper de INEI (estadísticas) | PENDIENTE | Estructura lista |
-| 2.4.6 | Configurar scraper de Twitter (requiere API key) | OMITIDO | Opcional |
-| 2.4.7 | Configurar scraper de YouTube (requiere API key) | OMITIDO | Opcional |
+| 2.4.6 | Configurar scraper de X/Twitter | CULMINADO | API configurada y funcionando |
+| 2.4.7 | Configurar scraper de YouTube | CULMINADO | API configurada y funcionando |
+| 2.4.8 | Configurar scraper de Facebook | CULMINADO | API configurada y funcionando |
+| 2.4.9 | Configurar scraper de Instagram | CULMINADO | API configurada y funcionando |
+| 2.4.10 | Configurar scraper de TikTok | PENDIENTE | Credenciales configuradas, pendiente aprobación (2-5 días) |
 
 ### 2.5 Servicios de Análisis
 | ID | Tarea | Estado |
@@ -281,16 +284,18 @@
 | Fase | Total Tareas | Culminadas | Omitidas | Pendientes |
 |------|--------------|------------|----------|------------|
 | Fase 1: Infraestructura | 9 | 9 | 0 | 0 |
-| Fase 2: Backend Scrapping | 27 | 18 | 2 | 7 |
+| Fase 2: Backend Scrapping | 30 | 22 | 0 | 8 |
 | Fase 3: Backend Sniffing | 18 | 18 | 0 | 0 |
 | Fase 4: Frontend React | 27 | 11 | 0 | 16 |
 | Fase 5: Frontend Sniffing | 12 | 0 | 12 | 0 |
 | Fase 6: Testing | 9 | 1 | 0 | 8 |
 | Fase 7: Deployment | 13 | 2 | 0 | 11 |
-| Fase 8: Invest. Partidos | 5 | 0 | 0 | 5 |
-| **TOTAL** | **120** | **59** | **14** | **47** |
+| Fase 8: Invest. Partidos | 5 | 4 | 0 | 1 |
+| **TOTAL** | **123** | **67** | **12** | **44** |
 
-**Progreso Total: 49% completado (65% considerando omitidas)**
+**Progreso Total: 54% completado (64% considerando omitidas)**
+
+**Última Actualización:** 2025-12-26
 
 ---
 
