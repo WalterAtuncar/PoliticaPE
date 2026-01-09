@@ -13,7 +13,7 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
-import { TrendingUp, TrendingDown, AlertCircle, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertCircle, Loader2, BarChart3 } from 'lucide-react';
 import { Card } from '../../ui/Card';
 import { AnalyticsFilters } from '../AnalyticsPage';
 import { useAnalyticsData } from '../../../hooks/useAnalyticsData';
@@ -25,7 +25,7 @@ interface SentimentAnalysisProps {
 
 export const SentimentAnalysis: React.FC<SentimentAnalysisProps> = ({ filters }) => {
   const periodDays = filters.timeRange === '7d' ? 7 : filters.timeRange === '30d' ? 30 : 90;
-  const { sentiment, isLoading, isUsingMockData } = useAnalyticsData('news', periodDays);
+  const { sentiment, isLoading, hasData } = useAnalyticsData('news', periodDays);
 
   const sentimentData = sentiment ? [
     { name: 'Positivo', value: sentiment.sentiment_distribution.positive, color: '#10B981' },
@@ -38,13 +38,7 @@ export const SentimentAnalysis: React.FC<SentimentAnalysisProps> = ({ filters })
     Positivo: t.positive,
     Neutral: t.neutral,
     Negativo: t.negative,
-  })) ?? [
-    { date: '01/12', Positivo: 42, Neutral: 32, Negativo: 26 },
-    { date: '02/12', Positivo: 44, Neutral: 31, Negativo: 25 },
-    { date: '03/12', Positivo: 45, Neutral: 30, Negativo: 25 },
-    { date: '04/12', Positivo: 46, Neutral: 29, Negativo: 25 },
-    { date: '05/12', Positivo: 45, Neutral: 30, Negativo: 25 },
-  ];
+  })) ?? [];
 
   if (isLoading) {
     return (
@@ -55,20 +49,27 @@ export const SentimentAnalysis: React.FC<SentimentAnalysisProps> = ({ filters })
     );
   }
 
-  const averageSentiment = sentiment?.average_sentiment ?? 0.18;
-  const totalMentions = sentiment?.total_items ?? 9330;
+  if (!hasData || !sentiment) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96">
+        <BarChart3 className="h-16 w-16 text-gray-300 dark:text-gray-600 mb-4" />
+        <h3 className="text-lg font-medium text-gray-600 dark:text-gray-400">
+          Sin datos de sentimiento
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-500 mt-2 text-center max-w-md">
+          No hay datos de análisis de sentimiento disponibles para el período seleccionado.
+          Los datos aparecerán cuando se procesen noticias y publicaciones.
+        </p>
+      </div>
+    );
+  }
+
+  const averageSentiment = sentiment.average_sentiment;
+  const totalMentions = sentiment.total_items;
+  const activeRegions = sentiment.sentiment_trend?.length > 0 ? 24 : 0;
 
   return (
     <div className="space-y-6">
-      {isUsingMockData && (
-        <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-          <AlertCircle className="h-4 w-4 text-amber-600" />
-          <span className="text-sm text-amber-700 dark:text-amber-300">
-            Mostrando datos de ejemplo. Los datos reales aparecerán cuando haya información en la base de datos.
-          </span>
-        </div>
-      )}
-
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <motion.div
@@ -137,7 +138,7 @@ export const SentimentAnalysis: React.FC<SentimentAnalysisProps> = ({ filters })
                   Regiones Activas
                 </p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  24
+                  {activeRegions}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   De 25 departamentos
