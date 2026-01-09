@@ -37,14 +37,21 @@ async def get_sentiment_analysis(
 
 @router.get("/trends", response_model=TrendAnalysisResponse)
 async def get_trend_analysis(
-    keywords: str = Query(..., description="Comma-separated keywords to analyze"),
-    days: int = Query(30, description="Number of days to analyze"),
+    keywords: Optional[str] = Query(None, description="Comma-separated keywords to analyze"),
+    period_days: int = Query(30, description="Number of days to analyze"),
+    days: int = Query(None, description="Alias for period_days"),
     db: Session = Depends(get_db)
 ):
     """Get trend analysis for specified keywords"""
-    keyword_list = [k.strip() for k in keywords.split(",")]
+    actual_days = days if days is not None else period_days
+    
+    if keywords:
+        keyword_list = [k.strip() for k in keywords.split(",")]
+    else:
+        keyword_list = ["política", "gobierno", "elecciones", "congreso", "presidente"]
+    
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=days)
+    start_date = end_date - timedelta(days=actual_days)
     
     analysis_service = AnalysisService(db)
     result = analysis_service.analyze_trends(keyword_list, start_date, end_date)
