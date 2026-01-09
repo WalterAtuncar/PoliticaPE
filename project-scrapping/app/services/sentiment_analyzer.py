@@ -1,73 +1,82 @@
-from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
-import torch
-from typing import Optional
+from typing import Optional, List
 import logging
-from app.config import settings
+import re
+
+logger = logging.getLogger(__name__)
 
 class SentimentAnalyzer:
     def __init__(self):
-        """Initialize sentiment analysis model"""
-        try:
-            self.tokenizer = AutoTokenizer.from_pretrained(settings.SENTIMENT_MODEL)
-            self.model = AutoModelForSequenceClassification.from_pretrained(settings.SENTIMENT_MODEL)
-            self.classifier = pipeline(
-                "sentiment-analysis",
-                model=self.model,
-                tokenizer=self.tokenizer,
-                return_all_scores=True
-            )
-            logging.info(f"Sentiment analyzer initialized with model: {settings.SENTIMENT_MODEL}")
-        except Exception as e:
-            logging.error(f"Failed to initialize sentiment analyzer: {e}")
-            self.classifier = None
+        self.positive_words = [
+            "bueno", "excelente", "mejor", "éxito", "logro", "avance", "progreso",
+            "apoyo", "beneficio", "solución", "mejora", "desarrollo", "crecimiento",
+            "positivo", "favorable", "esperanza", "confianza", "victoria", "triunfo",
+            "acuerdo", "aprobación", "celebración", "felicitaciones", "gracias",
+            "importante", "necesario", "valioso", "histórico", "extraordinario",
+            "bien", "correcto", "justo", "transparente", "honesto", "eficiente"
+        ]
+        
+        self.negative_words = [
+            "malo", "peor", "fracaso", "corrupción", "escándalo", "crisis",
+            "problema", "conflicto", "rechazo", "protesta", "denuncia", "crítica",
+            "negativo", "desfavorable", "preocupación", "amenaza", "riesgo",
+            "derrota", "pérdida", "error", "fallo", "violación", "abuso",
+            "injusticia", "ilegal", "fraude", "mentira", "engaño", "traición",
+            "robo", "delito", "crimen", "violencia", "muerte", "accidente",
+            "mal", "incorrecto", "corrupto", "ineficiente", "incompetente"
+        ]
+        
+        self.intensifiers = ["muy", "mucho", "demasiado", "extremadamente", "totalmente"]
+        self.negators = ["no", "nunca", "jamás", "sin", "tampoco", "ni"]
+        
+        logger.info("SentimentAnalyzer inicializado (análisis basado en reglas)")
+    
+    def analyze(self, text: str) -> Optional[float]:
+        return self.analyze_text(text)
     
     def analyze_text(self, text: str) -> Optional[float]:
-        """
-        Analyze sentiment of text
-        Returns: Float between -1 (negative) and 1 (positive)
-        """
-        if not self.classifier or not text:
+        if not text:
             return None
         
         try:
-            # Truncate text if too long
-            max_length = 512
-            if len(text) > max_length:
-                text = text[:max_length]
+            text_lower = text.lower()
+            words = re.findall(r'\b\w+\b', text_lower)
             
-            # Get prediction
-            results = self.classifier(text)
-            
-            # Convert to -1 to 1 scale
-            if isinstance(results[0], list):
-                scores = results[0]
-                positive_score = next((s['score'] for s in scores if s['label'] == 'POSITIVE'), 0)
-                negative_score = next((s['score'] for s in scores if s['label'] == 'NEGATIVE'), 0)
-                return positive_score - negative_score
-            else:
-                # Fallback for different model outputs
+            if not words:
                 return 0.0
+            
+            positive_count = 0
+            negative_count = 0
+            
+            for i, word in enumerate(words):
+                is_negated = False
+                if i > 0 and words[i-1] in self.negators:
+                    is_negated = True
                 
+                intensity = 1.0
+                if i > 0 and words[i-1] in self.intensifiers:
+                    intensity = 1.5
+                
+                if word in self.positive_words:
+                    if is_negated:
+                        negative_count += intensity
+                    else:
+                        positive_count += intensity
+                elif word in self.negative_words:
+                    if is_negated:
+                        positive_count += intensity * 0.5
+                    else:
+                        negative_count += intensity
+            
+            total = positive_count + negative_count
+            if total == 0:
+                return 0.0
+            
+            sentiment = (positive_count - negative_count) / total
+            return max(-1.0, min(1.0, sentiment))
+            
         except Exception as e:
-            logging.error(f"Error analyzing sentiment: {e}")
+            logger.error(f"Error analizando sentimiento: {e}")
             return None
     
-    def analyze_batch(self, texts: list) -> list:
-        """Analyze sentiment for multiple texts"""
-        if not self.classifier:
-            return [None] * len(texts)
-        
-        results = []
-        batch_size = settings.BATCH_SIZE
-        
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
-            batch_results = []
-            
-            for text in batch:
-                score = self.analyze_text(text)
-                batch_results.append(score)
-            
-            results.extend(batch_results)
-        
-        return results
+    def analyze_batch(self, texts: List[str]) -> List[Optional[float]]:
+        return [self.analyze_text(text) for text in texts]
