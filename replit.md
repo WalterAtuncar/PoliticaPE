@@ -115,8 +115,15 @@ PostgreSQL with 27+ tables across schemas:
 - Created `TwitterAPIioScraper` class with X-API-Key authentication
 - Endpoints: `/api/v1/scraping/trigger/twitterapi-io`, `/api/v1/scraping/test/twitterapi-io`
 - Searches for political keywords: "Peru politica OR congreso peru OR presidente peru"
-- Status: **20 real tweets imported** with engagement data (likes, retweets, views)
+- **Optimized for engagement**: Uses `queryType: "Top"` and `min_faves:10` filter
+- Status: **62 tweets imported** with 21,284 likes, 5,166 retweets, 824,354 views
 - Cost: ~$0.15 per 1,000 tweets (much cheaper than official Twitter API)
+
+**Frontend Scraping Panel:**
+- New "Importar Datos" tab in Settings page
+- Platform cards for Twitter and YouTube with import buttons
+- Scraping history table with status, items imported, and dates
+- Hook `useScrapingControl.ts` for API integration
 
 **YouTube Data API v3:**
 - Created `YouTubeScraper` class with API key authentication

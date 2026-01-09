@@ -18,7 +18,7 @@ class TwitterAPIioScraper:
     def is_configured(self) -> bool:
         return bool(self.api_key)
     
-    async def search_tweets(self, query: str, max_results: int = 20) -> List[Dict[str, Any]]:
+    async def search_tweets(self, query: str, max_results: int = 20, sort_by_engagement: bool = True, min_likes: int = 10) -> List[Dict[str, Any]]:
         if not self.is_configured():
             logger.error("TwitterAPI.io no está configurado - falta TWITTERAPI_IO_KEY")
             return []
@@ -26,14 +26,17 @@ class TwitterAPIioScraper:
         all_tweets = []
         cursor = None
         
+        enhanced_query = f"{query} min_faves:{min_likes}" if min_likes > 0 else query
+        query_type = "Top" if sort_by_engagement else "Latest"
+        
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 while len(all_tweets) < max_results:
                     url = f"{self.base_url}/tweet/advanced_search"
                     
                     params = {
-                        "query": query,
-                        "queryType": "Latest"
+                        "query": enhanced_query,
+                        "queryType": query_type
                     }
                     
                     if cursor:
@@ -53,7 +56,7 @@ class TwitterAPIioScraper:
                         logger.error(f"Error TwitterAPI.io: {response.status_code} - {response.text}")
                         break
                 
-                logger.info(f"TwitterAPI.io: {len(all_tweets)} tweets encontrados para '{query}'")
+                logger.info(f"TwitterAPI.io: {len(all_tweets)} tweets encontrados para '{enhanced_query}' (sort: {query_type})")
                 return all_tweets[:max_results]
                     
         except Exception as e:
