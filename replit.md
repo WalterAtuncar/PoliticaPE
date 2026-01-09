@@ -111,11 +111,12 @@ PostgreSQL with 27+ tables across schemas:
 ## Recent Changes
 
 ### 2026-01-09: Social Media Scrapers Integration
-**Twitter API v2 (X):**
-- Created `TwitterScraper` class with OAuth Bearer Token authentication
-- Endpoints: `/api/v1/scraping/trigger/twitter`, `/api/v1/scraping/test/twitter`
-- Searches for political keywords: "Peru política", "Congreso Peru", "presidente Peru"
-- Status: Connected successfully, returns 0 results due to free tier API limitations
+**Twitter via TwitterAPI.io (alternative API):**
+- Created `TwitterAPIioScraper` class with X-API-Key authentication
+- Endpoints: `/api/v1/scraping/trigger/twitterapi-io`, `/api/v1/scraping/test/twitterapi-io`
+- Searches for political keywords: "Peru politica OR congreso peru OR presidente peru"
+- Status: **20 real tweets imported** with engagement data (likes, retweets, views)
+- Cost: ~$0.15 per 1,000 tweets (much cheaper than official Twitter API)
 
 **YouTube Data API v3:**
 - Created `YouTubeScraper` class with API key authentication

@@ -329,6 +329,109 @@ async def test_twitter_api():
             "api_configured": True
         }
 
+@router.get("/test/twitterapi-io")
+async def test_twitterapi_io():
+    from app.services.scrapers.twitterapi_io_scraper import TwitterAPIioScraper
+    
+    scraper = TwitterAPIioScraper()
+    result = await scraper.test_connection()
+    return result
+
+async def run_twitterapi_io_scraping(db_url: str, query: str = None, max_results: int = 100):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.services.scrapers.twitterapi_io_scraper import TwitterAPIioScraper
+    
+    engine = create_engine(db_url)
+    SessionLocal = sessionmaker(bind=engine)
+    db = SessionLocal()
+    
+    log = ScrapingLog(
+        id=str(uuid.uuid4()),
+        source="twitter",
+        scraping_type="social",
+        status="running"
+    )
+    db.add(log)
+    db.commit()
+    
+    try:
+        scraper = TwitterAPIioScraper()
+        search_query = query or "Peru politica OR congreso peru OR presidente peru"
+        tweets = await scraper.search_tweets(query=search_query, max_results=max_results)
+        
+        sentiment_analyzer = SentimentAnalyzer()
+        items_added = 0
+        
+        for tweet in tweets:
+            transformed = scraper.transform_tweet(tweet)
+            
+            existing = db.query(RawSocialPost).filter(
+                RawSocialPost.platform == "twitter",
+                RawSocialPost.post_id == transformed["post_id"]
+            ).first()
+            
+            if existing:
+                continue
+            
+            sentiment_score = sentiment_analyzer.analyze(transformed.get("content", ""))
+            
+            post = RawSocialPost(
+                id=str(uuid.uuid4()),
+                platform=transformed["platform"],
+                post_id=transformed["post_id"],
+                author=transformed["author"],
+                content=transformed["content"],
+                created_at=transformed["created_at"],
+                engagement_metrics=transformed["engagement_metrics"],
+                geographic_location=transformed.get("geographic_location"),
+                sentiment_score=sentiment_score,
+                processed=True
+            )
+            db.add(post)
+            items_added += 1
+        
+        db.commit()
+        
+        log.status = "completed"
+        log.items_scraped = items_added
+        log.completed_at = datetime.now()
+        log.extra_metadata = {"total_fetched": len(tweets), "duplicates_skipped": len(tweets) - items_added, "source": "twitterapi.io"}
+        db.commit()
+        
+        logger.info(f"TwitterAPI.io scraping completado: {items_added} tweets agregados")
+        
+    except Exception as e:
+        log.status = "failed"
+        log.error_message = str(e)
+        log.completed_at = datetime.now()
+        db.commit()
+        logger.error(f"Error en TwitterAPI.io scraping: {str(e)}")
+    finally:
+        db.close()
+
+@router.post("/trigger/twitterapi-io")
+async def trigger_twitterapi_io_scraping(
+    background_tasks: BackgroundTasks,
+    query: Optional[str] = Query(None, description="Búsqueda personalizada"),
+    max_results: int = Query(50, description="Máximo de resultados", le=200)
+):
+    from app.config import settings
+    
+    task_id = str(uuid.uuid4())
+    background_tasks.add_task(
+        lambda: asyncio.run(run_twitterapi_io_scraping(settings.DATABASE_URL, query, max_results))
+    )
+    
+    return {
+        "message": "Scraping de Twitter (via TwitterAPI.io) iniciado",
+        "task_id": task_id,
+        "platform": "twitter",
+        "source": "twitterapi.io",
+        "query": query or "Peru politica OR congreso peru OR presidente peru",
+        "max_results": max_results
+    }
+
 @router.get("/test/youtube")
 async def test_youtube_api():
     from app.services.scrapers.youtube_scraper import YouTubeScraper
