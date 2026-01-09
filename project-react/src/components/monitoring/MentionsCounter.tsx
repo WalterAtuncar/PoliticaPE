@@ -10,13 +10,29 @@ interface MentionsCounterProps {
 }
 
 export const MentionsCounter: React.FC<MentionsCounterProps> = ({ mentions }) => {
+  if (!mentions || mentions.length === 0) {
+    return (
+      <Card glass className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Menciones en Vivo
+          </h3>
+        </div>
+        <div className="flex flex-col items-center justify-center h-48 text-gray-500">
+          <Hash className="h-8 w-8 mb-2" />
+          <span>No hay datos de menciones disponibles</span>
+        </div>
+      </Card>
+    );
+  }
+
   const totalMentions = mentions.reduce((sum, item) => sum + item.count, 0);
   const topCandidate = mentions.reduce((prev, current) => 
     prev.count > current.count ? prev : current
   );
 
   const chartData = mentions.map(item => ({
-    name: item.name.split(' ')[0], // First name only for chart
+    name: item.name.split(' ')[0],
     count: item.count,
     trend: item.trend,
   }));
