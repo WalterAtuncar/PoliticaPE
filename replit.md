@@ -110,6 +110,32 @@ PostgreSQL with 27+ tables across schemas:
 
 ## Recent Changes
 
+### 2026-01-09: Production Deployment Configuration
+**Reverse Proxy Gateway:**
+- Added httpx-based proxy routes in scrapping backend for sniffing service endpoints
+- Proxy endpoints: `/api/metrics`, `/api/analyze`, `/api/recent`, `/api/crisis-alerts`
+- All proxies preserve upstream HTTP status codes using JSONResponse
+- Graceful fallbacks for connection/timeout errors (return empty data with 200)
+- Other errors return 502 Bad Gateway
+
+**WebSocket Proxy:**
+- Added WebSocket proxy at `/ws/stream` using websockets library
+- Bidirectional forwarding between client and sniffing service
+
+**Static File Serving:**
+- Root "/" serves SPA index.html when SERVE_FRONTEND=true
+- Catch-all route serves SPA for all non-API routes in production
+- Static assets mounted from `/assets` directory
+
+**Environment Variables:**
+- `SERVE_FRONTEND`: Set to "true" to serve frontend from FastAPI
+- `SNIFFING_URL`: HTTP URL for sniffing service (default: http://localhost:8080)
+- `SNIFFING_WS_URL`: WebSocket URL for sniffing service (default: ws://localhost:8080)
+
+**Deployment Configuration:**
+- Build: `npm run build` in project-react
+- Run: Both sniffing service (port 8080) and scrapping service (port 5000) with SERVE_FRONTEND=true
+
 ### 2026-01-09: Frontend-Backend API Integration Fix
 **Backend fixes:**
 - Fixed Pydantic schemas: Added `BaseResponseModel` with UUID-to-string field validator
@@ -123,7 +149,7 @@ PostgreSQL with 27+ tables across schemas:
 - `useDashboardData.ts`: Added `source_type=news` parameter to sentiment API call
 - All hooks include `isUsingMockData` flag and graceful fallback to mock data
 
-**Progress:** 54% completed (67 of 123 tasks)
+**Progress:** 55% completed (68 of 123 tasks)
 
 ### 2025-12-25: Dev Team Commit (a671a9d6)
 - Added `PLAN_DE_TRABAJO.md` with detailed task tracking
