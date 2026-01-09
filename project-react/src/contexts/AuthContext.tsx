@@ -100,16 +100,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const register = async (email: string, password: string, name: string) => {
     dispatch({ type: 'SET_LOADING', payload: true });
-    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    const user: User = {
-      id: Date.now().toString(),
-      email,
-      name,
-      role: 'analyst',
-    };
-    
-    dispatch({ type: 'SET_USER', payload: user });
+    try {
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, name }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Error al registrar');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.user) {
+        const user: User = {
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.name,
+          role: data.user.role as 'admin' | 'analyst' | 'viewer',
+          avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?w=100&h=100&fit=crop&crop=face',
+        };
+        
+        localStorage.setItem('user', JSON.stringify(user));
+        dispatch({ type: 'SET_USER', payload: user });
+      } else {
+        throw new Error('Error al registrar');
+      }
+    } catch (error) {
+      dispatch({ type: 'SET_LOADING', payload: false });
+      throw error;
+    }
   };
 
   React.useEffect(() => {

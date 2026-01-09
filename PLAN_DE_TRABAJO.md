@@ -156,18 +156,18 @@
 | ID | Tarea | Estado |
 |----|-------|--------|
 | 4.2.1 | Crear servicio API client para conectar con backend scrapping | CULMINADO |
-| 4.2.2 | Reemplazar mock data de noticias por datos reales | PENDIENTE |
-| 4.2.3 | Reemplazar mock data de redes sociales por datos reales | PENDIENTE |
-| 4.2.4 | Reemplazar mock data gubernamental por datos reales | PENDIENTE |
-| 4.2.5 | Integrar análisis de sentimiento real | PENDIENTE |
+| 4.2.2 | Reemplazar mock data de noticias por datos reales | CULMINADO |
+| 4.2.3 | Reemplazar mock data de redes sociales por datos reales | PARCIAL - Hook integrado, usa fallback mock |
+| 4.2.4 | Reemplazar mock data gubernamental por datos reales | CULMINADO |
+| 4.2.5 | Integrar análisis de sentimiento real | CULMINADO |
 
 ### 4.3 Integración con Backend Sniffing (Tiempo Real)
 | ID | Tarea | Estado |
 |----|-------|--------|
 | 4.3.1 | Actualizar hook useWebSocket para conectar con backend real | CULMINADO |
-| 4.3.2 | Actualizar hook useRealtimeData para datos reales | PENDIENTE |
-| 4.3.3 | Conectar MonitoringPage con WebSocket real | PENDIENTE |
-| 4.3.4 | Conectar AlertsPanel con datos reales de crisis | PENDIENTE |
+| 4.3.2 | Actualizar hook useRealtimeData para datos reales | CULMINADO |
+| 4.3.3 | Conectar MonitoringPage con WebSocket real | CULMINADO |
+| 4.3.4 | Conectar AlertsPanel con datos reales de crisis | CULMINADO |
 | 4.3.5 | Conectar TrendingHashtags con datos reales | PENDIENTE |
 
 ### 4.4 Módulos del Dashboard
@@ -190,7 +190,7 @@
 | 4.5.1 | Implementar autenticación real (no mock) | CULMINADO |
 | 4.5.2 | Conectar login con tabla identity.users | CULMINADO |
 | 4.5.3 | Validación segura de contraseñas con bcrypt | CULMINADO |
-| 4.5.4 | Implementar registro de usuarios | PENDIENTE |
+| 4.5.4 | Implementar registro de usuarios | CULMINADO |
 | 4.5.5 | Implementar recuperación de contraseña | PENDIENTE |
 | 4.5.6 | Implementar manejo de sesiones/tokens | PENDIENTE |
 
@@ -198,8 +198,8 @@
 | ID | Tarea | Estado |
 |----|-------|--------|
 | 4.6.1 | Workflow "Frontend" funcionando | CULMINADO |
-| 4.6.2 | Configurar build de producción | PENDIENTE |
-| 4.6.3 | Configurar deployment para producción | PENDIENTE |
+| 4.6.2 | Configurar build de producción | CULMINADO |
+| 4.6.3 | Configurar deployment para producción | CULMINADO |
 
 ---
 
@@ -220,7 +220,7 @@
 |----|-------|--------|
 | 6.1.1 | Test: Scraping de noticias → API → Frontend | PENDIENTE |
 | 6.1.2 | Test: Datos en tiempo real → WebSocket → Dashboard | PENDIENTE |
-| 6.1.3 | Test: Autenticación completa (login/logout/registro) | CULMINADO (login verificado) |
+| 6.1.3 | Test: Autenticación completa (login/logout/registro) | CULMINADO |
 | 6.1.4 | Test: Gestión de campañas CRUD completo | PENDIENTE |
 | 6.1.5 | Test: Análisis geográfico con datos reales | PENDIENTE |
 

@@ -13,7 +13,17 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+
 class LoginResponse(BaseModel):
+    success: bool
+    user: Optional[dict] = None
+    message: str
+
+class RegisterResponse(BaseModel):
     success: bool
     user: Optional[dict] = None
     message: str
@@ -84,6 +94,77 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error de autenticación: {str(e)}")
+
+def hash_password(password: str) -> str:
+    """Hash password with bcrypt"""
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+@router.post("/register", response_model=RegisterResponse)
+async def register(request: RegisterRequest, db: Session = Depends(get_db)):
+    """Register a new user"""
+    try:
+        existing = db.execute(
+            text("SELECT id FROM identity.users WHERE email = :email"),
+            {"email": request.email}
+        ).fetchone()
+        
+        if existing:
+            raise HTTPException(status_code=400, detail="El correo ya está registrado")
+        
+        if len(request.password) < 6:
+            raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
+        
+        password_hash = hash_password(request.password)
+        
+        default_tenant = db.execute(
+            text("SELECT id FROM identity.tenants LIMIT 1")
+        ).fetchone()
+        tenant_id = default_tenant[0] if default_tenant else None
+        
+        result = db.execute(
+            text("""
+                INSERT INTO identity.users (email, name, password_hash, tenant_id, is_active, created_at)
+                VALUES (:email, :name, :password_hash, :tenant_id, true, NOW())
+                RETURNING id, email, name
+            """),
+            {
+                "email": request.email,
+                "name": request.name,
+                "password_hash": password_hash,
+                "tenant_id": tenant_id
+            }
+        ).fetchone()
+        
+        user_id = result[0]
+        
+        analyst_role = db.execute(
+            text("SELECT id FROM identity.roles WHERE name = 'analyst' LIMIT 1")
+        ).fetchone()
+        
+        if analyst_role and tenant_id:
+            db.execute(
+                text("INSERT INTO identity.user_roles (user_id, role_id, tenant_id) VALUES (:user_id, :role_id, :tenant_id)"),
+                {"user_id": user_id, "role_id": analyst_role[0], "tenant_id": tenant_id}
+            )
+        
+        db.commit()
+        
+        return RegisterResponse(
+            success=True,
+            user={
+                "id": str(user_id),
+                "email": result[1],
+                "name": result[2],
+                "role": "analyst"
+            },
+            message="Usuario registrado exitosamente"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al registrar: {str(e)}")
 
 @router.get("/me")
 async def get_current_user(user_id: str, db: Session = Depends(get_db)):
