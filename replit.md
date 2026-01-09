@@ -110,6 +110,30 @@ PostgreSQL with 27+ tables across schemas:
 
 ## Recent Changes
 
+### 2026-01-09: Social Media Scrapers Integration
+**Twitter API v2 (X):**
+- Created `TwitterScraper` class with OAuth Bearer Token authentication
+- Endpoints: `/api/v1/scraping/trigger/twitter`, `/api/v1/scraping/test/twitter`
+- Searches for political keywords: "Peru política", "Congreso Peru", "presidente Peru"
+- Status: Connected successfully, returns 0 results due to free tier API limitations
+
+**YouTube Data API v3:**
+- Created `YouTubeScraper` class with API key authentication
+- Endpoints: `/api/v1/scraping/trigger/youtube`, `/api/v1/scraping/test/youtube`
+- Searches for political content with engagement metrics (likes, views, comments)
+- Status: **42 real videos imported** with 17,119 likes and 599,347 views
+
+**Sentiment Analyzer Rewrite:**
+- Replaced transformers ML model with lightweight rule-based Spanish lexicon
+- Keywords: positive/negative words, intensifiers, negators
+- No external ML dependencies required
+
+**Scraping Infrastructure:**
+- Background task processing with ScrapingLog tracking
+- Duplicate detection via post_id
+- Auto sentiment scoring on import
+- Rate limiting: Twitter 450 req/15min, YouTube 10k quota/day
+
 ### 2026-01-09: Complete Mock Data Elimination
 **Backend Analysis Endpoints:**
 - Added 7 new analysis endpoints: `/analysis/time-series`, `/analysis/platform-breakdown`, `/analysis/share-of-voice`, `/analysis/top-posts`, `/analysis/trending-topics`, `/analysis/regional-engagement`, `/analysis/engagement`
