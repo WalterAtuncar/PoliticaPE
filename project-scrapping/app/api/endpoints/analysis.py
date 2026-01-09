@@ -365,31 +365,32 @@ async def get_regional_engagement(
     days: int = Query(30, description="Number of days to analyze"),
     db: Session = Depends(get_db)
 ):
-    """Get engagement metrics by region"""
+    """Get engagement metrics by region (departamentos de Perú)"""
     end_date = datetime.now()
     start_date = end_date - timedelta(days=days)
     
     posts = db.query(RawSocialPost).filter(
         and_(
             RawSocialPost.created_at >= start_date,
-            RawSocialPost.created_at <= end_date,
-            RawSocialPost.geographic_location.isnot(None)
+            RawSocialPost.created_at <= end_date
         )
     ).all()
     
     region_stats = {}
     for post in posts:
-        region = post.geographic_location
+        region = post.region if post.region else "Nacional"
         if region not in region_stats:
-            region_stats[region] = {"posts": 0, "total_engagement": 0}
+            region_stats[region] = {"posts": 0, "total_engagement": 0, "likes": 0, "shares": 0, "comments": 0}
         
         region_stats[region]["posts"] += 1
         if post.engagement_metrics and isinstance(post.engagement_metrics, dict):
-            region_stats[region]["total_engagement"] += (
-                post.engagement_metrics.get("likes", 0) +
-                post.engagement_metrics.get("shares", 0) +
-                post.engagement_metrics.get("comments", 0)
-            )
+            likes = post.engagement_metrics.get("likes", 0)
+            shares = post.engagement_metrics.get("shares", 0)
+            comments = post.engagement_metrics.get("comments", 0)
+            region_stats[region]["likes"] += likes
+            region_stats[region]["shares"] += shares
+            region_stats[region]["comments"] += comments
+            region_stats[region]["total_engagement"] += likes + shares + comments
     
     regional_data = []
     for region, stats in region_stats.items():
@@ -397,9 +398,12 @@ async def get_regional_engagement(
         regional_data.append({
             "region": region,
             "posts": stats["posts"],
-            "engagement": round(engagement_rate, 1)
+            "engagement": round(engagement_rate, 1),
+            "likes": stats["likes"],
+            "shares": stats["shares"],
+            "comments": stats["comments"]
         })
     
     regional_data.sort(key=lambda x: x["engagement"], reverse=True)
     
-    return {"regions": regional_data[:10], "period_days": days}
+    return {"regions": regional_data[:15], "period_days": days}

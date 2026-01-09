@@ -18,6 +18,7 @@ class RawSocialPost(Base):
     processed = Column(Boolean, default=False)
     sentiment_score = Column(Float, nullable=True)
     geographic_location = Column(String(100), nullable=True)
+    region = Column(String(100), nullable=True)
     
     __table_args__ = (
         Index('idx_platform_post_id', 'platform', 'post_id'),

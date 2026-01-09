@@ -1,10 +1,78 @@
 import httpx
 import os
 import logging
-from typing import Optional, List, Dict, Any
+import re
+from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+PERU_REGIONS = {
+    "lima": "Lima",
+    "callao": "Callao",
+    "arequipa": "Arequipa",
+    "trujillo": "La Libertad",
+    "la libertad": "La Libertad",
+    "chiclayo": "Lambayeque",
+    "lambayeque": "Lambayeque",
+    "piura": "Piura",
+    "cusco": "Cusco",
+    "cuzco": "Cusco",
+    "iquitos": "Loreto",
+    "loreto": "Loreto",
+    "huancayo": "Junín",
+    "junin": "Junín",
+    "junín": "Junín",
+    "tacna": "Tacna",
+    "ica": "Ica",
+    "puno": "Puno",
+    "juliaca": "Puno",
+    "cajamarca": "Cajamarca",
+    "ayacucho": "Ayacucho",
+    "huanuco": "Huánuco",
+    "huánuco": "Huánuco",
+    "chimbote": "Áncash",
+    "ancash": "Áncash",
+    "áncash": "Áncash",
+    "huaraz": "Áncash",
+    "tumbes": "Tumbes",
+    "moquegua": "Moquegua",
+    "pucallpa": "Ucayali",
+    "ucayali": "Ucayali",
+    "tarapoto": "San Martín",
+    "san martin": "San Martín",
+    "san martín": "San Martín",
+    "moyobamba": "San Martín",
+    "huancavelica": "Huancavelica",
+    "cerro de pasco": "Pasco",
+    "pasco": "Pasco",
+    "puerto maldonado": "Madre de Dios",
+    "madre de dios": "Madre de Dios",
+    "abancay": "Apurímac",
+    "apurimac": "Apurímac",
+    "apurímac": "Apurímac",
+    "amazonas": "Amazonas",
+    "chachapoyas": "Amazonas",
+}
+
+def parse_peru_region(location_text: str) -> Tuple[str, str]:
+    if not location_text:
+        return ("Perú", "Nacional")
+    
+    location_lower = location_text.lower().strip()
+    
+    if "peru" not in location_lower and "perú" not in location_lower:
+        for region_key, region_name in PERU_REGIONS.items():
+            if region_key in location_lower:
+                return (location_text, region_name)
+        return (location_text, "Internacional")
+    
+    for region_key, region_name in PERU_REGIONS.items():
+        if region_key in location_lower:
+            return (location_text, region_name)
+    
+    return (location_text, "Nacional")
+
 
 class TwitterAPIioScraper:
     def __init__(self):
@@ -77,9 +145,12 @@ class TwitterAPIioScraper:
             sample_tweets = []
             for tweet in tweets[:3]:
                 author = tweet.get("author", {})
+                location, region = parse_peru_region(author.get("location", ""))
                 sample_tweets.append({
                     "id": tweet.get("id", ""),
                     "author": author.get("userName", "unknown"),
+                    "author_location": location,
+                    "region": region,
                     "content": tweet.get("text", "")[:200],
                     "engagement": {
                         "likes": tweet.get("likeCount", 0),
@@ -113,6 +184,9 @@ class TwitterAPIioScraper:
         except:
             created_at = datetime.utcnow()
         
+        author_location = author.get("location", "")
+        location, region = parse_peru_region(author_location)
+        
         return {
             "platform": "twitter",
             "post_id": tweet.get("id", ""),
@@ -125,6 +199,7 @@ class TwitterAPIioScraper:
                 "comments": tweet.get("replyCount", 0),
                 "views": tweet.get("viewCount", 0)
             },
-            "geographic_location": "Perú",
+            "geographic_location": location if location else "Perú",
+            "region": region,
             "url": f"https://twitter.com/{author.get('userName', '')}/status/{tweet.get('id', '')}"
         }

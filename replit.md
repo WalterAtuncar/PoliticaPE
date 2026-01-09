@@ -131,6 +131,13 @@ PostgreSQL with 27+ tables across schemas:
 - Searches for political content with engagement metrics (likes, views, comments)
 - Status: **42 real videos imported** with 17,119 likes and 599,347 views
 
+**Regional Engagement (Departamentos de Perú):**
+- Scraper extracts `author.location` from Twitter user profiles
+- `parse_peru_region()` function identifies 25 departamentos de Perú
+- Regional mapping: Lima, Arequipa, Cusco, Piura, La Libertad, Lambayeque, etc.
+- Categories: Specific region (Lima, Cusco), Nacional (Peru sin especificar), Internacional
+- Endpoint: `/api/v1/analysis/regional-engagement` returns engagement by region
+
 **Sentiment Analyzer Rewrite:**
 - Replaced transformers ML model with lightweight rule-based Spanish lexicon
 - Keywords: positive/negative words, intensifiers, negators

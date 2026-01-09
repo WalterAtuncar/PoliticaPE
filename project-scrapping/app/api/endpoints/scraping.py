@@ -385,6 +385,7 @@ async def run_twitterapi_io_scraping(db_url: str, query: str = None, max_results
                 created_at=transformed["created_at"],
                 engagement_metrics=transformed["engagement_metrics"],
                 geographic_location=transformed.get("geographic_location"),
+                region=transformed.get("region", "Nacional"),
                 sentiment_score=sentiment_score,
                 processed=True
             )
