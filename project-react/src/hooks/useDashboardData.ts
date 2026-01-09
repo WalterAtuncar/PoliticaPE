@@ -76,7 +76,7 @@ export const useDashboardData = (): DashboardData => {
 
       const [statsRes, sentimentRes] = await Promise.allSettled([
         fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.STATS}`),
-        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SENTIMENT}`),
+        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SENTIMENT}?source_type=news`),
       ]);
 
       let stats: DashboardStats | null = null;

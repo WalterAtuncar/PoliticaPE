@@ -1,8 +1,19 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, Field, field_validator, ConfigDict
+from typing import List, Optional, Dict, Any, Union
 from datetime import datetime, date
+from uuid import UUID
 
-class NewsArticleResponse(BaseModel):
+class BaseResponseModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    @field_validator('id', mode='before', check_fields=False)
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
+
+class NewsArticleResponse(BaseResponseModel):
     id: str
     source: str
     title: str
@@ -15,11 +26,8 @@ class NewsArticleResponse(BaseModel):
     tags: Optional[List[str]]
     sentiment_score: Optional[float]
     political_entities: Optional[Dict[str, Any]]
-    
-    class Config:
-        from_attributes = True
 
-class SocialPostResponse(BaseModel):
+class SocialPostResponse(BaseResponseModel):
     id: str
     platform: str
     post_id: str
@@ -30,11 +38,8 @@ class SocialPostResponse(BaseModel):
     engagement_metrics: Optional[Dict[str, Any]]
     sentiment_score: Optional[float]
     geographic_location: Optional[str]
-    
-    class Config:
-        from_attributes = True
 
-class GovernmentDataResponse(BaseModel):
+class GovernmentDataResponse(BaseResponseModel):
     id: str
     source: str
     data_type: str
@@ -44,11 +49,8 @@ class GovernmentDataResponse(BaseModel):
     scraped_at: datetime
     url: str
     department: Optional[str]
-    
-    class Config:
-        from_attributes = True
 
-class SurveyResponse(BaseModel):
+class SurveyResponse(BaseResponseModel):
     id: str
     source: str
     title: str
@@ -61,9 +63,6 @@ class SurveyResponse(BaseModel):
     scraped_at: datetime
     url: str
     pollster: Optional[str]
-    
-    class Config:
-        from_attributes = True
 
 class StatsResponse(BaseModel):
     total_news_articles: int
@@ -74,7 +73,7 @@ class StatsResponse(BaseModel):
     recent_social_24h: int
     recent_government_24h: int
 
-class ScrapingLogResponse(BaseModel):
+class ScrapingLogResponse(BaseResponseModel):
     id: str
     source: str
     scraping_type: str
@@ -84,9 +83,6 @@ class ScrapingLogResponse(BaseModel):
     started_at: datetime
     completed_at: Optional[datetime]
     error_message: Optional[str]
-    
-    class Config:
-        from_attributes = True
 
 class ScrapingTaskRequest(BaseModel):
     sources: Optional[List[str]] = None
@@ -147,9 +143,14 @@ class CampaignResponse(CampaignBase):
     party_id: str
     created_at: datetime
     updated_at: datetime
+    model_config = ConfigDict(from_attributes=True)
     
-    class Config:
-        from_attributes = True
+    @field_validator('id', 'tenant_id', 'party_id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
 
 class CampaignTeamMemberBase(BaseModel):
     name: str
@@ -165,9 +166,16 @@ class CampaignTeamMemberResponse(CampaignTeamMemberBase):
     campaign_id: str
     user_id: Optional[str]
     created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
     
-    class Config:
-        from_attributes = True
+    @field_validator('id', 'campaign_id', 'user_id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if v is None:
+            return v
+        if isinstance(v, UUID):
+            return str(v)
+        return v
 
 class CampaignAssetBase(BaseModel):
     name: str
@@ -184,9 +192,14 @@ class CampaignAssetResponse(CampaignAssetBase):
     campaign_id: str
     approval_status: str
     created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
     
-    class Config:
-        from_attributes = True
+    @field_validator('id', 'campaign_id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
 
 class ABTestBase(BaseModel):
     name: str
@@ -204,9 +217,14 @@ class ABTestResponse(ABTestBase):
     campaign_id: str
     results_summary: Optional[Dict[str, Any]]
     created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
     
-    class Config:
-        from_attributes = True
+    @field_validator('id', 'campaign_id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v
 
 class CompetitorCampaignBase(BaseModel):
     competitor_name: str
@@ -224,6 +242,11 @@ class CompetitorCampaignResponse(CompetitorCampaignBase):
     id: str
     tenant_id: str
     detected_at: datetime
+    model_config = ConfigDict(from_attributes=True)
     
-    class Config:
-        from_attributes = True
+    @field_validator('id', 'tenant_id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, UUID):
+            return str(v)
+        return v

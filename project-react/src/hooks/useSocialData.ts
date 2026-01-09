@@ -915,32 +915,41 @@ export const useSocialData = (filters: SocialFilters) => {
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data) && data.length > 0) {
-          const realPosts: SocialPost[] = data.map((post: any) => ({
-            id: post.id || String(Math.random()),
-            platform: post.platform || 'twitter',
-            content: post.content || '',
-            author: post.author || 'Usuario',
-            handle: post.handle || `@usuario`,
-            authorAvatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?w=100&h=100&fit=crop&crop=face',
-            timestamp: new Date(post.created_at || Date.now()),
-            likes: post.likes_count || 0,
-            comments: post.comments_count || 0,
-            shares: post.shares_count || 0,
-            engagementRate: post.engagement_rate || 0,
-            sentiment: post.sentiment_score > 0.2 ? 'positive' : post.sentiment_score < -0.2 ? 'negative' : 'neutral',
-            sentimentScore: post.sentiment_score || 0,
-            region: post.detected_region || 'Nacional',
-            hashtags: post.hashtags || [],
-            mentions: post.mentions || [],
-            reach: post.reach || 1000,
-            impressions: post.impressions || 1500,
-            isVerified: post.is_verified || false,
-            isViral: post.is_viral || false,
-            isFakeNews: false,
-            fakeNewsScore: 0,
-            emotions: [],
-            userLiked: false,
-          }));
+          const realPosts: SocialPost[] = data.map((post: any) => {
+            const metrics = post.engagement_metrics || {};
+            const likes = metrics.likes ?? 0;
+            const comments = metrics.comments ?? 0;
+            const shares = metrics.shares ?? 0;
+            const total = likes + comments + shares;
+            const reach = Math.max(total * 10, 1000);
+            
+            return {
+              id: post.id || String(Math.random()),
+              platform: post.platform || 'twitter',
+              content: post.content || '',
+              author: post.author || 'Usuario',
+              handle: `@${(post.author || 'usuario').toLowerCase().replace(/\s+/g, '')}`,
+              authorAvatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?w=100&h=100&fit=crop&crop=face',
+              timestamp: new Date(post.created_at || Date.now()),
+              likes,
+              comments,
+              shares,
+              engagementRate: reach > 0 ? parseFloat(((total / reach) * 100).toFixed(1)) : 0,
+              sentiment: (post.sentiment_score ?? 0) > 0.2 ? 'positive' : (post.sentiment_score ?? 0) < -0.2 ? 'negative' : 'neutral',
+              sentimentScore: post.sentiment_score ?? 0,
+              region: post.geographic_location || 'Nacional',
+              hashtags: [],
+              mentions: [],
+              reach,
+              impressions: reach * 1.5,
+              isVerified: false,
+              isViral: total > 1000,
+              isFakeNews: false,
+              fakeNewsScore: 0,
+              emotions: [],
+              userLiked: false,
+            };
+          });
           setAllPosts(realPosts);
           setPosts(realPosts);
           setIsUsingMockData(false);

@@ -110,6 +110,21 @@ PostgreSQL with 27+ tables across schemas:
 
 ## Recent Changes
 
+### 2026-01-09: Frontend-Backend API Integration Fix
+**Backend fixes:**
+- Fixed Pydantic schemas: Added `BaseResponseModel` with UUID-to-string field validator
+- Updated all response schemas (News, Social, Government, Campaign, etc.) to properly serialize UUIDs
+- All data APIs now return 200 OK: `/api/v1/data/news`, `/api/v1/data/social`, `/api/v1/data/government`
+- Sentiment API requires `source_type` parameter: `/api/v1/analysis/sentiment?source_type=news`
+
+**Frontend fixes:**
+- `useNewsData.ts`: Updated to handle array API response (not wrapped in `{articles: []}`)
+- `useSocialData.ts`: Fixed mapping for `engagement_metrics` object from backend
+- `useDashboardData.ts`: Added `source_type=news` parameter to sentiment API call
+- All hooks include `isUsingMockData` flag and graceful fallback to mock data
+
+**Progress:** 54% completed (67 of 123 tasks)
+
 ### 2025-12-25: Dev Team Commit (a671a9d6)
 - Added `PLAN_DE_TRABAJO.md` with detailed task tracking
 - Added database seed scripts for political parties (9 parties)
