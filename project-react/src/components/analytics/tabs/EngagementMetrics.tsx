@@ -249,7 +249,8 @@ export const EngagementMetrics: React.FC<EngagementMetricsProps> = ({ filters })
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.1 * index }}
-                    className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200/50 dark:border-gray-600/50"
+                    onClick={() => post.url && window.open(post.url, '_blank')}
+                    className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200/50 dark:border-gray-600/50 cursor-pointer hover:bg-white/80 dark:hover:bg-gray-700/50 hover:shadow-md transition-all duration-200"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center space-x-2">
@@ -270,7 +271,7 @@ export const EngagementMetrics: React.FC<EngagementMetricsProps> = ({ filters })
                         {post.timestamp ? new Date(post.timestamp).toLocaleDateString() : 'Sin fecha'}
                       </span>
                     </div>
-                    <p className="text-gray-700 dark:text-gray-300 mb-3 text-sm leading-relaxed">
+                    <p className="text-gray-700 dark:text-gray-300 mb-3 text-sm leading-relaxed whitespace-pre-line">
                       {post.content}
                     </p>
                     <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">

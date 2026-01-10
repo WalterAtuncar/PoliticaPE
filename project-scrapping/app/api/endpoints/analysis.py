@@ -348,15 +348,27 @@ async def get_top_posts(
                 return f"#{hashtags[0]}"
         return "Instagram"
     
+    def get_post_url(post):
+        metadata = post.metadata if isinstance(post.metadata, dict) else {}
+        if post.platform == "youtube":
+            return metadata.get("video_url") or f"https://www.youtube.com/watch?v={post.post_id}"
+        elif post.platform == "twitter":
+            author = post.author or "user"
+            return f"https://twitter.com/{author}/status/{post.post_id}"
+        elif post.platform == "instagram":
+            return metadata.get("permalink") or f"https://www.instagram.com/p/{post.post_id}/"
+        return None
+    
     top_posts = []
     for post in paginated_posts:
         metrics = post.engagement_metrics if isinstance(post.engagement_metrics, dict) else {}
         post_date = post.created_at or post.scraped_at
         top_posts.append({
             "id": post.id,
-            "content": post.content[:200] + "..." if post.content and len(post.content) > 200 else post.content,
+            "content": post.content,
             "author": get_author_display(post),
             "platform": post.platform,
+            "url": get_post_url(post),
             "engagement": {
                 "likes": metrics.get("likes", 0),
                 "shares": metrics.get("shares", 0),

@@ -42,6 +42,7 @@ interface TopPost {
   content: string;
   author: string;
   platform: string;
+  url?: string;
   engagement: {
     likes: number;
     shares: number;
