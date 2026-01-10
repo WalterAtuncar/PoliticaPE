@@ -349,7 +349,7 @@ async def get_top_posts(
         return "Instagram"
     
     def get_post_url(post):
-        metadata = post.metadata if isinstance(post.metadata, dict) else {}
+        metadata = post.extra_metadata if isinstance(post.extra_metadata, dict) else {}
         if post.platform == "youtube":
             return metadata.get("video_url") or f"https://www.youtube.com/watch?v={post.post_id}"
         elif post.platform == "twitter":
