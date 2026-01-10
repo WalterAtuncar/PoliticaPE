@@ -1,5 +1,5 @@
 #!/bin/bash
+set -e
 cd project-react
 npm install
-npm install serve
-npx vite build
+npm run build

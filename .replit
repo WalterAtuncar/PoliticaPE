@@ -81,5 +81,5 @@ externalPort = 8080
 [deployment]
 deploymentTarget = "autoscale"
 run = ["bash", "-c", "cd project-sniffing/microservice && python -m uvicorn main:app --host 0.0.0.0 --port 8080 & cd project-scrapping && SERVE_FRONTEND=true python -m uvicorn app.main:app --host 0.0.0.0 --port 5000"]
-build = ["bash", "-c", "cd project-react && npm run build"]
+build = ["bash", "build.sh"]
 publicDir = "project-react/dist"
