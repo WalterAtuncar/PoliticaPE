@@ -87,6 +87,50 @@ async def rapidoc():
     """
     return html_content
 
+def create_demo_user():
+    """Create demo user if it doesn't exist"""
+    import bcrypt
+    from sqlalchemy import text
+    from app.database import SessionLocal
+    
+    db = SessionLocal()
+    try:
+        existing = db.execute(
+            text("SELECT id FROM identity.users WHERE email = 'admin@politica.pe'")
+        ).fetchone()
+        
+        if not existing:
+            password_hash = bcrypt.hashpw("password123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            
+            tenant = db.execute(text("SELECT id FROM identity.tenants LIMIT 1")).fetchone()
+            tenant_id = tenant[0] if tenant else None
+            
+            if not tenant_id:
+                db.execute(text("""
+                    INSERT INTO identity.tenants (name, slug, is_active, created_at)
+                    VALUES ('PoliticaPE', 'politicape', true, NOW())
+                """))
+                db.commit()
+                tenant = db.execute(text("SELECT id FROM identity.tenants LIMIT 1")).fetchone()
+                tenant_id = tenant[0] if tenant else None
+            
+            db.execute(
+                text("""
+                    INSERT INTO identity.users (email, name, password_hash, tenant_id, is_active, created_at)
+                    VALUES ('admin@politica.pe', 'Administrador', :password_hash, :tenant_id, true, NOW())
+                """),
+                {"password_hash": password_hash, "tenant_id": tenant_id}
+            )
+            db.commit()
+            logger.info("Demo user created: admin@politica.pe")
+        else:
+            logger.info("Demo user already exists")
+    except Exception as e:
+        logger.error(f"Error creating demo user: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup"""
@@ -96,6 +140,9 @@ async def startup_event():
     # Initialize database
     init_db()
     logger.info("Database initialized")
+    
+    # Create demo user
+    create_demo_user()
     
     logger.info("Application startup completed")
 
