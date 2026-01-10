@@ -31,13 +31,26 @@ export function useScrapingControl() {
   const [logs, setLogs] = useState<ScrapingLog[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const triggerScraping = useCallback(async (platform: 'twitter' | 'youtube', maxResults: number = 50): Promise<ScrapingResult | null> => {
+  const triggerScraping = useCallback(async (platform: 'twitter' | 'youtube' | 'instagram', maxResults: number = 50, igUserId?: string): Promise<ScrapingResult | null> => {
     setLoading(prev => ({ ...prev, [platform]: true }));
     setError(null);
 
     try {
-      const endpoint = platform === 'twitter' ? ENDPOINTS.TRIGGER_TWITTER : ENDPOINTS.TRIGGER_YOUTUBE;
-      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${endpoint}?max_results=${maxResults}`, {
+      let endpoint = ENDPOINTS.TRIGGER_TWITTER;
+      let url = '';
+      
+      if (platform === 'twitter') {
+        endpoint = ENDPOINTS.TRIGGER_TWITTER;
+        url = `${API_CONFIG.SCRAPPING_BASE_URL}${endpoint}?max_results=${maxResults}`;
+      } else if (platform === 'youtube') {
+        endpoint = ENDPOINTS.TRIGGER_YOUTUBE;
+        url = `${API_CONFIG.SCRAPPING_BASE_URL}${endpoint}?max_results=${maxResults}`;
+      } else if (platform === 'instagram') {
+        endpoint = ENDPOINTS.TRIGGER_INSTAGRAM;
+        url = `${API_CONFIG.SCRAPPING_BASE_URL}${endpoint}?max_results=${maxResults}&ig_user_id=${igUserId}`;
+      }
+      
+      const response = await fetch(url, {
         method: 'POST',
       });
 
@@ -60,9 +73,11 @@ export function useScrapingControl() {
     }
   }, []);
 
-  const testConnection = useCallback(async (platform: 'twitter' | 'youtube') => {
+  const testConnection = useCallback(async (platform: 'twitter' | 'youtube' | 'instagram') => {
     try {
-      const endpoint = platform === 'twitter' ? ENDPOINTS.TEST_TWITTER : ENDPOINTS.TEST_YOUTUBE;
+      let endpoint = ENDPOINTS.TEST_TWITTER;
+      if (platform === 'youtube') endpoint = ENDPOINTS.TEST_YOUTUBE;
+      if (platform === 'instagram') endpoint = ENDPOINTS.TEST_INSTAGRAM;
       return await fetchFromScrapping(endpoint);
     } catch (err) {
       return { status: 'error', message: 'Error de conexión' };
@@ -79,7 +94,7 @@ export function useScrapingControl() {
   }, []);
 
   const getPlatformStatus = useCallback((): PlatformStatus[] => {
-    const platforms = ['twitter', 'youtube'];
+    const platforms = ['twitter', 'youtube', 'instagram'];
     
     return platforms.map(platform => {
       const platformLogs = logs.filter(log => log.source === platform);

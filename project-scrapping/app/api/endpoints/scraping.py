@@ -473,3 +473,152 @@ async def test_youtube_api():
             "message": f"Error al conectar con YouTube API: {str(e)}",
             "api_configured": True
         }
+
+
+@router.get("/test/instagram")
+async def test_instagram_api():
+    from app.services.scrapers.instagram_scraper import InstagramScraper
+    import os
+    
+    access_token = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
+    
+    if not access_token:
+        return {
+            "status": "error",
+            "message": "INSTAGRAM_ACCESS_TOKEN no está configurado",
+            "api_configured": False
+        }
+    
+    try:
+        scraper = InstagramScraper()
+        result = await scraper.test_connection()
+        
+        if result.get("success"):
+            accounts = await scraper.get_instagram_accounts()
+            return {
+                "status": "success",
+                "message": result.get("message"),
+                "api_configured": True,
+                "user_name": result.get("name"),
+                "instagram_accounts": len(accounts),
+                "accounts": accounts
+            }
+        else:
+            return {
+                "status": "error",
+                "message": result.get("error"),
+                "api_configured": True
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Error al conectar con Instagram API: {str(e)}",
+            "api_configured": True
+        }
+
+
+async def run_instagram_scraping(db_url: str, ig_user_id: str, max_results: int = 100):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.services.scrapers.instagram_scraper import InstagramScraper
+    
+    engine = create_engine(db_url)
+    SessionLocal = sessionmaker(bind=engine)
+    db = SessionLocal()
+    
+    log = ScrapingLog(
+        id=str(uuid.uuid4()),
+        source="instagram",
+        scraping_type="social",
+        status="running"
+    )
+    db.add(log)
+    db.commit()
+    
+    try:
+        scraper = InstagramScraper()
+        
+        if not scraper.is_configured():
+            raise Exception("INSTAGRAM_ACCESS_TOKEN no está configurado")
+        
+        posts = await scraper.scrape_political_content(ig_user_id, max_per_hashtag=max_results // 6)
+        
+        sentiment_analyzer = SentimentAnalyzer()
+        items_added = 0
+        
+        for post in posts:
+            existing = db.query(RawSocialPost).filter(
+                RawSocialPost.platform == "instagram",
+                RawSocialPost.post_id == post["post_id"]
+            ).first()
+            
+            if existing:
+                continue
+            
+            sentiment_score = sentiment_analyzer.analyze(post.get("content", ""))
+            
+            db_post = RawSocialPost(
+                id=str(uuid.uuid4()),
+                platform="instagram",
+                post_id=post["post_id"],
+                author=post.get("author", ""),
+                content=post.get("content", ""),
+                engagement_metrics={
+                    "likes": post.get("likes", 0),
+                    "shares": 0,
+                    "comments": post.get("comments", 0),
+                    "views": 0
+                },
+                collected_at=datetime.now(),
+                region="Nacional",
+                sentiment_score=sentiment_score
+            )
+            db.add(db_post)
+            items_added += 1
+        
+        db.commit()
+        
+        log.status = "completed"
+        log.items_collected = items_added
+        log.completed_at = datetime.now()
+        db.commit()
+        
+        logger.info(f"Instagram scraping completado: {items_added} posts añadidos")
+        
+    except Exception as e:
+        log.status = "failed"
+        log.error_message = str(e)
+        log.completed_at = datetime.now()
+        db.commit()
+        logger.error(f"Error en Instagram scraping: {str(e)}")
+    finally:
+        db.close()
+
+
+@router.post("/trigger/instagram")
+async def trigger_instagram_scraping(
+    background_tasks: BackgroundTasks,
+    ig_user_id: str = Query(..., description="ID de cuenta Instagram Business"),
+    max_results: int = Query(50, description="Máximo de resultados por hashtag", le=200),
+    db: Session = Depends(get_db)
+):
+    from app.config import settings
+    from app.services.scrapers.instagram_scraper import InstagramScraper
+    
+    scraper = InstagramScraper()
+    if not scraper.is_configured():
+        raise HTTPException(status_code=400, detail="INSTAGRAM_ACCESS_TOKEN no está configurado")
+    
+    task_id = str(uuid.uuid4())
+    background_tasks.add_task(
+        lambda: asyncio.run(run_instagram_scraping(settings.DATABASE_URL, ig_user_id, max_results))
+    )
+    
+    return {
+        "message": "Scraping de Instagram iniciado",
+        "task_id": task_id,
+        "platform": "instagram",
+        "ig_user_id": ig_user_id,
+        "max_results": max_results,
+        "hashtags": ["politicaperu", "perupolitico", "congresoperu", "gobiernoperu", "eleccionesperu", "peru2026"]
+    }

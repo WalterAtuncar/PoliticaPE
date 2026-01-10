@@ -1,26 +1,27 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCw, CheckCircle, XCircle, Clock, Database, Twitter, Youtube } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, Clock, Database, Twitter, Youtube, Instagram } from 'lucide-react';
 import { useScrapingControl } from '../../../hooks/useScrapingControl';
 
 interface PlatformCardProps {
-  platform: 'twitter' | 'youtube';
+  platform: 'twitter' | 'youtube' | 'instagram';
   name: string;
   icon: React.ReactNode;
   color: string;
-  onTrigger: (platform: 'twitter' | 'youtube', maxResults: number) => Promise<void>;
+  onTrigger: (platform: 'twitter' | 'youtube' | 'instagram', maxResults: number, igUserId?: string) => Promise<void>;
   loading: boolean;
   lastScrape: string | null;
   itemsScraped: number;
+  igUserId?: string;
 }
 
-function PlatformCard({ platform, name, icon, color, onTrigger, loading, lastScrape, itemsScraped }: PlatformCardProps) {
+function PlatformCard({ platform, name, icon, color, onTrigger, loading, lastScrape, itemsScraped, igUserId }: PlatformCardProps) {
   const [maxResults, setMaxResults] = useState(50);
   const [message, setMessage] = useState<string | null>(null);
 
   const handleTrigger = async () => {
     setMessage(null);
-    await onTrigger(platform, maxResults);
+    await onTrigger(platform, maxResults, igUserId);
     setMessage(`Scraping de ${name} iniciado`);
     setTimeout(() => setMessage(null), 5000);
   };
@@ -133,10 +134,12 @@ export default function ScrapingPanel() {
     setPlatformStatus(getPlatformStatus());
   }, [logs, getPlatformStatus]);
 
-  const handleTrigger = async (platform: 'twitter' | 'youtube', maxResults: number) => {
-    await triggerScraping(platform, maxResults);
+  const handleTrigger = async (platform: 'twitter' | 'youtube' | 'instagram', maxResults: number, igUserId?: string) => {
+    await triggerScraping(platform, maxResults, igUserId);
     setTimeout(() => fetchLogs(), 5000);
   };
+
+  const INSTAGRAM_USER_ID = '17841429930462129';
 
   const getStatusForPlatform = (platform: string) => {
     return platformStatus.find(p => p.platform === platform) || {
@@ -183,6 +186,17 @@ export default function ScrapingPanel() {
           loading={loading.youtube || false}
           lastScrape={getStatusForPlatform('youtube').lastScrape}
           itemsScraped={getStatusForPlatform('youtube').itemsScraped}
+        />
+        <PlatformCard
+          platform="instagram"
+          name="Instagram"
+          icon={<Instagram className="w-6 h-6 text-white" />}
+          color="bg-gradient-to-br from-purple-600 to-pink-500"
+          onTrigger={handleTrigger}
+          loading={loading.instagram || false}
+          lastScrape={getStatusForPlatform('instagram').lastScrape}
+          itemsScraped={getStatusForPlatform('instagram').itemsScraped}
+          igUserId={INSTAGRAM_USER_ID}
         />
       </div>
 
