@@ -357,6 +357,8 @@ async def get_top_posts(
             return f"https://twitter.com/{author}/status/{post.post_id}"
         elif post.platform == "instagram":
             return metadata.get("permalink") or f"https://www.instagram.com/p/{post.post_id}/"
+        elif post.platform == "facebook":
+            return metadata.get("permalink") or f"https://www.facebook.com/{post.post_id}"
         return None
     
     top_posts = []

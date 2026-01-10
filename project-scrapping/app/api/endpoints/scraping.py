@@ -627,3 +627,137 @@ async def trigger_instagram_scraping(
         "max_results": max_results,
         "hashtags": ["politicaperu", "perupolitico", "congresoperu", "gobiernoperu", "eleccionesperu", "peru2026"]
     }
+
+
+@router.get("/test/facebook")
+async def test_facebook_connection():
+    from app.services.scrapers.facebook_scraper import FacebookScraper
+    
+    scraper = FacebookScraper()
+    result = await scraper.test_connection()
+    
+    if result.get("success"):
+        pages = await scraper.get_managed_pages()
+        result["pages"] = pages
+    
+    return result
+
+
+async def run_facebook_scraping(database_url: str, page_ids: list, max_results: int):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.models import RawSocialPost, ScrapingLog
+    from app.services.scrapers.facebook_scraper import FacebookScraper
+    from app.services.sentiment_analyzer import SentimentAnalyzer
+    
+    engine = create_engine(database_url)
+    SessionLocal = sessionmaker(bind=engine)
+    db = SessionLocal()
+    
+    log = ScrapingLog(
+        id=str(uuid.uuid4()),
+        source="facebook",
+        scraping_type="social",
+        status="running"
+    )
+    db.add(log)
+    db.commit()
+    
+    try:
+        scraper = FacebookScraper()
+        
+        if not scraper.is_configured():
+            raise Exception("FACEBOOK_GRAPH_TOKEN no está configurado")
+        
+        all_posts = []
+        for page_id in page_ids:
+            posts = await scraper.get_page_posts(page_id, max_results // len(page_ids))
+            all_posts.extend(posts)
+        
+        sentiment_analyzer = SentimentAnalyzer()
+        items_added = 0
+        
+        for post in all_posts:
+            if not post.get("content"):
+                continue
+            
+            existing = db.query(RawSocialPost).filter(
+                RawSocialPost.platform == "facebook",
+                RawSocialPost.post_id == post["post_id"]
+            ).first()
+            
+            if existing:
+                continue
+            
+            sentiment_score = sentiment_analyzer.analyze(post.get("content", ""))
+            
+            db_post = RawSocialPost(
+                id=str(uuid.uuid4()),
+                platform="facebook",
+                post_id=post["post_id"],
+                author=post.get("author", ""),
+                content=post.get("content", ""),
+                engagement_metrics={
+                    "likes": post.get("likes", 0),
+                    "shares": post.get("shares", 0),
+                    "comments": post.get("comments", 0),
+                    "views": 0
+                },
+                extra_metadata={
+                    "permalink": post.get("permalink", ""),
+                    "author_id": post.get("author_id", "")
+                },
+                scraped_at=datetime.now(),
+                region="Nacional",
+                sentiment_score=sentiment_score
+            )
+            db.add(db_post)
+            items_added += 1
+        
+        db.commit()
+        
+        log.status = "completed"
+        log.items_scraped = items_added
+        log.completed_at = datetime.now()
+        db.commit()
+        
+        logger.info(f"Facebook scraping completado: {items_added} posts añadidos")
+        
+    except Exception as e:
+        log.status = "failed"
+        log.error_message = str(e)
+        log.completed_at = datetime.now()
+        db.commit()
+        logger.error(f"Error en Facebook scraping: {str(e)}")
+    finally:
+        db.close()
+
+
+@router.post("/trigger/facebook")
+async def trigger_facebook_scraping(
+    background_tasks: BackgroundTasks,
+    page_ids: str = Query("CongresoPeru,PresidenciaPeru", description="IDs de páginas separados por coma"),
+    max_results: int = Query(50, description="Máximo de resultados total", le=200),
+    db: Session = Depends(get_db)
+):
+    from app.config import settings
+    from app.services.scrapers.facebook_scraper import FacebookScraper
+    
+    scraper = FacebookScraper()
+    if not scraper.is_configured():
+        raise HTTPException(status_code=400, detail="FACEBOOK_GRAPH_TOKEN no está configurado")
+    
+    page_list = [p.strip() for p in page_ids.split(",") if p.strip()]
+    
+    task_id = str(uuid.uuid4())
+    background_tasks.add_task(
+        lambda: asyncio.run(run_facebook_scraping(settings.DATABASE_URL, page_list, max_results))
+    )
+    
+    return {
+        "message": "Scraping de Facebook iniciado",
+        "task_id": task_id,
+        "platform": "facebook",
+        "page_ids": page_list,
+        "max_results": max_results
+    }
