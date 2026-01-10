@@ -33,12 +33,18 @@ export const SentimentAnalysis: React.FC<SentimentAnalysisProps> = ({ filters })
     { name: 'Negativo', value: sentiment.sentiment_distribution.negative, color: '#EF4444' },
   ] : [];
 
-  const timeSeriesData = sentiment?.sentiment_trend?.map(t => ({
-    date: t.date,
-    Positivo: t.positive,
-    Neutral: t.neutral,
-    Negativo: t.negative,
-  })) ?? [];
+  const timeSeriesData = sentiment?.sentiment_trend
+    ?.filter((t: { date: string; average_sentiment?: number; item_count?: number }) => (t.item_count ?? 0) > 0)
+    ?.map((t: { date: string; average_sentiment?: number; item_count?: number }) => {
+      const avgSentiment = t.average_sentiment ?? 0;
+      return {
+        date: t.date.substring(5),
+        Positivo: avgSentiment > 0 ? Math.round(avgSentiment * 100) : 0,
+        Neutral: avgSentiment === 0 ? 50 : 0,
+        Negativo: avgSentiment < 0 ? Math.round(Math.abs(avgSentiment) * 100) : 0,
+        Menciones: t.item_count ?? 0,
+      };
+    }) ?? [];
 
   if (isLoading) {
     return (

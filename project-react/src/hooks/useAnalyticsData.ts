@@ -51,8 +51,8 @@ export const useAnalyticsData = (sourceType: string = 'news', periodDays: number
     
     try {
       const [sentimentRes, trendsRes] = await Promise.all([
-        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/sentiment?source_type=${sourceType}&period_days=${periodDays}`),
-        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/trends?period_days=${periodDays}`),
+        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/sentiment?source_type=${sourceType}&days=${periodDays}`),
+        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/trends?days=${periodDays}`),
       ]);
 
       if (!sentimentRes.ok) {
