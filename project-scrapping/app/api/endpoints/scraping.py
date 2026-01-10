@@ -569,7 +569,7 @@ async def run_instagram_scraping(db_url: str, ig_user_id: str, max_results: int 
                     "comments": post.get("comments", 0),
                     "views": 0
                 },
-                collected_at=datetime.now(),
+                scraped_at=datetime.now(),
                 region="Nacional",
                 sentiment_score=sentiment_score
             )
