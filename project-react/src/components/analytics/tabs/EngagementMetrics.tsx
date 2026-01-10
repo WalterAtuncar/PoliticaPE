@@ -26,9 +26,9 @@ export const EngagementMetrics: React.FC<EngagementMetricsProps> = ({ filters })
   const { posts: topPosts, totalPages, totalPosts, isLoading: postsLoading, hasData: hasPosts } = useTopPosts(periodDays, 5, currentPage);
   const { regions, isLoading: regionsLoading, hasData: hasRegions } = useRegionalEngagement(periodDays);
 
-  const isLoading = engagementLoading || platformLoading || postsLoading || regionsLoading;
+  const isInitialLoading = engagementLoading || platformLoading || regionsLoading;
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -235,9 +235,14 @@ export const EngagementMetrics: React.FC<EngagementMetricsProps> = ({ filters })
               </span>
             )}
           </div>
-          {hasPosts ? (
+          {hasPosts || postsLoading ? (
             <>
-              <div className="space-y-4">
+              <div className={`space-y-4 relative ${postsLoading ? 'opacity-50' : ''}`}>
+                {postsLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-gray-900/50 z-10 rounded-lg">
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                  </div>
+                )}
                 {topPosts.map((post, index) => (
                   <motion.div
                     key={post.id}
