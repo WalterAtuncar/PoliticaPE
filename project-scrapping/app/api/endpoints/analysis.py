@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from collections import Counter
@@ -162,9 +162,15 @@ async def get_platform_breakdown(
     start_date = end_date - timedelta(days=days)
     
     posts = db.query(RawSocialPost).filter(
-        and_(
-            RawSocialPost.created_at >= start_date,
-            RawSocialPost.created_at <= end_date
+        or_(
+            and_(
+                RawSocialPost.created_at >= start_date,
+                RawSocialPost.created_at <= end_date
+            ),
+            and_(
+                RawSocialPost.scraped_at >= start_date,
+                RawSocialPost.scraped_at <= end_date
+            )
         )
     ).all()
     

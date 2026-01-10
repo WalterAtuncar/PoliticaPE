@@ -579,7 +579,7 @@ async def run_instagram_scraping(db_url: str, ig_user_id: str, max_results: int 
         db.commit()
         
         log.status = "completed"
-        log.items_collected = items_added
+        log.items_scraped = items_added
         log.completed_at = datetime.now()
         db.commit()
         
