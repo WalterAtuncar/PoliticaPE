@@ -28,44 +28,25 @@ export const TrendChart: React.FC = () => {
     const fetchTrends = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/time-series?days=180`);
+        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/time-series?days=30`);
         if (response.ok) {
-          const timeSeriesData = await response.json();
+          const responseData = await response.json();
+          const timeSeriesData = responseData.time_series || responseData;
+          
           if (Array.isArray(timeSeriesData) && timeSeriesData.length > 0) {
-            const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-            const monthlyData: Record<string, { sentiment: number[], mentions: number[], engagement: number[] }> = {};
+            const dataWithMentions = timeSeriesData.filter((item: Record<string, unknown>) => 
+              Number(item.mentions ?? 0) > 0
+            );
             
-            timeSeriesData.forEach((item: Record<string, unknown>) => {
-              const date = new Date(String(item.date));
-              const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
-              
-              if (!monthlyData[monthKey]) {
-                monthlyData[monthKey] = { sentiment: [], mentions: [], engagement: [] };
-              }
-              
-              monthlyData[monthKey].sentiment.push(Number(item.sentiment ?? 0));
-              monthlyData[monthKey].mentions.push(Number(item.mentions ?? 0));
-              monthlyData[monthKey].engagement.push(Number(item.engagement ?? 0));
-            });
-
-            const formattedData: TrendDataPoint[] = Object.entries(monthlyData)
-              .sort(([a], [b]) => a.localeCompare(b))
-              .slice(-6)
-              .map(([key, values]) => {
-                const month = key.split('-')[1];
-                return {
-                  name: monthNames[parseInt(month)],
-                  sentiment: values.sentiment.length > 0 
-                    ? Math.round(values.sentiment.reduce((a, b) => a + b, 0) / values.sentiment.length) 
-                    : 0,
-                  mentions: values.mentions.reduce((a, b) => a + b, 0),
-                  engagement: values.engagement.length > 0 
-                    ? parseFloat((values.engagement.reduce((a, b) => a + b, 0) / values.engagement.length).toFixed(1))
-                    : 0,
-                };
-              });
-
-            setData(formattedData);
+            if (dataWithMentions.length > 0) {
+              const formattedData: TrendDataPoint[] = dataWithMentions.slice(-10).map((item: Record<string, unknown>) => ({
+                name: String(item.date ?? ''),
+                sentiment: Math.round(Number(item.sentiment ?? 0) * 100),
+                mentions: Number(item.mentions ?? 0),
+                engagement: Number(item.events ?? 0),
+              }));
+              setData(formattedData);
+            }
           }
         }
       } catch (error) {
