@@ -87,6 +87,70 @@ async def rapidoc():
     """
     return html_content
 
+def init_identity_schema():
+    """Create identity schema and tables if they don't exist"""
+    from sqlalchemy import text
+    from app.database import SessionLocal
+    
+    db = SessionLocal()
+    try:
+        db.execute(text("CREATE SCHEMA IF NOT EXISTS identity"))
+        db.commit()
+        
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS identity.tenants (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                name VARCHAR(255) NOT NULL,
+                slug VARCHAR(100) UNIQUE NOT NULL,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+        
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS identity.users (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                email VARCHAR(255) UNIQUE NOT NULL,
+                name VARCHAR(255),
+                password_hash VARCHAR(255) NOT NULL,
+                tenant_id UUID REFERENCES identity.tenants(id),
+                is_active BOOLEAN DEFAULT TRUE,
+                last_login_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+        
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS identity.roles (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                name VARCHAR(100) NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """))
+        db.commit()
+        
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS identity.user_roles (
+                user_id UUID REFERENCES identity.users(id),
+                role_id UUID REFERENCES identity.roles(id),
+                tenant_id UUID REFERENCES identity.tenants(id),
+                PRIMARY KEY (user_id, role_id)
+            )
+        """))
+        db.commit()
+        
+        logger.info("Identity schema initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing identity schema: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
 def create_demo_user():
     """Create demo user if it doesn't exist"""
     import bcrypt
@@ -114,13 +178,28 @@ def create_demo_user():
                 tenant = db.execute(text("SELECT id FROM identity.tenants LIMIT 1")).fetchone()
                 tenant_id = tenant[0] if tenant else None
             
-            db.execute(
+            admin_role = db.execute(text("SELECT id FROM identity.roles WHERE name = 'admin' LIMIT 1")).fetchone()
+            if not admin_role:
+                db.execute(text("INSERT INTO identity.roles (name, description) VALUES ('admin', 'Administrator')"))
+                db.execute(text("INSERT INTO identity.roles (name, description) VALUES ('analyst', 'Analyst')"))
+                db.commit()
+                admin_role = db.execute(text("SELECT id FROM identity.roles WHERE name = 'admin' LIMIT 1")).fetchone()
+            
+            result = db.execute(
                 text("""
                     INSERT INTO identity.users (email, name, password_hash, tenant_id, is_active, created_at)
                     VALUES ('admin@politica.pe', 'Administrador', :password_hash, :tenant_id, true, NOW())
+                    RETURNING id
                 """),
                 {"password_hash": password_hash, "tenant_id": tenant_id}
-            )
+            ).fetchone()
+            
+            if result and admin_role and tenant_id:
+                db.execute(
+                    text("INSERT INTO identity.user_roles (user_id, role_id, tenant_id) VALUES (:user_id, :role_id, :tenant_id)"),
+                    {"user_id": result[0], "role_id": admin_role[0], "tenant_id": tenant_id}
+                )
+            
             db.commit()
             logger.info("Demo user created: admin@politica.pe")
         else:
@@ -141,7 +220,8 @@ async def startup_event():
     init_db()
     logger.info("Database initialized")
     
-    # Create demo user
+    # Initialize identity schema and create demo user
+    init_identity_schema()
     create_demo_user()
     
     logger.info("Application startup completed")
