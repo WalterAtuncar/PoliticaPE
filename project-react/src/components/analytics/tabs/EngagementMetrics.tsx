@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   BarChart,
@@ -9,7 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { Heart, MessageCircle, Share, Eye, Loader2, TrendingUp } from 'lucide-react';
+import { Heart, MessageCircle, Share, Eye, Loader2, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card } from '../../ui/Card';
 import { AnalyticsFilters } from '../AnalyticsPage';
 import { useEngagementSummary, usePlatformBreakdown, useTopPosts, useRegionalEngagement } from '../../../hooks/useAdvancedAnalytics';
@@ -19,10 +19,11 @@ interface EngagementMetricsProps {
 }
 
 export const EngagementMetrics: React.FC<EngagementMetricsProps> = ({ filters }) => {
+  const [currentPage, setCurrentPage] = useState(1);
   const periodDays = filters.timeRange === '7d' ? 7 : filters.timeRange === '30d' ? 30 : 90;
   const { engagement, isLoading: engagementLoading, hasData: hasEngagement } = useEngagementSummary(periodDays);
   const { platforms, isLoading: platformLoading, hasData: hasPlatforms } = usePlatformBreakdown(periodDays);
-  const { posts: topPosts, isLoading: postsLoading, hasData: hasPosts } = useTopPosts(periodDays, 5);
+  const { posts: topPosts, totalPages, totalPosts, isLoading: postsLoading, hasData: hasPosts } = useTopPosts(periodDays, 5, currentPage);
   const { regions, isLoading: regionsLoading, hasData: hasRegions } = useRegionalEngagement(periodDays);
 
   const isLoading = engagementLoading || platformLoading || postsLoading || regionsLoading;
@@ -224,56 +225,96 @@ export const EngagementMetrics: React.FC<EngagementMetricsProps> = ({ filters })
         transition={{ delay: 0.7 }}
       >
         <Card glass className="p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-            Posts con Mayor Engagement
-          </h3>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Posts con Mayor Engagement
+            </h3>
+            {hasPosts && (
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                {totalPosts} posts totales
+              </span>
+            )}
+          </div>
           {hasPosts ? (
-            <div className="space-y-4">
-              {topPosts.map((post, index) => (
-                <motion.div
-                  key={post.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 * index }}
-                  className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200/50 dark:border-gray-600/50"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        @{post.author}
+            <>
+              <div className="space-y-4">
+                {topPosts.map((post, index) => (
+                  <motion.div
+                    key={post.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1 * index }}
+                    className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-4 border border-gray-200/50 dark:border-gray-600/50"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          @{post.author}
+                        </span>
+                        <span className={`text-xs px-2 py-1 rounded ${
+                          post.platform === 'instagram' 
+                            ? 'bg-pink-100 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400'
+                            : post.platform === 'youtube'
+                            ? 'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400'
+                            : 'bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                        }`}>
+                          {post.platform}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {post.timestamp ? new Date(post.timestamp).toLocaleDateString() : 'Sin fecha'}
                       </span>
-                      <span className="text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2 py-1 rounded">
-                        {post.platform}
-                      </span>
                     </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {post.timestamp ? new Date(post.timestamp).toLocaleDateString() : 'Sin fecha'}
-                    </span>
-                  </div>
-                  <p className="text-gray-700 dark:text-gray-300 mb-3 text-sm leading-relaxed">
-                    {post.content}
-                  </p>
-                  <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-                    <div className="flex items-center space-x-1">
-                      <Heart className="h-4 w-4" />
-                      <span>{post.engagement.likes}</span>
+                    <p className="text-gray-700 dark:text-gray-300 mb-3 text-sm leading-relaxed">
+                      {post.content}
+                    </p>
+                    <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center space-x-1">
+                        <Heart className="h-4 w-4" />
+                        <span>{formatNumber(post.engagement.likes)}</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Share className="h-4 w-4" />
+                        <span>{formatNumber(post.engagement.shares)}</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <MessageCircle className="h-4 w-4" />
+                        <span>{formatNumber(post.engagement.comments)}</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <TrendingUp className="h-4 w-4" />
+                        <span>Total: {formatNumber(post.engagement.total)}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-1">
-                      <Share className="h-4 w-4" />
-                      <span>{post.engagement.shares}</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <MessageCircle className="h-4 w-4" />
-                      <span>{post.engagement.comments}</span>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      <TrendingUp className="h-4 w-4" />
-                      <span>Total: {post.engagement.total}</span>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+                  </motion.div>
+                ))}
+              </div>
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center space-x-4 mt-6 pt-4 border-t border-gray-200/50 dark:border-gray-600/50">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="flex items-center px-3 py-2 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Anterior
+                  </button>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="flex items-center px-3 py-2 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    Siguiente
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             <div className="flex items-center justify-center h-32 text-gray-500">
               No hay posts con engagement disponibles

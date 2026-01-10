@@ -159,9 +159,11 @@ export function useShareOfVoice(days: number = 30) {
   return { parties, hashtags, figures, totalMentions, isLoading, error, hasData: parties.length > 0 };
 }
 
-export function useTopPosts(days: number = 7, limit: number = 10) {
+export function useTopPosts(days: number = 30, limit: number = 5, page: number = 1) {
   const [posts, setPosts] = useState<TopPost[]>([]);
   const [totalAnalyzed, setTotalAnalyzed] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalPosts, setTotalPosts] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -170,11 +172,13 @@ export function useTopPosts(days: number = 7, limit: number = 10) {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/top-posts?days=${days}&limit=${limit}`);
+        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/top-posts?days=${days}&limit=${limit}&page=${page}`);
         if (!response.ok) throw new Error('Failed to fetch top posts');
         const result = await response.json();
         setPosts(result.posts || []);
         setTotalAnalyzed(result.total_analyzed || 0);
+        setTotalPages(result.total_pages || 0);
+        setTotalPosts(result.total_posts || 0);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
         setPosts([]);
@@ -183,9 +187,9 @@ export function useTopPosts(days: number = 7, limit: number = 10) {
       }
     };
     fetchData();
-  }, [days, limit]);
+  }, [days, limit, page]);
 
-  return { posts, totalAnalyzed, isLoading, error, hasData: posts.length > 0 };
+  return { posts, totalAnalyzed, totalPages, totalPosts, isLoading, error, hasData: posts.length > 0 };
 }
 
 export function useTrendingTopics(days: number = 7, limit: number = 20) {
