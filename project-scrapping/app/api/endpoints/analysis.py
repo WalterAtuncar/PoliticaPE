@@ -297,8 +297,9 @@ async def get_share_of_voice(
 
 @router.get("/top-posts")
 async def get_top_posts(
-    days: int = Query(7, description="Number of days to analyze"),
+    days: int = Query(30, description="Number of days to analyze"),
     limit: int = Query(10, description="Number of posts to return"),
+    page: int = Query(1, description="Page number for pagination"),
     db: Session = Depends(get_db)
 ):
     """Get top performing posts by engagement"""
@@ -307,8 +308,16 @@ async def get_top_posts(
     
     posts = db.query(RawSocialPost).filter(
         and_(
-            RawSocialPost.created_at >= start_date,
-            RawSocialPost.created_at <= end_date,
+            or_(
+                and_(
+                    RawSocialPost.created_at >= start_date,
+                    RawSocialPost.created_at <= end_date
+                ),
+                and_(
+                    RawSocialPost.scraped_at >= start_date,
+                    RawSocialPost.scraped_at <= end_date
+                )
+            ),
             RawSocialPost.engagement_metrics.isnot(None)
         )
     ).all()
@@ -319,11 +328,17 @@ async def get_top_posts(
         metrics = post.engagement_metrics
         return metrics.get("likes", 0) + metrics.get("shares", 0) * 2 + metrics.get("comments", 0) * 3
     
-    sorted_posts = sorted(posts, key=get_total_engagement, reverse=True)[:limit]
+    sorted_posts = sorted(posts, key=get_total_engagement, reverse=True)
+    
+    total_posts = len(sorted_posts)
+    start_idx = (page - 1) * limit
+    end_idx = start_idx + limit
+    paginated_posts = sorted_posts[start_idx:end_idx]
     
     top_posts = []
-    for post in sorted_posts:
+    for post in paginated_posts:
         metrics = post.engagement_metrics if isinstance(post.engagement_metrics, dict) else {}
+        post_date = post.created_at or post.scraped_at
         top_posts.append({
             "id": post.id,
             "content": post.content[:200] + "..." if post.content and len(post.content) > 200 else post.content,
@@ -335,11 +350,19 @@ async def get_top_posts(
                 "comments": metrics.get("comments", 0),
                 "total": get_total_engagement(post)
             },
-            "timestamp": post.created_at.isoformat() if post.created_at else None,
+            "timestamp": post_date.isoformat() if post_date else None,
             "sentiment": post.sentiment_score
         })
     
-    return {"posts": top_posts, "total_analyzed": len(posts), "period_days": days}
+    return {
+        "posts": top_posts,
+        "total_analyzed": len(posts),
+        "period_days": days,
+        "page": page,
+        "limit": limit,
+        "total_pages": (total_posts + limit - 1) // limit,
+        "total_posts": total_posts
+    }
 
 
 @router.get("/trending-topics")
