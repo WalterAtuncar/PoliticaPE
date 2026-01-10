@@ -335,6 +335,19 @@ async def get_top_posts(
     end_idx = start_idx + limit
     paginated_posts = sorted_posts[start_idx:end_idx]
     
+    def get_author_display(post):
+        if post.author:
+            return post.author
+        if post.platform == "instagram" and post.content:
+            import re
+            hashtags = re.findall(r'#(\w+)', post.content)
+            political_tags = [h for h in hashtags if any(kw in h.lower() for kw in ['peru', 'politic', 'congreso', 'gobierno', 'eleccion'])]
+            if political_tags:
+                return f"#{political_tags[0]}"
+            elif hashtags:
+                return f"#{hashtags[0]}"
+        return "Instagram"
+    
     top_posts = []
     for post in paginated_posts:
         metrics = post.engagement_metrics if isinstance(post.engagement_metrics, dict) else {}
@@ -342,7 +355,7 @@ async def get_top_posts(
         top_posts.append({
             "id": post.id,
             "content": post.content[:200] + "..." if post.content and len(post.content) > 200 else post.content,
-            "author": post.author or "Anónimo",
+            "author": get_author_display(post),
             "platform": post.platform,
             "engagement": {
                 "likes": metrics.get("likes", 0),

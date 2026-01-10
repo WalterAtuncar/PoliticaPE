@@ -15,6 +15,24 @@ class InstagramScraper:
     def is_configured(self) -> bool:
         return bool(self.access_token)
     
+    def _extract_username_from_permalink(self, permalink: str) -> str:
+        """Extract username from Instagram permalink like https://www.instagram.com/p/CODE/"""
+        if not permalink:
+            return ""
+        try:
+            import re
+            match = re.search(r'instagram\.com/([^/]+)/p/', permalink)
+            if match:
+                username = match.group(1)
+                if username not in ['p', 'reel', 'tv', 'stories']:
+                    return username
+            match = re.search(r'instagram\.com/reel/[^/]+/?\?.*igsh=', permalink)
+            if match:
+                return ""
+        except Exception:
+            pass
+        return ""
+    
     async def test_connection(self) -> Dict[str, Any]:
         if not self.is_configured():
             return {
@@ -141,7 +159,7 @@ class InstagramScraper:
                     params={
                         "user_id": user_id,
                         "access_token": self.access_token,
-                        "fields": "id,caption,like_count,comments_count,timestamp,permalink,media_type,media_url"
+                        "fields": "id,caption,like_count,comments_count,timestamp,permalink,media_type"
                     }
                 )
                 
@@ -152,15 +170,19 @@ class InstagramScraper:
                 posts = media_response.json().get("data", [])[:max_results]
                 
                 for post in posts:
+                    permalink = post.get("permalink", "")
+                    author_name = self._extract_username_from_permalink(permalink)
+                    
                     all_posts.append({
                         "post_id": post.get("id"),
                         "content": post.get("caption", ""),
+                        "author": author_name,
                         "likes": post.get("like_count", 0),
                         "comments": post.get("comments_count", 0),
                         "shares": 0,
                         "views": 0,
                         "timestamp": post.get("timestamp"),
-                        "permalink": post.get("permalink"),
+                        "permalink": permalink,
                         "media_type": post.get("media_type"),
                         "hashtag": hashtag,
                         "platform": "instagram"
