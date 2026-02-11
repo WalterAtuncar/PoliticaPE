@@ -345,15 +345,149 @@ class DatosAbiertosScraper(BaseScraper):
     def __init__(self):
         super().__init__()
         self.base_url = 'https://www.datosabiertos.gob.pe'
-        self.delay_range = (0.5, 1.5)
+        self.api_url = f'{self.base_url}/api/3/action'
+        self.delay_range = (0.3, 0.8)
+        self.max_csv_rows = 60
+        self.max_datasets_per_category = 3
+        self.max_attempts_per_category = 15
 
     def _parse_content(self, response) -> List[Dict[str, Any]]:
         return []
 
+    def _download_csv_data(self, url: str) -> Optional[Dict[str, Any]]:
+        try:
+            r = requests.get(url, timeout=8, headers=self.session.headers, stream=True)
+            if r.status_code != 200:
+                return None
+
+            max_bytes = 500_000
+            chunks = []
+            downloaded = 0
+            for chunk in r.iter_content(chunk_size=8192):
+                chunks.append(chunk if isinstance(chunk, bytes) else chunk.encode('utf-8'))
+                downloaded += len(chunk)
+                if downloaded > max_bytes:
+                    break
+            r.close()
+            raw = b''.join(chunks)
+            if raw.startswith(b'\xef\xbb\xbf'):
+                raw = raw[3:]
+            for enc in ['utf-8', 'latin-1', 'cp1252']:
+                try:
+                    text = raw.decode(enc).strip()
+                    break
+                except (UnicodeDecodeError, ValueError):
+                    continue
+            else:
+                text = raw.decode('utf-8', errors='replace').strip()
+            text = text.replace('\r\n', '\n').replace('\r', '\n')
+            if not text:
+                return None
+
+            import csv
+            from io import StringIO
+
+            sample = text[:2048]
+            try:
+                dialect = csv.Sniffer().sniff(sample, delimiters=',;\t|')
+            except csv.Error:
+                dialect = csv.excel
+
+            reader = csv.reader(StringIO(text), dialect)
+            rows_list = []
+            for row in reader:
+                rows_list.append(row)
+                if len(rows_list) > self.max_csv_rows + 1:
+                    break
+
+            if len(rows_list) < 2:
+                return None
+
+            headers = [h.strip().lstrip('\ufeff') for h in rows_list[0] if h.strip()]
+            if len(headers) < 2 or len(headers) > 30:
+                return None
+
+            data_rows = []
+            for row in rows_list[1:]:
+                if row and any(cell.strip() for cell in row):
+                    row_dict = {}
+                    for i, h in enumerate(headers):
+                        if i < len(row):
+                            row_dict[h] = row[i].strip()
+                    data_rows.append(row_dict)
+
+            total_approx = len(rows_list) - 1
+            if downloaded >= max_bytes:
+                total_approx = max(total_approx, int(total_approx * 1.5))
+
+            return {
+                'headers': headers[:15],
+                'datos': data_rows[:50],
+                'total_filas': total_approx,
+                'filas_mostradas': min(len(data_rows), 50),
+            }
+        except Exception as e:
+            logger.warning(f"Error downloading CSV {url[:60]}: {e}")
+            return None
+
+    def _get_package_with_data(self, pkg_name: str) -> Optional[Dict[str, Any]]:
+        try:
+            r = requests.get(f'{self.api_url}/package_show?id={pkg_name}', timeout=8, headers=self.session.headers)
+            if not r or r.status_code != 200:
+                return None
+            resp = r.json()
+            result = resp.get('result', {})
+            if isinstance(result, list):
+                result = result[0] if result else {}
+
+            title = result.get('title', pkg_name.replace('-', ' ').title())
+            org = result.get('organization', {})
+            org_name = org.get('title', '') if isinstance(org, dict) else ''
+            resources = result.get('resources', [])
+
+            csv_resources = [res for res in resources if res.get('format', '').lower() == 'csv']
+            if not csv_resources:
+                logger.debug(f"Package {pkg_name}: no CSV resources (formats: {[r.get('format','') for r in resources[:5]]})")
+                return None
+
+            datasets_with_data = []
+            for res in csv_resources[:2]:
+                csv_url = res.get('url', '')
+                res_name = res.get('name', '')
+                if not csv_url:
+                    continue
+                csv_data = self._download_csv_data(csv_url)
+                if csv_data and csv_data['total_filas'] > 1:
+                    datasets_with_data.append({
+                        'recurso': res_name or title,
+                        'formato': 'CSV',
+                        'total_filas': csv_data['total_filas'],
+                        'filas_mostradas': csv_data['filas_mostradas'],
+                        'headers': csv_data['headers'],
+                        'datos': csv_data['datos'],
+                        'url_recurso': csv_url,
+                    })
+                    break
+                else:
+                    logger.debug(f"Package {pkg_name}: CSV download failed or empty for {csv_url[:60]}")
+
+            if not datasets_with_data:
+                return None
+
+            return {
+                'title': title,
+                'organization': org_name,
+                'datasets': datasets_with_data,
+                'url': result.get('url', f'{self.base_url}/dataset/{pkg_name}'),
+            }
+        except Exception as e:
+            logger.warning(f"Error getting package {pkg_name}: {e}")
+            return None
+
     def scrape(self, db: Session) -> int:
         all_items = []
         try:
-            r = self._make_request(f'{self.base_url}/api/3/action/package_list')
+            r = self._make_request(f'{self.api_url}/package_list')
             if not r:
                 return 0
             data = r.json()
@@ -378,7 +512,7 @@ class DatosAbiertosScraper(BaseScraper):
                 'Electoral': [],
                 'Indicadores Sociales': [],
                 'Gobierno y Transparencia': [],
-                'Otros': [],
+                'Seguridad': [],
             }
 
             for pkg in relevant:
@@ -391,67 +525,55 @@ class DatosAbiertosScraper(BaseScraper):
                     categories['Indicadores Sociales'].append(pkg)
                 elif any(kw in pkg_lower for kw in ['gobierno', 'transparencia', 'ministerio', 'corrupción']):
                     categories['Gobierno y Transparencia'].append(pkg)
-                else:
-                    categories['Otros'].append(pkg)
+                elif any(kw in pkg_lower for kw in ['seguridad']):
+                    categories['Seguridad'].append(pkg)
 
-            cat_summary = []
+            total_with_data = 0
             for cat, pkgs in categories.items():
-                if pkgs:
-                    cat_summary.append({
-                        'categoria': cat,
-                        'total_datasets': len(pkgs),
-                        'datasets_ejemplo': [p.replace('-', ' ').title()[:60] for p in pkgs[:5]],
-                    })
+                if not pkgs:
+                    continue
 
-            if relevant:
-                all_items.append({
-                    'source': 'PCM',
-                    'data_type': 'Datos Abiertos',
-                    'title': f'Plataforma Nacional de Datos Abiertos ({len(relevant)} datasets relevantes de {len(all_packages)} total)',
-                    'content': {
-                        'tipo': 'Catálogo de Datos Abiertos',
-                        'total_datasets_plataforma': len(all_packages),
-                        'datasets_relevantes': len(relevant),
-                        'categorias': cat_summary,
-                        'datos_encontrados': True,
-                    },
-                    'published_at': datetime.now(),
-                    'url': 'https://www.datosabiertos.gob.pe/',
-                    'department': 'Nacional',
-                    'metadata': {'extraction_method': 'ckan_api'},
-                    'scraped_at': datetime.now(),
-                })
+                datasets_downloaded = []
+                attempts = 0
+                for pkg_name in pkgs:
+                    if len(datasets_downloaded) >= self.max_datasets_per_category:
+                        break
+                    if attempts >= self.max_attempts_per_category:
+                        break
+                    attempts += 1
+                    pkg_data = self._get_package_with_data(pkg_name)
+                    if pkg_data:
+                        datasets_downloaded.append(pkg_data)
+                        logger.info(f"Datos Abiertos [{cat}]: descargado '{pkg_data['title'][:50]}'")
+                
 
-            for cat, pkgs in categories.items():
-                if pkgs and cat != 'Otros':
-                    dataset_details = []
-                    for pkg_name in pkgs[:8]:
-                        readable = pkg_name.replace('-', ' ').replace('_', ' ').title()
-                        dataset_details.append({
-                            'nombre': readable[:80],
-                            'slug': pkg_name,
-                            'url': f'{self.base_url}/dataset/{pkg_name}',
-                        })
-
+                if datasets_downloaded:
+                    total_with_data += len(datasets_downloaded)
                     all_items.append({
                         'source': 'PCM',
-                        'data_type': 'Catálogo',
-                        'title': f'{cat}: {len(pkgs)} datasets disponibles',
+                        'data_type': 'Datos Abiertos',
+                        'title': f'{cat}: {len(datasets_downloaded)} datasets con datos reales',
                         'content': {
-                            'tipo': f'Datasets de {cat}',
+                            'tipo': f'Datos Abiertos - {cat}',
                             'categoria': cat,
-                            'total_datasets': len(pkgs),
-                            'datasets': dataset_details,
+                            'total_datasets_categoria': len(pkgs),
+                            'datasets_descargados': len(datasets_downloaded),
+                            'datasets': [{
+                                'titulo': ds['title'],
+                                'organizacion': ds['organization'],
+                                'url': ds['url'],
+                                'recursos': ds['datasets'],
+                            } for ds in datasets_downloaded],
                             'datos_encontrados': True,
                         },
                         'published_at': datetime.now(),
                         'url': f'{self.base_url}/dataset',
                         'department': 'Nacional',
-                        'metadata': {'extraction_method': 'ckan_api'},
+                        'metadata': {'extraction_method': 'ckan_api_csv_download'},
                         'scraped_at': datetime.now(),
                     })
 
-            logger.info(f"Datos Abiertos: {len(relevant)} datasets relevantes en {len([c for c in categories.values() if c])} categorías")
+            logger.info(f"Datos Abiertos: {total_with_data} datasets con datos reales descargados en {len([i for i in all_items])} categorías")
         except Exception as e:
             logger.error(f"Error scraping Datos Abiertos: {e}")
         return self._save_items(db, all_items, GovernmentData)

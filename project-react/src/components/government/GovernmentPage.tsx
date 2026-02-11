@@ -187,8 +187,14 @@ const GovernmentDetailModal: React.FC<{ item: GovernmentDataItem; onClose: () =>
   };
 
   const renderComisiones = () => {
-    const comisiones = (content.comisiones as string[] | undefined) || [];
+    const rawComisiones = (content.comisiones as unknown[] | undefined) || [];
     const totalComisiones = content.total_comisiones as number | undefined;
+
+    const comisionNames = rawComisiones.map((c) => {
+      if (typeof c === 'string') return c;
+      if (c && typeof c === 'object' && 'nombre' in c) return String((c as Record<string, unknown>).nombre);
+      return JSON.stringify(c);
+    });
 
     return (
       <>
@@ -201,16 +207,16 @@ const GovernmentDetailModal: React.FC<{ item: GovernmentDataItem; onClose: () =>
             <p className="text-lg font-bold text-emerald-800 dark:text-emerald-300">{totalComisiones}</p>
           </div>
         )}
-        {comisiones.length > 0 && (
+        {comisionNames.length > 0 && (
           <div className="bg-white dark:bg-gray-700/30 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
             <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
               <Landmark className="w-4 h-4" />
               Comisiones del Congreso
             </h4>
             <div className="space-y-2">
-              {comisiones.map((c, i) => (
+              {comisionNames.map((name, i) => (
                 <div key={i} className="bg-emerald-50 dark:bg-emerald-900/10 rounded-lg p-3 border-l-4 border-l-emerald-400 text-sm text-gray-700 dark:text-gray-300">
-                  {c}
+                  {name}
                 </div>
               ))}
             </div>
@@ -300,47 +306,101 @@ const GovernmentDetailModal: React.FC<{ item: GovernmentDataItem; onClose: () =>
   };
 
   const renderDatosAbiertos = () => {
-    const categorias = (content.categorias as Record<string, unknown>[] | string[] | undefined) || [];
-    const datasets = (content.datasets as Record<string, unknown>[] | string[] | undefined) || [];
-    const totalDatasets = content.total_datasets as number | undefined;
-    const totalPlataforma = content.total_datasets_plataforma as number | undefined;
-    const items = categorias.length > 0 ? categorias : datasets;
+    const datasets = (content.datasets as Record<string, unknown>[] | undefined) || [];
+    const totalCategoria = content.total_datasets_categoria as number | undefined;
+    const descargados = content.datasets_descargados as number | undefined;
 
     return (
       <>
         <div className="grid grid-cols-2 gap-3">
-          {totalDatasets && (
+          {totalCategoria && (
             <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-3 border border-amber-100 dark:border-amber-800">
               <div className="flex items-center gap-1.5 mb-1">
                 <Database className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium uppercase">Total datasets</span>
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium uppercase">Datasets en categoría</span>
               </div>
-              <p className="text-lg font-bold text-amber-800 dark:text-amber-300">{totalDatasets}</p>
+              <p className="text-lg font-bold text-amber-800 dark:text-amber-300">{totalCategoria}</p>
             </div>
           )}
-          {totalPlataforma && (
-            <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-3 border border-orange-100 dark:border-orange-800">
+          {descargados && (
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 border border-green-100 dark:border-green-800">
               <div className="flex items-center gap-1.5 mb-1">
-                <Database className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
-                <span className="text-[10px] text-orange-600 dark:text-orange-400 font-medium uppercase">En plataforma</span>
+                <FileText className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                <span className="text-[10px] text-green-600 dark:text-green-400 font-medium uppercase">Con datos descargados</span>
               </div>
-              <p className="text-lg font-bold text-orange-800 dark:text-orange-300">{totalPlataforma}</p>
+              <p className="text-lg font-bold text-green-800 dark:text-green-300">{descargados}</p>
             </div>
           )}
         </div>
-        {items.length > 0 && (
-          <div className="bg-white dark:bg-gray-700/30 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
-            <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-              <Database className="w-4 h-4" />
-              {categorias.length > 0 ? 'Categorías' : 'Datasets'}
-            </h4>
-            <div className="space-y-2">
-              {items.map((item, i) => (
-                <div key={i} className="bg-amber-50 dark:bg-amber-900/10 rounded-lg p-3 border-l-4 border-l-amber-400 text-sm text-gray-700 dark:text-gray-300">
-                  {typeof item === 'string' ? item : (item as Record<string, unknown>).nombre ? String((item as Record<string, unknown>).nombre) : JSON.stringify(item)}
+        {datasets.length > 0 && (
+          <div className="space-y-4">
+            {datasets.map((ds, i) => {
+              const titulo = String((ds as Record<string, unknown>).titulo || '');
+              const organizacion = String((ds as Record<string, unknown>).organizacion || '');
+              const recursos = ((ds as Record<string, unknown>).recursos as Record<string, unknown>[] | undefined) || [];
+
+              return (
+                <div key={i} className="bg-white dark:bg-gray-700/30 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">{titulo}</h4>
+                      {organizacion && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{organizacion}</p>}
+                    </div>
+                    <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
+                      {recursos.length} recurso{recursos.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  {recursos.map((rec, j) => {
+                    const recursoName = String((rec as Record<string, unknown>).recurso || '');
+                    const totalFilas = (rec as Record<string, unknown>).total_filas as number | undefined;
+                    const filasMostradas = (rec as Record<string, unknown>).filas_mostradas as number | undefined;
+                    const headers = ((rec as Record<string, unknown>).headers as string[] | undefined) || [];
+                    const datos = ((rec as Record<string, unknown>).datos as Record<string, unknown>[] | undefined) || [];
+
+                    return (
+                      <div key={j} className="mt-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-medium text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                            <BarChart3 className="w-3 h-3" />
+                            {recursoName}
+                          </p>
+                          {totalFilas && (
+                            <span className="text-[10px] text-gray-400">{totalFilas} filas totales{filasMostradas ? ` · ${filasMostradas} mostradas` : ''}</span>
+                          )}
+                        </div>
+                        {datos.length > 0 && headers.length > 0 && (
+                          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-600">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="bg-gray-50 dark:bg-gray-700">
+                                  {headers.slice(0, 6).map(h => (
+                                    <th key={h} className="text-left py-1.5 px-2 font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {datos.slice(0, 15).map((row, ri) => (
+                                  <tr key={ri} className="border-t border-gray-100 dark:border-gray-700">
+                                    {headers.slice(0, 6).map(h => (
+                                      <td key={h} className="py-1 px-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">{String((row as Record<string, unknown>)[h] ?? '—')}</td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            {datos.length > 15 && (
+                              <p className="text-[10px] text-gray-400 text-center py-1 bg-gray-50 dark:bg-gray-700">
+                                Mostrando 15 de {datos.length} filas
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         )}
       </>
@@ -454,6 +514,9 @@ const getCardPreview = (item: GovernmentDataItem): string => {
   }
 
   if (dataType === 'Datos Abiertos' || dataType === 'Catálogo') {
+    const descargados = content.datasets_descargados as number | undefined;
+    const totalCategoria = content.total_datasets_categoria as number | undefined;
+    if (descargados) return `${descargados} datasets con datos reales${totalCategoria ? ` de ${totalCategoria} disponibles` : ''}`;
     const total = content.total_datasets as number | undefined;
     return `${total || 0} datasets disponibles`;
   }
