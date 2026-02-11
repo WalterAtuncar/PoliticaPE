@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Tag,
@@ -11,8 +11,13 @@ import {
   X,
   Clock,
   BarChart3,
+  History,
+  Play,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { useSearchTags, SearchTag } from '../../hooks/useSearchTags';
+import { API_CONFIG, ENDPOINTS } from '../../config/api';
 import toast from 'react-hot-toast';
 
 const platformIcons: Record<string, string> = {
@@ -42,6 +47,49 @@ export const TagsPanel: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTag, setEditTag] = useState('');
   const [editPlatforms, setEditPlatforms] = useState<string[]>([]);
+  const [historicalRunning, setHistoricalRunning] = useState(false);
+  const [historicalStatus, setHistoricalStatus] = useState<any>(null);
+  const [historicalLoading, setHistoricalLoading] = useState(false);
+
+  const fetchHistoricalStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.HISTORICAL_STATUS}`);
+      if (res.ok) {
+        const data = await res.json();
+        setHistoricalRunning(data.is_running);
+        setHistoricalStatus(data.last_run);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    fetchHistoricalStatus();
+    const interval = setInterval(fetchHistoricalStatus, 10000);
+    return () => clearInterval(interval);
+  }, [fetchHistoricalStatus]);
+
+  const triggerHistorical = async () => {
+    if (tags.filter(t => t.is_active).length === 0) {
+      toast.error('Agrega al menos un tag activo antes de ejecutar el scraping histórico');
+      return;
+    }
+    setHistoricalLoading(true);
+    try {
+      const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_HISTORICAL}`, { method: 'POST' });
+      if (res.status === 409) {
+        toast.error('El scraping histórico ya está en ejecución');
+        return;
+      }
+      if (!res.ok) throw new Error('Error al iniciar');
+      const data = await res.json();
+      toast.success(data.message);
+      setHistoricalRunning(true);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Error al iniciar scraping histórico');
+    } finally {
+      setHistoricalLoading(false);
+    }
+  };
 
   const handleCreate = async () => {
     if (!newTag.trim()) {
@@ -366,6 +414,76 @@ export const TagsPanel: React.FC = () => {
           ))}
         </div>
       )}
+
+      <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-6 border border-gray-200/50 dark:border-gray-700/50">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center">
+              <History className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 dark:text-white">Scraping Histórico</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Busca datos de los últimos 90 días en Twitter y YouTube usando los tags activos
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={triggerHistorical}
+            disabled={historicalRunning || historicalLoading || tags.filter(t => t.is_active).length === 0}
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {historicalRunning || historicalLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Play className="w-4 h-4" />
+            )}
+            {historicalRunning ? 'En ejecución...' : 'Ejecutar'}
+          </button>
+        </div>
+
+        {historicalStatus && (
+          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm">
+              {historicalStatus.status === 'completed' ? (
+                <CheckCircle2 className="w-4 h-4 text-green-500" />
+              ) : historicalStatus.status === 'failed' ? (
+                <AlertCircle className="w-4 h-4 text-red-500" />
+              ) : (
+                <Loader2 className="w-4 h-4 text-amber-500 animate-spin" />
+              )}
+              <span className="font-medium text-gray-900 dark:text-white">
+                Última ejecución: {historicalStatus.status === 'completed' ? 'Completada' : historicalStatus.status === 'failed' ? 'Fallida' : 'En progreso'}
+              </span>
+            </div>
+            {historicalStatus.items_scraped != null && (
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {historicalStatus.items_scraped} items recopilados
+              </p>
+            )}
+            {historicalStatus.completed_at && (
+              <p className="text-xs text-gray-500">
+                Terminado: {new Date(historicalStatus.completed_at).toLocaleString('es-PE')}
+              </p>
+            )}
+            {historicalStatus.details?.per_platform && (
+              <div className="flex gap-4 text-xs text-gray-500 mt-1">
+                {Object.entries(historicalStatus.details.per_platform).map(([platform, count]) => (
+                  <span key={platform} className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                    {platform}: {typeof count === 'number' ? `${count} items` : String(count)}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tags.filter(t => t.is_active).length === 0 && (
+          <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
+            Agrega al menos un tag activo para poder ejecutar el scraping histórico
+          </p>
+        )}
+      </div>
     </motion.div>
   );
 };

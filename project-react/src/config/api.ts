@@ -25,6 +25,8 @@ export const ENDPOINTS = {
   TRIGGER_GOVERNMENT: '/api/v1/scraping/trigger/government',
   TRIGGER_SURVEYS: '/api/v1/scraping/trigger/surveys',
   TRIGGER_ALL: '/api/v1/scraping/trigger/all',
+  TRIGGER_HISTORICAL: '/api/v1/scraping/trigger/historical',
+  HISTORICAL_STATUS: '/api/v1/scraping/historical/status',
   SURVEYS: '/api/v1/data/surveys',
   SENTIMENT: '/api/v1/analysis/sentiment',
   TRENDS: '/api/v1/analysis/trends',

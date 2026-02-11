@@ -810,3 +810,62 @@ async def trigger_all_scraping(
         "task_id": task_id,
         "sources": ["Twitter", "YouTube", "Instagram", "ONPE", "INEI", "MEF", "IEP", "Ipsos", "Datum", "CPI"]
     }
+
+
+@router.post("/trigger/historical")
+async def trigger_historical_scraping(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    from app.services.scheduler import _historical_running, HISTORICAL_DAYS_BACK
+
+    if _historical_running:
+        raise HTTPException(status_code=409, detail="El scraping histórico ya está en ejecución. Espere a que termine.")
+
+    from app.models import SearchTag
+    active_tags = db.query(SearchTag).filter(SearchTag.is_active == True).all()
+
+    task_id = str(uuid.uuid4())
+
+    async def _run_historical():
+        from app.services.scheduler import run_historical_scraping
+        await run_historical_scraping()
+
+    background_tasks.add_task(lambda: asyncio.run(_run_historical()))
+
+    return {
+        "message": f"Scraping histórico iniciado ({HISTORICAL_DAYS_BACK} días atrás)",
+        "task_id": task_id,
+        "days_back": HISTORICAL_DAYS_BACK,
+        "platforms": ["twitter", "youtube"],
+        "active_tags": [t.tag for t in active_tags],
+        "note": "Este proceso se ejecuta en segundo plano. Consulte los logs de scraping para ver el progreso."
+    }
+
+
+@router.get("/historical/status")
+async def get_historical_status(db: Session = Depends(get_db)):
+    from app.models import ScrapingLog
+    from app.services.scheduler import _historical_running
+
+    last_historical = db.query(ScrapingLog).filter(
+        ScrapingLog.source == "historical"
+    ).order_by(ScrapingLog.started_at.desc()).first()
+
+    if not last_historical:
+        return {
+            "is_running": _historical_running,
+            "last_run": None
+        }
+
+    return {
+        "is_running": _historical_running,
+        "last_run": {
+            "id": last_historical.id,
+            "status": last_historical.status,
+            "items_scraped": last_historical.items_scraped,
+            "started_at": str(last_historical.started_at) if last_historical.started_at else None,
+            "completed_at": str(last_historical.completed_at) if last_historical.completed_at else None,
+            "details": last_historical.extra_metadata
+        }
+    }

@@ -58,7 +58,7 @@ def update_token_status(db, token_id: str, success: bool, error_msg: str = None)
         db.commit()
 
 
-async def run_twitter_with_token(db, token_info: Dict, sentiment_analyzer) -> int:
+async def run_twitter_with_token(db, token_info: Dict, sentiment_analyzer, days_back: int = 7) -> int:
     from app.models import RawSocialPost
     from app.services.scrapers.twitterapi_io_scraper import TwitterAPIioScraper
 
@@ -75,17 +75,24 @@ async def run_twitter_with_token(db, token_info: Dict, sentiment_analyzer) -> in
         return 0
 
     try:
+        from datetime import timedelta
         tags = get_active_tags(db, "twitter")
         queries = ["Peru politica OR congreso peru OR presidente peru"]
         for tag in tags:
             queries.append(f'"{tag}"')
 
+        since_date = ""
+        if days_back > 7:
+            since_dt = datetime.utcnow() - timedelta(days=days_back)
+            since_date = f" since:{since_dt.strftime('%Y-%m-%d')}"
+
         items_added = 0
         for query in queries:
             try:
+                search_query = f"{query}{since_date}" if since_date else query
                 tweets = await scraper.search_tweets(
-                    query=query,
-                    max_results=50
+                    query=search_query,
+                    max_results=100 if days_back > 7 else 50
                 )
 
                 tag_count = 0
@@ -137,7 +144,7 @@ async def run_twitter_with_token(db, token_info: Dict, sentiment_analyzer) -> in
         return 0
 
 
-async def run_youtube_with_token(db, token_info: Dict, sentiment_analyzer) -> int:
+async def run_youtube_with_token(db, token_info: Dict, sentiment_analyzer, days_back: int = 7) -> int:
     from app.models import RawSocialPost
     from app.services.scrapers.youtube_scraper import YouTubeScraper
 
@@ -164,7 +171,8 @@ async def run_youtube_with_token(db, token_info: Dict, sentiment_analyzer) -> in
             try:
                 videos = await scraper.search_videos(
                     query=query,
-                    max_results=30
+                    max_results=50 if days_back > 7 else 30,
+                    days_back=days_back
                 )
 
                 tag_count = 0
@@ -295,7 +303,7 @@ async def run_instagram_with_token(db, token_info: Dict, sentiment_analyzer) -> 
         return 0
 
 
-async def run_scheduled_social_scraping(db_url: str, platform: str) -> int:
+async def run_scheduled_social_scraping(db_url: str, platform: str, days_back: int = 7) -> int:
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from app.models import ScrapingLog
@@ -343,9 +351,9 @@ async def run_scheduled_social_scraping(db_url: str, platform: str) -> int:
             label = token_info["label"]
             try:
                 if platform == "twitter":
-                    count = await run_twitter_with_token(db, token_info, sentiment_analyzer)
+                    count = await run_twitter_with_token(db, token_info, sentiment_analyzer, days_back=days_back)
                 elif platform == "youtube":
-                    count = await run_youtube_with_token(db, token_info, sentiment_analyzer)
+                    count = await run_youtube_with_token(db, token_info, sentiment_analyzer, days_back=days_back)
                 elif platform == "instagram":
                     count = await run_instagram_with_token(db, token_info, sentiment_analyzer)
                 else:
@@ -578,6 +586,76 @@ async def run_scheduled_survey_scraping(db_url: str):
         logger.error(f"[Scheduler] Error encuestas: {e}")
         return 0
     finally:
+        db.close()
+
+
+HISTORICAL_DAYS_BACK = 90
+
+_historical_running = False
+
+async def run_historical_scraping() -> Dict:
+    global _historical_running
+    if _historical_running:
+        return {"status": "already_running", "message": "El scraping histórico ya está en ejecución"}
+
+    _historical_running = True
+    from app.config import settings
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.models import ScrapingLog
+
+    db_url = settings.DATABASE_URL
+    engine = create_engine(db_url)
+    SessionLocal = sessionmaker(bind=engine)
+    db = SessionLocal()
+
+    log = ScrapingLog(
+        id=str(uuid.uuid4()),
+        source="historical",
+        scraping_type="historical",
+        status="running"
+    )
+    db.add(log)
+    db.commit()
+
+    logger.info(f"[Historical] Iniciando scraping histórico ({HISTORICAL_DAYS_BACK} días atrás)...")
+
+    results = {}
+    total = 0
+
+    try:
+        for platform in ["twitter", "youtube"]:
+            try:
+                count = await run_scheduled_social_scraping(db_url, platform, days_back=HISTORICAL_DAYS_BACK)
+                results[platform] = count
+                total += count
+                logger.info(f"[Historical] {platform}: {count} items nuevos")
+            except Exception as e:
+                results[platform] = f"error: {str(e)[:100]}"
+                logger.error(f"[Historical] Error en {platform}: {e}")
+
+        log.status = "completed"
+        log.items_scraped = total
+        log.completed_at = datetime.now()
+        log.extra_metadata = {
+            "triggered_by": "historical_endpoint",
+            "days_back": HISTORICAL_DAYS_BACK,
+            "per_platform": results
+        }
+        db.commit()
+
+        logger.info(f"[Historical] Completado: {total} items nuevos en total")
+        return {"status": "completed", "total_items": total, "per_platform": results, "days_back": HISTORICAL_DAYS_BACK}
+
+    except Exception as e:
+        log.status = "failed"
+        log.error_message = str(e)[:500]
+        log.completed_at = datetime.now()
+        db.commit()
+        logger.error(f"[Historical] Error general: {e}")
+        return {"status": "failed", "error": str(e)[:200]}
+    finally:
+        _historical_running = False
         db.close()
 
 
