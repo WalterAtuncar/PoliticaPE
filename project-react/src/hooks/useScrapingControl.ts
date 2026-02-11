@@ -36,40 +36,81 @@ export function useScrapingControl() {
     setError(null);
 
     try {
-      let endpoint = ENDPOINTS.TRIGGER_TWITTER;
       let url = '';
       
       if (platform === 'twitter') {
-        endpoint = ENDPOINTS.TRIGGER_TWITTER;
-        url = `${API_CONFIG.SCRAPPING_BASE_URL}${endpoint}?max_results=${maxResults}`;
+        url = `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_TWITTER}?max_results=${maxResults}`;
       } else if (platform === 'youtube') {
-        endpoint = ENDPOINTS.TRIGGER_YOUTUBE;
-        url = `${API_CONFIG.SCRAPPING_BASE_URL}${endpoint}?max_results=${maxResults}`;
+        url = `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_YOUTUBE}?max_results=${maxResults}`;
       } else if (platform === 'instagram') {
-        endpoint = ENDPOINTS.TRIGGER_INSTAGRAM;
-        url = `${API_CONFIG.SCRAPPING_BASE_URL}${endpoint}?max_results=${maxResults}&ig_user_id=${igUserId}`;
+        url = `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_INSTAGRAM}?max_results=${maxResults}&ig_user_id=${igUserId || ''}`;
       }
       
-      const response = await fetch(url, {
-        method: 'POST',
-      });
+      const response = await fetch(url, { method: 'POST' });
 
       if (!response.ok) {
         throw new Error(`Error al iniciar scraping de ${platform}`);
       }
 
       const result = await response.json();
-      
-      setTimeout(() => {
-        fetchLogs();
-      }, 3000);
-
+      setTimeout(() => { fetchLogs(); }, 3000);
       return result;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
       return null;
     } finally {
       setLoading(prev => ({ ...prev, [platform]: false }));
+    }
+  }, []);
+
+  const triggerGovernment = useCallback(async () => {
+    setLoading(prev => ({ ...prev, government: true }));
+    setError(null);
+    try {
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_GOVERNMENT}`, { method: 'POST' });
+      if (!response.ok) throw new Error('Error al iniciar scraping gubernamental');
+      const result = await response.json();
+      setTimeout(() => { fetchLogs(); }, 3000);
+      return result;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      return null;
+    } finally {
+      setLoading(prev => ({ ...prev, government: false }));
+    }
+  }, []);
+
+  const triggerSurveys = useCallback(async () => {
+    setLoading(prev => ({ ...prev, surveys: true }));
+    setError(null);
+    try {
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_SURVEYS}`, { method: 'POST' });
+      if (!response.ok) throw new Error('Error al iniciar scraping de encuestas');
+      const result = await response.json();
+      setTimeout(() => { fetchLogs(); }, 3000);
+      return result;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      return null;
+    } finally {
+      setLoading(prev => ({ ...prev, surveys: false }));
+    }
+  }, []);
+
+  const triggerAll = useCallback(async () => {
+    setLoading(prev => ({ ...prev, all: true }));
+    setError(null);
+    try {
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_ALL}`, { method: 'POST' });
+      if (!response.ok) throw new Error('Error al iniciar scraping completo');
+      const result = await response.json();
+      setTimeout(() => { fetchLogs(); }, 5000);
+      return result;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      return null;
+    } finally {
+      setLoading(prev => ({ ...prev, all: false }));
     }
   }, []);
 
@@ -86,7 +127,7 @@ export function useScrapingControl() {
 
   const fetchLogs = useCallback(async () => {
     try {
-      const data = await fetchFromScrapping(`${ENDPOINTS.SCRAPING_LOGS}?limit=10`);
+      const data = await fetchFromScrapping(`${ENDPOINTS.SCRAPING_LOGS}?limit=20`);
       setLogs(data);
     } catch (err) {
       console.error('Error fetching logs:', err);
@@ -94,7 +135,7 @@ export function useScrapingControl() {
   }, []);
 
   const getPlatformStatus = useCallback((): PlatformStatus[] => {
-    const platforms = ['twitter', 'youtube', 'instagram'];
+    const platforms = ['twitter', 'youtube', 'instagram', 'government', 'surveys'];
     
     return platforms.map(platform => {
       const platformLogs = logs.filter(log => log.source === platform);
@@ -103,7 +144,7 @@ export function useScrapingControl() {
       return {
         platform,
         configured: true,
-        lastScrape: lastLog?.completed_at || null,
+        lastScrape: lastLog?.completed_at || lastLog?.started_at || null,
         itemsScraped: platformLogs.reduce((sum, log) => sum + (log.items_scraped || 0), 0),
       };
     });
@@ -114,6 +155,9 @@ export function useScrapingControl() {
     logs,
     error,
     triggerScraping,
+    triggerGovernment,
+    triggerSurveys,
+    triggerAll,
     testConnection,
     fetchLogs,
     getPlatformStatus,

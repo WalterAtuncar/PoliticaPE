@@ -1,27 +1,29 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { RefreshCw, CheckCircle, XCircle, Clock, Database, Twitter, Youtube, Instagram } from 'lucide-react';
+import { RefreshCw, CheckCircle, Clock, Database, Twitter, Youtube, Instagram, Building2, BarChart3, Zap } from 'lucide-react';
 import { useScrapingControl } from '../../../hooks/useScrapingControl';
 
+type ScrapingPlatform = 'twitter' | 'youtube' | 'instagram' | 'government' | 'surveys' | 'all';
+
 interface PlatformCardProps {
-  platform: 'twitter' | 'youtube' | 'instagram';
+  platform: ScrapingPlatform;
   name: string;
+  description: string;
   icon: React.ReactNode;
   color: string;
-  onTrigger: (platform: 'twitter' | 'youtube' | 'instagram', maxResults: number, igUserId?: string) => Promise<void>;
+  onTrigger: (platform: ScrapingPlatform) => Promise<void>;
   loading: boolean;
   lastScrape: string | null;
   itemsScraped: number;
-  igUserId?: string;
+  showMaxResults?: boolean;
 }
 
-function PlatformCard({ platform, name, icon, color, onTrigger, loading, lastScrape, itemsScraped, igUserId }: PlatformCardProps) {
-  const [maxResults, setMaxResults] = useState(50);
+function PlatformCard({ platform, name, description, icon, color, onTrigger, loading, lastScrape, itemsScraped, showMaxResults = true }: PlatformCardProps) {
   const [message, setMessage] = useState<string | null>(null);
 
   const handleTrigger = async () => {
     setMessage(null);
-    await onTrigger(platform, maxResults, igUserId);
+    await onTrigger(platform);
     setMessage(`Scraping de ${name} iniciado`);
     setTimeout(() => setMessage(null), 5000);
   };
@@ -51,12 +53,12 @@ function PlatformCard({ platform, name, icon, color, onTrigger, loading, lastScr
           </div>
           <div>
             <h3 className="font-semibold text-gray-900">{name}</h3>
-            <p className="text-sm text-gray-500">Importar contenido político</p>
+            <p className="text-sm text-gray-500">{description}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <CheckCircle className="w-5 h-5 text-green-500" />
-          <span className="text-sm text-green-600">Configurado</span>
+          <span className="text-sm text-green-600">Activo</span>
         </div>
       </div>
 
@@ -64,7 +66,7 @@ function PlatformCard({ platform, name, icon, color, onTrigger, loading, lastScr
         <div className="bg-gray-50 rounded-lg p-3">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
             <Clock className="w-4 h-4" />
-            Último scraping
+            Última importación
           </div>
           <p className="font-medium text-gray-900">{formatDate(lastScrape)}</p>
         </div>
@@ -77,36 +79,18 @@ function PlatformCard({ platform, name, icon, color, onTrigger, loading, lastScr
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="flex-1">
-          <label className="text-sm text-gray-600 mb-1 block">Cantidad máxima</label>
-          <select
-            value={maxResults}
-            onChange={(e) => setMaxResults(Number(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value={20}>20 items</option>
-            <option value={50}>50 items</option>
-            <option value={100}>100 items</option>
-            <option value={200}>200 items</option>
-          </select>
-        </div>
-        <div className="flex-1">
-          <label className="text-sm text-gray-600 mb-1 block">&nbsp;</label>
-          <button
-            onClick={handleTrigger}
-            disabled={loading}
-            className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-white font-medium transition-colors ${
-              loading 
-                ? 'bg-gray-400 cursor-not-allowed' 
-                : 'bg-blue-600 hover:bg-blue-700'
-            }`}
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            {loading ? 'Importando...' : 'Importar'}
-          </button>
-        </div>
-      </div>
+      <button
+        onClick={handleTrigger}
+        disabled={loading}
+        className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-white font-medium transition-colors ${
+          loading 
+            ? 'bg-gray-400 cursor-not-allowed' 
+            : 'bg-blue-600 hover:bg-blue-700'
+        }`}
+      >
+        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        {loading ? 'Importando...' : 'Importar ahora'}
+      </button>
 
       {message && (
         <motion.div
@@ -123,7 +107,7 @@ function PlatformCard({ platform, name, icon, color, onTrigger, loading, lastScr
 }
 
 export default function ScrapingPanel() {
-  const { loading, logs, fetchLogs, triggerScraping, getPlatformStatus } = useScrapingControl();
+  const { loading, logs, fetchLogs, triggerScraping, triggerGovernment, triggerSurveys, triggerAll, getPlatformStatus } = useScrapingControl();
   const [platformStatus, setPlatformStatus] = useState<ReturnType<typeof getPlatformStatus>>([]);
 
   useEffect(() => {
@@ -134,12 +118,18 @@ export default function ScrapingPanel() {
     setPlatformStatus(getPlatformStatus());
   }, [logs, getPlatformStatus]);
 
-  const handleTrigger = async (platform: 'twitter' | 'youtube' | 'instagram', maxResults: number, igUserId?: string) => {
-    await triggerScraping(platform, maxResults, igUserId);
+  const handleTrigger = async (platform: ScrapingPlatform) => {
+    if (platform === 'government') {
+      await triggerGovernment();
+    } else if (platform === 'surveys') {
+      await triggerSurveys();
+    } else if (platform === 'all') {
+      await triggerAll();
+    } else {
+      await triggerScraping(platform as 'twitter' | 'youtube' | 'instagram', 50);
+    }
     setTimeout(() => fetchLogs(), 5000);
   };
-
-  const INSTAGRAM_USER_ID = '17841429930462129';
 
   const getStatusForPlatform = (platform: string) => {
     return platformStatus.find(p => p.platform === platform) || {
@@ -159,50 +149,108 @@ export default function ScrapingPanel() {
     return statusMap[status] || { label: status, color: 'text-gray-600 bg-gray-50' };
   };
 
+  const formatSource = (source: string) => {
+    const sourceMap: Record<string, string> = {
+      twitter: 'Twitter / X',
+      youtube: 'YouTube',
+      instagram: 'Instagram',
+      government: 'Datos Gubernamentales',
+      surveys: 'Encuestas',
+    };
+    return sourceMap[source] || source;
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Panel de Scraping</h2>
-        <p className="text-gray-600">Importa datos de redes sociales para análisis político</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Panel de Importación de Datos</h2>
+          <p className="text-gray-600">Importa datos de múltiples fuentes para análisis político</p>
+        </div>
+        <button
+          onClick={() => handleTrigger('all')}
+          disabled={loading.all || false}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-white font-medium transition-colors ${
+            loading.all ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'
+          }`}
+        >
+          <Zap className={`w-5 h-5 ${loading.all ? 'animate-spin' : ''}`} />
+          {loading.all ? 'Importando todo...' : 'Importar Todo'}
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <PlatformCard
-          platform="twitter"
-          name="Twitter / X"
-          icon={<Twitter className="w-6 h-6 text-white" />}
-          color="bg-sky-500"
-          onTrigger={handleTrigger}
-          loading={loading.twitter || false}
-          lastScrape={getStatusForPlatform('twitter').lastScrape}
-          itemsScraped={getStatusForPlatform('twitter').itemsScraped}
-        />
-        <PlatformCard
-          platform="youtube"
-          name="YouTube"
-          icon={<Youtube className="w-6 h-6 text-white" />}
-          color="bg-red-500"
-          onTrigger={handleTrigger}
-          loading={loading.youtube || false}
-          lastScrape={getStatusForPlatform('youtube').lastScrape}
-          itemsScraped={getStatusForPlatform('youtube').itemsScraped}
-        />
-        <PlatformCard
-          platform="instagram"
-          name="Instagram"
-          icon={<Instagram className="w-6 h-6 text-white" />}
-          color="bg-gradient-to-br from-purple-600 to-pink-500"
-          onTrigger={handleTrigger}
-          loading={loading.instagram || false}
-          lastScrape={getStatusForPlatform('instagram').lastScrape}
-          itemsScraped={getStatusForPlatform('instagram').itemsScraped}
-          igUserId={INSTAGRAM_USER_ID}
-        />
+      <div>
+        <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">Redes Sociales</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <PlatformCard
+            platform="twitter"
+            name="Twitter / X"
+            description="Tweets sobre política peruana"
+            icon={<Twitter className="w-6 h-6 text-white" />}
+            color="bg-sky-500"
+            onTrigger={handleTrigger}
+            loading={loading.twitter || false}
+            lastScrape={getStatusForPlatform('twitter').lastScrape}
+            itemsScraped={getStatusForPlatform('twitter').itemsScraped}
+          />
+          <PlatformCard
+            platform="youtube"
+            name="YouTube"
+            description="Videos de análisis político"
+            icon={<Youtube className="w-6 h-6 text-white" />}
+            color="bg-red-500"
+            onTrigger={handleTrigger}
+            loading={loading.youtube || false}
+            lastScrape={getStatusForPlatform('youtube').lastScrape}
+            itemsScraped={getStatusForPlatform('youtube').itemsScraped}
+          />
+          <PlatformCard
+            platform="instagram"
+            name="Instagram"
+            description="Contenido político visual"
+            icon={<Instagram className="w-6 h-6 text-white" />}
+            color="bg-gradient-to-br from-purple-600 to-pink-500"
+            onTrigger={handleTrigger}
+            loading={loading.instagram || false}
+            lastScrape={getStatusForPlatform('instagram').lastScrape}
+            itemsScraped={getStatusForPlatform('instagram').itemsScraped}
+          />
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-3">Fuentes Institucionales</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <PlatformCard
+            platform="government"
+            name="Datos Gubernamentales"
+            description="ONPE, INEI, MEF - datos oficiales del gobierno"
+            icon={<Building2 className="w-6 h-6 text-white" />}
+            color="bg-emerald-600"
+            onTrigger={handleTrigger}
+            loading={loading.government || false}
+            lastScrape={getStatusForPlatform('government').lastScrape}
+            itemsScraped={getStatusForPlatform('government').itemsScraped}
+            showMaxResults={false}
+          />
+          <PlatformCard
+            platform="surveys"
+            name="Encuestas y Sondeos"
+            description="IEP, Ipsos, Datum, CPI - encuestas de opinión"
+            icon={<BarChart3 className="w-6 h-6 text-white" />}
+            color="bg-amber-600"
+            onTrigger={handleTrigger}
+            loading={loading.surveys || false}
+            lastScrape={getStatusForPlatform('surveys').lastScrape}
+            itemsScraped={getStatusForPlatform('surveys').itemsScraped}
+            showMaxResults={false}
+          />
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900">Historial de Scraping</h3>
+          <h3 className="font-semibold text-gray-900">Historial de Importación</h3>
           <button
             onClick={() => fetchLogs()}
             className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
@@ -213,13 +261,14 @@ export default function ScrapingPanel() {
         </div>
 
         {logs.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">No hay registros de scraping</p>
+          <p className="text-gray-500 text-center py-8">No hay registros de importación</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
                   <th className="text-left py-3 px-2 font-medium text-gray-600">Fuente</th>
+                  <th className="text-left py-3 px-2 font-medium text-gray-600">Tipo</th>
                   <th className="text-left py-3 px-2 font-medium text-gray-600">Estado</th>
                   <th className="text-left py-3 px-2 font-medium text-gray-600">Items</th>
                   <th className="text-left py-3 px-2 font-medium text-gray-600">Fecha</th>
@@ -231,7 +280,10 @@ export default function ScrapingPanel() {
                   return (
                     <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="py-3 px-2">
-                        <span className="capitalize font-medium">{log.source}</span>
+                        <span className="font-medium">{formatSource(log.source)}</span>
+                      </td>
+                      <td className="py-3 px-2">
+                        <span className="capitalize text-gray-600">{log.scraping_type}</span>
                       </td>
                       <td className="py-3 px-2">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>

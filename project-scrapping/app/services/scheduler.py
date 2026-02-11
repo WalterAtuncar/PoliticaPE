@@ -300,6 +300,135 @@ async def run_scheduled_instagram_scraping(db_url: str):
         db.close()
 
 
+async def run_scheduled_government_scraping(db_url: str):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.models import ScrapingLog
+
+    engine = create_engine(db_url)
+    SessionLocal = sessionmaker(bind=engine)
+    db = SessionLocal()
+
+    log = ScrapingLog(
+        id=str(uuid.uuid4()),
+        source="government",
+        scraping_type="government",
+        status="running"
+    )
+    db.add(log)
+    db.commit()
+
+    try:
+        from app.scrapers.government_scrapers import ONPEScraper, INEIScraper, MEFScraper
+
+        total_items = 0
+        scrapers_info = {
+            "ONPE": ONPEScraper,
+            "INEI": INEIScraper,
+            "MEF": MEFScraper
+        }
+
+        details = {}
+        for name, scraper_cls in scrapers_info.items():
+            try:
+                scraper = scraper_cls()
+                count = await asyncio.to_thread(scraper.scrape, db)
+                total_items += count
+                details[name] = count
+                logger.info(f"[Scheduler] {name}: {count} items gubernamentales nuevos")
+                scraper.close()
+            except Exception as e:
+                logger.error(f"[Scheduler] Error en {name}: {e}")
+                details[name] = f"error: {str(e)[:100]}"
+
+        log.status = "completed"
+        log.items_scraped = total_items
+        log.completed_at = datetime.now()
+        log.extra_metadata = {
+            "triggered_by": "scheduler",
+            "sources": details
+        }
+        db.commit()
+
+        logger.info(f"[Scheduler] Datos gubernamentales: {total_items} items nuevos en total")
+        return total_items
+
+    except Exception as e:
+        log.status = "failed"
+        log.error_message = str(e)
+        log.completed_at = datetime.now()
+        db.commit()
+        logger.error(f"[Scheduler] Error datos gubernamentales: {e}")
+        return 0
+    finally:
+        db.close()
+
+
+async def run_scheduled_survey_scraping(db_url: str):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.models import ScrapingLog
+
+    engine = create_engine(db_url)
+    SessionLocal = sessionmaker(bind=engine)
+    db = SessionLocal()
+
+    log = ScrapingLog(
+        id=str(uuid.uuid4()),
+        source="surveys",
+        scraping_type="surveys",
+        status="running"
+    )
+    db.add(log)
+    db.commit()
+
+    try:
+        from app.scrapers.survey_scrapers import IEPScraper, IpsosScraper, DatumScraper, CPIScraper
+
+        total_items = 0
+        scrapers_info = {
+            "IEP": IEPScraper,
+            "Ipsos": IpsosScraper,
+            "Datum": DatumScraper,
+            "CPI": CPIScraper
+        }
+
+        details = {}
+        for name, scraper_cls in scrapers_info.items():
+            try:
+                scraper = scraper_cls()
+                count = await asyncio.to_thread(scraper.scrape, db)
+                total_items += count
+                details[name] = count
+                logger.info(f"[Scheduler] {name}: {count} encuestas nuevas")
+                scraper.close()
+            except Exception as e:
+                logger.error(f"[Scheduler] Error en {name}: {e}")
+                details[name] = f"error: {str(e)[:100]}"
+
+        log.status = "completed"
+        log.items_scraped = total_items
+        log.completed_at = datetime.now()
+        log.extra_metadata = {
+            "triggered_by": "scheduler",
+            "pollsters": details
+        }
+        db.commit()
+
+        logger.info(f"[Scheduler] Encuestas: {total_items} items nuevos en total")
+        return total_items
+
+    except Exception as e:
+        log.status = "failed"
+        log.error_message = str(e)
+        log.completed_at = datetime.now()
+        db.commit()
+        logger.error(f"[Scheduler] Error encuestas: {e}")
+        return 0
+    finally:
+        db.close()
+
+
 async def run_all_scrapers():
     from app.config import settings
     db_url = settings.DATABASE_URL
@@ -310,6 +439,8 @@ async def run_all_scrapers():
     total += await run_scheduled_twitter_scraping(db_url)
     total += await run_scheduled_youtube_scraping(db_url)
     total += await run_scheduled_instagram_scraping(db_url)
+    total += await run_scheduled_government_scraping(db_url)
+    total += await run_scheduled_survey_scraping(db_url)
 
     logger.info(f"[Scheduler] Ciclo completado: {total} items nuevos en total")
     return total

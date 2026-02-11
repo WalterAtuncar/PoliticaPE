@@ -267,18 +267,25 @@ async def trigger_news_scraping(
         sources=sources
     )
 
-@router.post("/trigger/government", response_model=ScrapingTaskResponse)
-async def trigger_government_scraping(
-    request: ScrapingTaskRequest,
-    background_tasks: BackgroundTasks
+@router.post("/trigger/government")
+async def trigger_government_scraping_legacy(
+    background_tasks: BackgroundTasks,
+    request: Optional[ScrapingTaskRequest] = None
 ):
-    sources = request.sources or ["onpe", "inei", "mef"]
-    task_ids = [str(uuid.uuid4()) for _ in sources]
-    
+    from app.config import settings
+
+    task_id = str(uuid.uuid4())
+
+    async def _run_gov():
+        from app.services.scheduler import run_scheduled_government_scraping
+        await run_scheduled_government_scraping(settings.DATABASE_URL)
+
+    background_tasks.add_task(lambda: asyncio.run(_run_gov()))
+
     return ScrapingTaskResponse(
-        message="Government scraping no implementado aún - requiere implementar scrapers gubernamentales",
-        task_ids=task_ids,
-        sources=sources
+        message="Scraping de datos gubernamentales iniciado (ONPE, INEI, MEF)",
+        task_ids=[task_id],
+        sources=["onpe", "inei", "mef"]
     )
 
 @router.get("/status/{task_id}")
@@ -760,4 +767,46 @@ async def trigger_facebook_scraping(
         "platform": "facebook",
         "page_ids": page_list,
         "max_results": max_results
+    }
+
+
+@router.post("/trigger/surveys")
+async def trigger_survey_scraping(
+    background_tasks: BackgroundTasks,
+):
+    from app.config import settings
+
+    task_id = str(uuid.uuid4())
+
+    async def _run_surveys():
+        from app.services.scheduler import run_scheduled_survey_scraping
+        await run_scheduled_survey_scraping(settings.DATABASE_URL)
+
+    background_tasks.add_task(lambda: asyncio.run(_run_surveys()))
+
+    return {
+        "message": "Scraping de encuestas iniciado",
+        "task_id": task_id,
+        "pollsters": ["IEP", "Ipsos", "Datum", "CPI"]
+    }
+
+
+@router.post("/trigger/all")
+async def trigger_all_scraping(
+    background_tasks: BackgroundTasks,
+):
+    from app.config import settings
+
+    task_id = str(uuid.uuid4())
+
+    async def _run_all():
+        from app.services.scheduler import run_all_scrapers
+        await run_all_scrapers()
+
+    background_tasks.add_task(lambda: asyncio.run(_run_all()))
+
+    return {
+        "message": "Scraping completo iniciado (redes sociales, gobierno, encuestas)",
+        "task_id": task_id,
+        "sources": ["Twitter", "YouTube", "Instagram", "ONPE", "INEI", "MEF", "IEP", "Ipsos", "Datum", "CPI"]
     }
