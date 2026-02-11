@@ -244,15 +244,20 @@ async def startup_event():
     init_db()
     logger.info("Database initialized")
     
-    # Initialize identity schema and create demo user
     init_identity_schema()
     create_demo_user()
+    
+    from app.services.scheduler import start_scheduler
+    start_scheduler()
+    logger.info("Scheduled scraping enabled")
     
     logger.info("Application startup completed")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on application shutdown"""
+    from app.services.scheduler import stop_scheduler
+    stop_scheduler()
     logger.info("Shutting down application")
 
 @app.get("/")
