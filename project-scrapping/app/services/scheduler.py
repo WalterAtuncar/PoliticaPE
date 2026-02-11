@@ -87,12 +87,13 @@ async def run_twitter_with_token(db, token_info: Dict, sentiment_analyzer, days_
             since_date = f" since:{since_dt.strftime('%Y-%m-%d')}"
 
         items_added = 0
+        is_historical = days_back > 7
         for query in queries:
             try:
                 search_query = f"{query}{since_date}" if since_date else query
                 tweets = await scraper.search_tweets(
                     query=search_query,
-                    max_results=100 if days_back > 7 else 50
+                    max_results=200 if is_historical else 50
                 )
 
                 tag_count = 0
@@ -167,56 +168,67 @@ async def run_youtube_with_token(db, token_info: Dict, sentiment_analyzer, days_
             queries.append(tag)
 
         items_added = 0
+        is_historical = days_back > 7
+        orders = ["date", "relevance"] if is_historical else ["relevance"]
+
         for query in queries:
-            try:
-                videos = await scraper.search_videos(
-                    query=query,
-                    max_results=50 if days_back > 7 else 30,
-                    days_back=days_back
-                )
-
-                tag_count = 0
-                for video in videos:
-                    post_id = f"yt_{video.get('id', '')}"
-                    existing = db.query(RawSocialPost).filter(
-                        RawSocialPost.platform == "youtube",
-                        RawSocialPost.post_id == post_id
-                    ).first()
-                    if existing:
-                        continue
-
-                    content = f"{video.get('title', '')} {video.get('description', '')}"
-                    sentiment_score = sentiment_analyzer.analyze(content)
-                    post = RawSocialPost(
-                        id=str(uuid.uuid4()),
-                        platform="youtube",
-                        post_id=post_id,
-                        author=video.get("channel_title", video.get("author", "")),
-                        content=content[:2000],
-                        created_at=video.get("published_at"),
-                        engagement_metrics={
-                            "likes": video.get("likes", 0),
-                            "shares": 0,
-                            "comments": video.get("comments", 0),
-                            "views": video.get("views", 0)
-                        },
-                        region="Nacional",
-                        sentiment_score=sentiment_score,
-                        processed=True
+            tag_count_total = 0
+            for order in orders:
+                try:
+                    videos = await scraper.search_videos(
+                        query=query,
+                        max_results=100 if is_historical else 30,
+                        days_back=days_back,
+                        order=order
                     )
-                    db.add(post)
-                    tag_count += 1
 
-                db.commit()
-                items_added += tag_count
+                    tag_count = 0
+                    for video in videos:
+                        video_post_id = video.get("post_id", "")
+                        if not video_post_id:
+                            continue
+                        existing = db.query(RawSocialPost).filter(
+                            RawSocialPost.platform == "youtube",
+                            RawSocialPost.post_id == video_post_id
+                        ).first()
+                        if existing:
+                            continue
 
-                if query != "política Perú congreso gobierno":
-                    update_tag_stats(db, query, tag_count)
-                    logger.info(f"[Scheduler] YouTube tag '{query}': {tag_count} videos nuevos")
+                        content = video.get("content", "")
+                        if not content:
+                            content = f"{video.get('title', '')} {video.get('description', '')}"
+                        sentiment_score = sentiment_analyzer.analyze(content)
+                        post = RawSocialPost(
+                            id=str(uuid.uuid4()),
+                            platform="youtube",
+                            post_id=video_post_id,
+                            author=video.get("author", ""),
+                            content=content[:2000],
+                            created_at=video.get("created_at"),
+                            engagement_metrics=video.get("engagement_metrics", {
+                                "likes": 0, "shares": 0, "comments": 0, "views": 0
+                            }),
+                            region=video.get("region", "Nacional"),
+                            sentiment_score=sentiment_score,
+                            processed=True
+                        )
+                        db.add(post)
+                        tag_count += 1
 
-            except Exception as e:
-                logger.error(f"[Scheduler] Error YouTube query '{query[:50]}': {e}")
-                continue
+                    db.commit()
+                    items_added += tag_count
+                    tag_count_total += tag_count
+
+                    if is_historical:
+                        logger.info(f"[Scheduler] YouTube tag '{query[:30]}' ({order}): {tag_count} videos nuevos")
+
+                except Exception as e:
+                    logger.error(f"[Scheduler] Error YouTube query '{query[:50]}' ({order}): {e}")
+                    continue
+
+            if query != "política Perú congreso gobierno":
+                update_tag_stats(db, query, tag_count_total)
+                logger.info(f"[Scheduler] YouTube tag '{query}': {tag_count_total} videos nuevos total")
 
         update_token_status(db, token_info["id"], True)
         logger.info(f"[Scheduler] YouTube '{token_info['label']}': {items_added} videos nuevos total")
@@ -631,8 +643,9 @@ async def run_historical_scraping() -> Dict:
                 total += count
                 logger.info(f"[Historical] {platform}: {count} items nuevos")
             except Exception as e:
-                results[platform] = f"error: {str(e)[:100]}"
+                results[platform] = 0
                 logger.error(f"[Historical] Error en {platform}: {e}")
+
 
         log.status = "completed"
         log.items_scraped = total
