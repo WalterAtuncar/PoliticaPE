@@ -17,7 +17,6 @@ pids
 coverage/
 .nyc_output/
 
-dist/
 build/
 build/Release/
 lib/
