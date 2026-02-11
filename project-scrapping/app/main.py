@@ -260,6 +260,11 @@ async def shutdown_event():
     stop_scheduler()
     logger.info("Shutting down application")
 
+@app.get("/healthz")
+async def healthz():
+    """Health check endpoint for deployment"""
+    return {"status": "ok"}
+
 @app.get("/")
 async def root():
     """Root endpoint - serves SPA in production or service info in dev"""
