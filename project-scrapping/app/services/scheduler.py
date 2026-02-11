@@ -315,6 +315,87 @@ async def run_instagram_with_token(db, token_info: Dict, sentiment_analyzer) -> 
         return 0
 
 
+HISTORICAL_DAYS_BACK = 90
+
+
+async def run_facebook_with_token(db, token_info: Dict, sentiment_analyzer) -> int:
+    from app.models import RawSocialPost
+    from app.services.scrapers.facebook_scraper import FacebookScraper
+
+    creds = token_info["credentials"]
+    access_token = creds.get("access_token", "")
+    if not access_token:
+        update_token_status(db, token_info["id"], False, "Sin access_token configurado")
+        return 0
+
+    scraper = FacebookScraper(access_token=access_token)
+    if not scraper.is_configured():
+        update_token_status(db, token_info["id"], False, "Token inválido")
+        return 0
+
+    test_result = await scraper.test_connection()
+    if not test_result.get("success"):
+        update_token_status(db, token_info["id"], False, test_result.get("error", "Token expirado"))
+        logger.warning(f"[Scheduler] Facebook '{token_info['label']}' token inválido")
+        return 0
+
+    try:
+        tags = get_active_tags(db, "facebook")
+        posts = await scraper.scrape_political_content(extra_tags=tags, max_per_query=50)
+        items_added = 0
+
+        for post in posts:
+            fb_post_id = post.get("post_id", "")
+            if not fb_post_id:
+                continue
+            existing = db.query(RawSocialPost).filter(
+                RawSocialPost.platform == "facebook",
+                RawSocialPost.post_id == fb_post_id
+            ).first()
+            if existing:
+                continue
+
+            content = post.get("content", "")
+            sentiment_score = sentiment_analyzer.analyze(content)
+            created_at = None
+            if post.get("timestamp"):
+                try:
+                    created_at = datetime.fromisoformat(post["timestamp"].replace("Z", "+00:00"))
+                except Exception:
+                    created_at = datetime.now()
+
+            db_post = RawSocialPost(
+                id=str(uuid.uuid4()),
+                platform="facebook",
+                post_id=fb_post_id,
+                author=post.get("author", ""),
+                content=content[:2000],
+                created_at=created_at,
+                engagement_metrics={
+                    "likes": post.get("likes", 0),
+                    "shares": post.get("shares", 0),
+                    "comments": post.get("comments", 0),
+                    "views": post.get("views", 0)
+                },
+                scraped_at=datetime.now(),
+                region="Nacional",
+                sentiment_score=sentiment_score,
+                processed=True
+            )
+            db.add(db_post)
+            items_added += 1
+
+        db.commit()
+        update_token_status(db, token_info["id"], True)
+        logger.info(f"[Scheduler] Facebook '{token_info['label']}': {items_added} posts nuevos")
+        return items_added
+
+    except Exception as e:
+        update_token_status(db, token_info["id"], False, str(e)[:200])
+        logger.error(f"[Scheduler] Error Facebook '{token_info['label']}': {e}")
+        return 0
+
+
 async def run_scheduled_social_scraping(db_url: str, platform: str, days_back: int = 7) -> int:
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
@@ -337,6 +418,10 @@ async def run_scheduled_social_scraping(db_url: str, platform: str, days_back: i
             tokens = [{"id": "__env__", "label": "Variable de entorno", "credentials": {"api_key": api_key}}]
     elif platform == "instagram" and not tokens:
         access_token = os.getenv("INSTAGRAM_ACCESS_TOKEN")
+        if access_token:
+            tokens = [{"id": "__env__", "label": "Variable de entorno", "credentials": {"access_token": access_token}}]
+    elif platform == "facebook" and not tokens:
+        access_token = os.getenv("FACEBOOK_GRAPH_TOKEN")
         if access_token:
             tokens = [{"id": "__env__", "label": "Variable de entorno", "credentials": {"access_token": access_token}}]
 
@@ -368,6 +453,8 @@ async def run_scheduled_social_scraping(db_url: str, platform: str, days_back: i
                     count = await run_youtube_with_token(db, token_info, sentiment_analyzer, days_back=days_back)
                 elif platform == "instagram":
                     count = await run_instagram_with_token(db, token_info, sentiment_analyzer)
+                elif platform == "facebook":
+                    count = await run_facebook_with_token(db, token_info, sentiment_analyzer)
                 else:
                     count = 0
                 total_added += count
@@ -601,8 +688,6 @@ async def run_scheduled_survey_scraping(db_url: str):
         db.close()
 
 
-HISTORICAL_DAYS_BACK = 90
-
 _historical_running = False
 
 async def run_historical_scraping() -> Dict:
@@ -636,7 +721,7 @@ async def run_historical_scraping() -> Dict:
     total = 0
 
     try:
-        for platform in ["twitter", "youtube"]:
+        for platform in ["twitter", "youtube", "instagram", "facebook"]:
             try:
                 count = await run_scheduled_social_scraping(db_url, platform, days_back=HISTORICAL_DAYS_BACK)
                 results[platform] = count
@@ -682,6 +767,7 @@ async def run_all_scrapers():
     total += await run_scheduled_social_scraping(db_url, "twitter")
     total += await run_scheduled_social_scraping(db_url, "youtube")
     total += await run_scheduled_social_scraping(db_url, "instagram")
+    total += await run_scheduled_social_scraping(db_url, "facebook")
     total += await run_scheduled_government_scraping(db_url)
     total += await run_scheduled_survey_scraping(db_url)
 

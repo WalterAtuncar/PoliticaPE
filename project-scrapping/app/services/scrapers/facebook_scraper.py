@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 class FacebookScraper:
-    def __init__(self):
-        self.access_token = os.getenv("FACEBOOK_GRAPH_TOKEN")
+    def __init__(self, access_token: str = None):
+        self.access_token = access_token or os.getenv("FACEBOOK_GRAPH_TOKEN")
         self.base_url = "https://graph.facebook.com/v18.0"
     
     def is_configured(self) -> bool:
@@ -225,4 +225,38 @@ class FacebookScraper:
                 continue
         
         unique_posts = {post["post_id"]: post for post in all_posts}
+        return list(unique_posts.values())
+
+    async def scrape_political_content(self, extra_tags: List[str] = None, max_per_query: int = 50) -> List[Dict[str, Any]]:
+        all_posts = []
+
+        page_posts = await self.scrape_political_pages(max_per_page=max_per_query)
+        all_posts.extend(page_posts)
+        logger.info(f"Facebook páginas políticas: {len(page_posts)} posts")
+
+        search_queries = [
+            "politica peru",
+            "congreso peru",
+            "presidente peru",
+            "elecciones peru 2026"
+        ]
+
+        if extra_tags:
+            for tag in extra_tags:
+                clean = tag.strip()
+                if clean and clean.lower() not in [q.lower() for q in search_queries]:
+                    search_queries.append(clean)
+
+        for query in search_queries:
+            try:
+                posts = await self.search_public_posts(query, max_results=max_per_query)
+                if posts:
+                    all_posts.extend(posts)
+                    logger.info(f"Facebook search '{query}': {len(posts)} posts")
+            except Exception as e:
+                logger.debug(f"Facebook search '{query}' no disponible: {e}")
+                continue
+
+        unique_posts = {post["post_id"]: post for post in all_posts if post.get("post_id")}
+        logger.info(f"Facebook total: {len(unique_posts)} posts únicos")
         return list(unique_posts.values())

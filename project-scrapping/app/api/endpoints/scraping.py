@@ -837,9 +837,9 @@ async def trigger_historical_scraping(
         "message": f"Scraping histórico iniciado ({HISTORICAL_DAYS_BACK} días atrás)",
         "task_id": task_id,
         "days_back": HISTORICAL_DAYS_BACK,
-        "platforms": ["twitter", "youtube"],
+        "platforms": ["twitter", "youtube", "instagram", "facebook"],
         "active_tags": [t.tag for t in active_tags],
-        "note": "Este proceso se ejecuta en segundo plano. Consulte los logs de scraping para ver el progreso."
+        "note": "Twitter y YouTube soportan búsqueda retroactiva por fechas. Instagram y Facebook obtienen los posts más recientes disponibles (sin filtro de fecha por limitación de sus APIs)."
     }
 
 
