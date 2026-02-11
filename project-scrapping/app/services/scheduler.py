@@ -338,10 +338,13 @@ async def run_scheduled_government_scraping(db_url: str):
     db.commit()
 
     try:
-        from app.scrapers.government_scrapers import ONPEScraper, INEIScraper, MEFScraper
+        from app.scrapers.government_scrapers import ONPEScraper, INEIScraper, MEFScraper, WikipediaGovScraper, CongresoScraper, DatosAbiertosScraper
 
         total_items = 0
         scrapers_info = {
+            "Wikipedia Gov": WikipediaGovScraper,
+            "Congreso": CongresoScraper,
+            "Datos Abiertos": DatosAbiertosScraper,
             "ONPE": ONPEScraper,
             "INEI": INEIScraper,
             "MEF": MEFScraper
@@ -378,6 +381,74 @@ async def run_scheduled_government_scraping(db_url: str):
         log.completed_at = datetime.now()
         db.commit()
         logger.error(f"[Scheduler] Error datos gubernamentales: {e}")
+        return 0
+    finally:
+        db.close()
+
+
+def run_government_scraping_sync(db_url: str):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.models import ScrapingLog
+
+    engine = create_engine(db_url)
+    SessionLocal = sessionmaker(bind=engine)
+    db = SessionLocal()
+
+    log = ScrapingLog(
+        id=str(uuid.uuid4()),
+        source="government",
+        scraping_type="government",
+        status="running"
+    )
+    db.add(log)
+    db.commit()
+
+    try:
+        from app.scrapers.government_scrapers import WikipediaGovScraper, CongresoScraper, DatosAbiertosScraper
+
+        total_items = 0
+        scrapers_info = {
+            "Wikipedia Gov": WikipediaGovScraper,
+            "Congreso": CongresoScraper,
+            "Datos Abiertos": DatosAbiertosScraper,
+        }
+
+        details = {}
+        for name, scraper_cls in scrapers_info.items():
+            try:
+                scraper = scraper_cls()
+                count = scraper.scrape(db)
+                total_items += count
+                details[name] = count
+                logger.info(f"[Scheduler] {name}: {count} items gubernamentales nuevos")
+                scraper.close()
+            except Exception as e:
+                logger.error(f"[Scheduler] Error en {name}: {e}")
+                import traceback
+                traceback.print_exc()
+                details[name] = f"error: {str(e)[:100]}"
+
+        log.status = "completed"
+        log.items_scraped = total_items
+        log.completed_at = datetime.now()
+        log.extra_metadata = {
+            "triggered_by": "trigger_endpoint",
+            "sources": details
+        }
+        db.commit()
+
+        logger.info(f"[Scheduler] Datos gubernamentales: {total_items} items nuevos en total")
+        return total_items
+
+    except Exception as e:
+        log.status = "failed"
+        log.error_message = str(e)
+        log.completed_at = datetime.now()
+        db.commit()
+        logger.error(f"[Scheduler] Error datos gubernamentales: {e}")
+        import traceback
+        traceback.print_exc()
         return 0
     finally:
         db.close()

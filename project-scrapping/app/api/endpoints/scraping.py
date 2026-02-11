@@ -276,16 +276,16 @@ async def trigger_government_scraping_legacy(
 
     task_id = str(uuid.uuid4())
 
-    async def _run_gov():
-        from app.services.scheduler import run_scheduled_government_scraping
-        await run_scheduled_government_scraping(settings.DATABASE_URL)
+    def _run_gov_sync():
+        from app.services.scheduler import run_government_scraping_sync
+        run_government_scraping_sync(settings.DATABASE_URL)
 
-    background_tasks.add_task(lambda: asyncio.run(_run_gov()))
+    background_tasks.add_task(_run_gov_sync)
 
     return ScrapingTaskResponse(
-        message="Scraping de datos gubernamentales iniciado (ONPE, INEI, MEF)",
+        message="Scraping de datos gubernamentales iniciado (Wikipedia, Congreso, Datos Abiertos)",
         task_ids=[task_id],
-        sources=["onpe", "inei", "mef"]
+        sources=["wikipedia", "congreso", "datos_abiertos"]
     )
 
 @router.get("/status/{task_id}")

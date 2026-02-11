@@ -11,366 +11,511 @@ from app.scrapers.base import BaseScraper
 from app.models import GovernmentData
 from loguru import logger
 
+
+class WikipediaGovScraper(BaseScraper):
+
+    def __init__(self):
+        super().__init__()
+        self.delay_range = (0.5, 1.5)
+
+    def _parse_content(self, response) -> List[Dict[str, Any]]:
+        return []
+
+    def scrape(self, db: Session) -> int:
+        all_items = []
+        all_items.extend(self._scrape_cabinet())
+        all_items.extend(self._scrape_economy())
+        return self._save_items(db, all_items, GovernmentData)
+
+    def _scrape_cabinet(self) -> List[Dict[str, Any]]:
+        items = []
+        try:
+            response = self._make_request('https://es.wikipedia.org/wiki/Consejo_de_Ministros_del_Per%C3%BA')
+            if not response:
+                return items
+            soup = BeautifulSoup(response.content, 'html.parser')
+            tables = soup.find_all('table', class_='wikitable')
+            if not tables:
+                return items
+
+            table = tables[0]
+            rows = table.find_all('tr')
+            ministros = []
+
+            for row in rows[1:]:
+                th = row.find('th')
+                ministerio_link = th.find('a') if th else None
+                ministerio_raw = ministerio_link.get('title', '') if ministerio_link else (th.get_text(strip=True) if th else '')
+                ministerio = re.sub(r' del Perú$', '', ministerio_raw).strip()
+
+                tds = row.find_all('td')
+                if tds:
+                    titular = tds[0].get_text(strip=True)
+                    fecha = tds[1].get_text(strip=True) if len(tds) > 1 else ''
+                else:
+                    continue
+
+                if titular and ministerio:
+                    ministros.append({
+                        'ministerio': ministerio,
+                        'titular': titular,
+                        'fecha_juramentacion': fecha,
+                    })
+
+            if ministros:
+                items.append({
+                    'source': 'Congreso',
+                    'data_type': 'Gabinete',
+                    'title': f'Consejo de Ministros del Perú ({len(ministros)} carteras)',
+                    'content': {
+                        'tipo': 'Gabinete Ministerial',
+                        'total_ministerios': len(ministros),
+                        'ministros': ministros,
+                        'fecha_juramentacion': ministros[0]['fecha_juramentacion'] if ministros else '',
+                        'premier': ministros[0]['titular'] if ministros else '',
+                        'premier_cargo': ministros[0]['ministerio'] if ministros else '',
+                    },
+                    'published_at': datetime.now(),
+                    'url': 'https://es.wikipedia.org/wiki/Consejo_de_Ministros_del_Per%C3%BA',
+                    'department': 'Nacional',
+                    'metadata': {'extraction_method': 'wikipedia_table'},
+                    'scraped_at': datetime.now(),
+                })
+                logger.info(f"Wikipedia: {len(ministros)} ministros extraídos del gabinete")
+        except Exception as e:
+            logger.error(f"Error scraping cabinet: {e}")
+        return items
+
+    def _scrape_economy(self) -> List[Dict[str, Any]]:
+        items = []
+        try:
+            response = self._make_request('https://es.wikipedia.org/wiki/Econom%C3%ADa_del_Per%C3%BA')
+            if not response:
+                return items
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            infobox = soup.find('table', class_='infobox')
+            if not infobox:
+                return items
+
+            indicators = {}
+            rows = infobox.find_all('tr')
+            for row in rows:
+                th = row.find('th')
+                td = row.find('td')
+                if th and td:
+                    key = th.get_text(strip=True)
+                    val = td.get_text(strip=True)
+                    if key and val:
+                        indicators[key] = val
+
+            if indicators:
+                key_indicators = {}
+                indicator_mapping = {
+                    'PIB(nominal)': 'pib_nominal',
+                    'PIB(PPA)': 'pib_ppa',
+                    'Variación del PIB': 'variacion_pib',
+                    'PIB per cápita(nominal)': 'pib_per_capita',
+                    'Inflación (IPC)': 'inflacion',
+                    'IDH': 'idh',
+                    'Población': 'poblacion',
+                    'Coef. de Gini': 'gini',
+                    'Moneda': 'moneda',
+                    'Deuda externa': 'deuda_externa',
+                    'Deuda pública': 'deuda_publica',
+                    'Ingresos': 'ingresos',
+                    'Gasto público': 'gasto_publico',
+                    'Reservas internacionales': 'reservas',
+                    'Tasa de desempleo': 'desempleo',
+                    'Salario mínimo': 'salario_minimo',
+                }
+                for wiki_key, mapped_key in indicator_mapping.items():
+                    for k, v in indicators.items():
+                        if wiki_key.lower() in k.lower():
+                            key_indicators[mapped_key] = v
+                            break
+
+                pib_nums = []
+                for k, v in indicators.items():
+                    matches = re.findall(r'[\d,.]+', v.replace('\xa0', ' '))
+                    if 'PIB' in k and matches:
+                        pib_nums.extend(matches[:2])
+
+                items.append({
+                    'source': 'INEI',
+                    'data_type': 'Indicador',
+                    'title': f'Indicadores Económicos del Perú ({len(key_indicators)} métricas)',
+                    'content': {
+                        'tipo': 'Indicadores Macroeconómicos',
+                        'indicadores': key_indicators,
+                        'total_metricas': len(key_indicators),
+                        'all_indicators': indicators,
+                        'datos_encontrados': True,
+                    },
+                    'published_at': datetime.now(),
+                    'url': 'https://es.wikipedia.org/wiki/Econom%C3%ADa_del_Per%C3%BA',
+                    'department': 'Nacional',
+                    'metadata': {'extraction_method': 'wikipedia_infobox'},
+                    'scraped_at': datetime.now(),
+                })
+                logger.info(f"Wikipedia: {len(key_indicators)} indicadores económicos extraídos")
+
+            tables = soup.find_all('table', class_='wikitable')
+            for table in tables[:3]:
+                rows = table.find_all('tr')
+                if len(rows) < 3:
+                    continue
+                headers = [h.get_text(strip=True) for h in rows[0].find_all(['th', 'td'])]
+                if not any('PIB' in h or 'Año' in h or 'año' in h.lower() for h in headers):
+                    continue
+
+                table_data = []
+                for row in rows[1:]:
+                    cells = [c.get_text(strip=True) for c in row.find_all(['td', 'th'])]
+                    if cells and any(c.strip() for c in cells):
+                        table_data.append(dict(zip(headers, cells)))
+
+                if table_data:
+                    items.append({
+                        'source': 'INEI',
+                        'data_type': 'Estadística',
+                        'title': f'PIB per cápita histórico ({len(table_data)} registros)',
+                        'content': {
+                            'tipo': 'Serie Histórica',
+                            'headers': headers,
+                            'datos': table_data[:15],
+                            'total_registros': len(table_data),
+                            'datos_encontrados': True,
+                        },
+                        'published_at': datetime.now(),
+                        'url': 'https://es.wikipedia.org/wiki/Econom%C3%ADa_del_Per%C3%BA',
+                        'department': 'Nacional',
+                        'metadata': {'extraction_method': 'wikipedia_table'},
+                        'scraped_at': datetime.now(),
+                    })
+                    break
+        except Exception as e:
+            logger.error(f"Error scraping economy: {e}")
+        return items
+
+    def _item_exists(self, db: Session, item_data: Dict[str, Any], model_class) -> bool:
+        existing = db.query(model_class).filter(
+            model_class.title == item_data['title'],
+            model_class.source == item_data['source']
+        ).first()
+        return existing is not None
+
+
+class CongresoScraper(BaseScraper):
+
+    def __init__(self):
+        super().__init__()
+        self.delay_range = (1, 2)
+
+    def _parse_content(self, response) -> List[Dict[str, Any]]:
+        return []
+
+    def scrape(self, db: Session) -> int:
+        all_items = []
+        all_items.extend(self._scrape_congresistas())
+        all_items.extend(self._scrape_comisiones())
+        return self._save_items(db, all_items, GovernmentData)
+
+    def _scrape_congresistas(self) -> List[Dict[str, Any]]:
+        items = []
+        try:
+            response = self._make_request('https://www.congreso.gob.pe/pleno/congresistas/')
+            if not response:
+                return items
+            soup = BeautifulSoup(response.content, 'html.parser')
+            table = soup.find('table')
+            if not table:
+                return items
+
+            rows = table.find_all('tr')
+            if len(rows) < 2:
+                return items
+
+            parties: Dict[str, List[str]] = {}
+            total = 0
+
+            for row in rows[1:]:
+                cells = row.find_all(['td', 'th'])
+                if len(cells) >= 3:
+                    name = cells[1].get_text(strip=True)
+                    party = cells[2].get_text(strip=True)
+                    if name and party:
+                        if party not in parties:
+                            parties[party] = []
+                        parties[party].append(name)
+                        total += 1
+
+            if parties:
+                party_summary = []
+                for party, members in sorted(parties.items(), key=lambda x: -len(x[1])):
+                    party_summary.append({
+                        'bancada': party,
+                        'escanos': len(members),
+                        'porcentaje': round(len(members) / total * 100, 1) if total > 0 else 0,
+                        'congresistas': members[:5],
+                    })
+
+                items.append({
+                    'source': 'Congreso',
+                    'data_type': 'Composición',
+                    'title': f'Composición del Congreso ({total} congresistas, {len(parties)} bancadas)',
+                    'content': {
+                        'tipo': 'Composición Parlamentaria',
+                        'total_congresistas': total,
+                        'total_bancadas': len(parties),
+                        'bancadas': party_summary,
+                        'bancada_mayoritaria': party_summary[0]['bancada'] if party_summary else '',
+                        'escanos_mayoritaria': party_summary[0]['escanos'] if party_summary else 0,
+                        'datos_encontrados': True,
+                    },
+                    'published_at': datetime.now(),
+                    'url': 'https://www.congreso.gob.pe/pleno/congresistas/',
+                    'department': 'Nacional',
+                    'metadata': {'extraction_method': 'congreso_table'},
+                    'scraped_at': datetime.now(),
+                })
+                logger.info(f"Congreso: {total} congresistas en {len(parties)} bancadas")
+        except Exception as e:
+            logger.error(f"Error scraping congresistas: {e}")
+        return items
+
+    def _scrape_comisiones(self) -> List[Dict[str, Any]]:
+        items = []
+        try:
+            response = self._make_request('https://www.congreso.gob.pe/CuadrodeComisiones/')
+            if not response:
+                return items
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            comisiones = []
+            links = soup.find_all('a', href=True)
+            for link in links:
+                href = link.get('href', '')
+                text = link.get_text(strip=True)
+                if ('comision' in href.lower() or 'Comisión' in text) and len(text) > 10 and text not in [c.get('nombre') for c in comisiones]:
+                    comisiones.append({
+                        'nombre': text[:120],
+                        'url': urljoin('https://www.congreso.gob.pe', href),
+                    })
+
+            comisiones_unique = []
+            seen = set()
+            for c in comisiones:
+                if c['nombre'] not in seen and len(c['nombre']) > 15:
+                    seen.add(c['nombre'])
+                    comisiones_unique.append(c)
+
+            if comisiones_unique:
+                items.append({
+                    'source': 'Congreso',
+                    'data_type': 'Organización',
+                    'title': f'Comisiones del Congreso ({len(comisiones_unique)} comisiones)',
+                    'content': {
+                        'tipo': 'Comisiones Parlamentarias',
+                        'total_comisiones': len(comisiones_unique),
+                        'comisiones': comisiones_unique[:30],
+                        'datos_encontrados': True,
+                    },
+                    'published_at': datetime.now(),
+                    'url': 'https://www.congreso.gob.pe/CuadrodeComisiones/',
+                    'department': 'Nacional',
+                    'metadata': {'extraction_method': 'congreso_html'},
+                    'scraped_at': datetime.now(),
+                })
+                logger.info(f"Congreso: {len(comisiones_unique)} comisiones encontradas")
+        except Exception as e:
+            logger.error(f"Error scraping comisiones: {e}")
+        return items
+
+    def _item_exists(self, db: Session, item_data: Dict[str, Any], model_class) -> bool:
+        existing = db.query(model_class).filter(
+            model_class.title == item_data['title'],
+            model_class.source == item_data['source']
+        ).first()
+        return existing is not None
+
+
+class DatosAbiertosScraper(BaseScraper):
+
+    def __init__(self):
+        super().__init__()
+        self.base_url = 'https://www.datosabiertos.gob.pe'
+        self.delay_range = (0.5, 1.5)
+
+    def _parse_content(self, response) -> List[Dict[str, Any]]:
+        return []
+
+    def scrape(self, db: Session) -> int:
+        all_items = []
+        try:
+            r = self._make_request(f'{self.base_url}/api/3/action/package_list')
+            if not r:
+                return 0
+            data = r.json()
+            all_packages = data.get('result', [])
+            logger.info(f"Datos Abiertos: {len(all_packages)} datasets disponibles")
+
+            political_keywords = [
+                'presupuesto', 'congreso', 'electoral', 'fiscal', 'gasto-público',
+                'deuda', 'empleo', 'pobreza', 'educación', 'salud', 'seguridad',
+                'corrupción', 'transparencia', 'gobierno', 'ministerio',
+                'indicador', 'censo', 'votación', 'elecciones',
+            ]
+
+            relevant = []
+            for pkg in all_packages:
+                pkg_lower = pkg.lower()
+                if any(kw in pkg_lower for kw in political_keywords):
+                    relevant.append(pkg)
+
+            categories: Dict[str, List[str]] = {
+                'Presupuesto y Finanzas': [],
+                'Electoral': [],
+                'Indicadores Sociales': [],
+                'Gobierno y Transparencia': [],
+                'Otros': [],
+            }
+
+            for pkg in relevant:
+                pkg_lower = pkg.lower()
+                if any(kw in pkg_lower for kw in ['presupuesto', 'fiscal', 'gasto', 'deuda', 'financ']):
+                    categories['Presupuesto y Finanzas'].append(pkg)
+                elif any(kw in pkg_lower for kw in ['electoral', 'votación', 'elecciones', 'congreso']):
+                    categories['Electoral'].append(pkg)
+                elif any(kw in pkg_lower for kw in ['empleo', 'pobreza', 'educación', 'salud', 'censo']):
+                    categories['Indicadores Sociales'].append(pkg)
+                elif any(kw in pkg_lower for kw in ['gobierno', 'transparencia', 'ministerio', 'corrupción']):
+                    categories['Gobierno y Transparencia'].append(pkg)
+                else:
+                    categories['Otros'].append(pkg)
+
+            cat_summary = []
+            for cat, pkgs in categories.items():
+                if pkgs:
+                    cat_summary.append({
+                        'categoria': cat,
+                        'total_datasets': len(pkgs),
+                        'datasets_ejemplo': [p.replace('-', ' ').title()[:60] for p in pkgs[:5]],
+                    })
+
+            if relevant:
+                all_items.append({
+                    'source': 'PCM',
+                    'data_type': 'Datos Abiertos',
+                    'title': f'Plataforma Nacional de Datos Abiertos ({len(relevant)} datasets relevantes de {len(all_packages)} total)',
+                    'content': {
+                        'tipo': 'Catálogo de Datos Abiertos',
+                        'total_datasets_plataforma': len(all_packages),
+                        'datasets_relevantes': len(relevant),
+                        'categorias': cat_summary,
+                        'datos_encontrados': True,
+                    },
+                    'published_at': datetime.now(),
+                    'url': 'https://www.datosabiertos.gob.pe/',
+                    'department': 'Nacional',
+                    'metadata': {'extraction_method': 'ckan_api'},
+                    'scraped_at': datetime.now(),
+                })
+
+            for cat, pkgs in categories.items():
+                if pkgs and cat != 'Otros':
+                    dataset_details = []
+                    for pkg_name in pkgs[:8]:
+                        readable = pkg_name.replace('-', ' ').replace('_', ' ').title()
+                        dataset_details.append({
+                            'nombre': readable[:80],
+                            'slug': pkg_name,
+                            'url': f'{self.base_url}/dataset/{pkg_name}',
+                        })
+
+                    all_items.append({
+                        'source': 'PCM',
+                        'data_type': 'Catálogo',
+                        'title': f'{cat}: {len(pkgs)} datasets disponibles',
+                        'content': {
+                            'tipo': f'Datasets de {cat}',
+                            'categoria': cat,
+                            'total_datasets': len(pkgs),
+                            'datasets': dataset_details,
+                            'datos_encontrados': True,
+                        },
+                        'published_at': datetime.now(),
+                        'url': f'{self.base_url}/dataset',
+                        'department': 'Nacional',
+                        'metadata': {'extraction_method': 'ckan_api'},
+                        'scraped_at': datetime.now(),
+                    })
+
+            logger.info(f"Datos Abiertos: {len(relevant)} datasets relevantes en {len([c for c in categories.values() if c])} categorías")
+        except Exception as e:
+            logger.error(f"Error scraping Datos Abiertos: {e}")
+        return self._save_items(db, all_items, GovernmentData)
+
+    def _item_exists(self, db: Session, item_data: Dict[str, Any], model_class) -> bool:
+        existing = db.query(model_class).filter(
+            model_class.title == item_data['title'],
+            model_class.source == item_data['source']
+        ).first()
+        return existing is not None
+
+
 class ONPEScraper(BaseScraper):
-    """Scraper for ONPE (Oficina Nacional de Procesos Electorales)"""
-    
+
     def __init__(self):
         super().__init__()
         self.base_url = "https://www.onpe.gob.pe"
-        self.sections = [
-            "/modCompendio/",
-            "/modOrganizacion/",
-            "/modEducacion/"
-        ]
-    
+
+    def _parse_content(self, response) -> List[Dict[str, Any]]:
+        return []
+
     def scrape(self, db: Session) -> int:
-        """Scrape ONPE data"""
-        all_items = []
-        
-        # Scrape main sections
-        for section in self.sections:
-            section_url = f"{self.base_url}{section}"
-            
-            if not self._check_robots_txt(self.base_url, section):
-                logger.warning(f"Skipping {section_url} due to robots.txt restrictions")
-                continue
-            
-            response = self._make_request(section_url)
-            if not response:
-                continue
-            
-            items = self._parse_content(response)
-            all_items.extend(items)
-            
-            logger.info(f"Scraped {len(items)} items from ONPE {section}")
-        
-        # Scrape electoral results if available
-        electoral_items = self._scrape_electoral_results()
-        all_items.extend(electoral_items)
-        
-        return self._save_items(db, all_items, GovernmentData)
-    
-    def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
-        """Parse ONPE HTML content"""
-        soup = BeautifulSoup(response.content, 'html.parser')
-        items = []
-        
-        # Find document/content elements
-        content_elements = soup.find_all(['div', 'article'], class_=re.compile(r'documento|contenido|noticia'))
-        
-        for element in content_elements:
-            try:
-                item_data = self._extract_government_item(element, response.url, 'onpe')
-                if item_data:
-                    items.append(item_data)
-            except Exception as e:
-                logger.error(f"Error extracting ONPE item: {e}")
-                continue
-        
-        return items
-    
-    def _scrape_electoral_results(self) -> List[Dict[str, Any]]:
-        """Scrape electoral results and statistics"""
-        results = []
-        
-        # This would contain specific logic for electoral data
-        # For now, return empty list
-        logger.info("Electoral results scraping not implemented yet")
-        
-        return results
-    
-    def _extract_government_item(self, element: BeautifulSoup, base_url: str, source: str) -> Optional[Dict[str, Any]]:
-        """Extract government data item"""
-        
-        # Extract title
-        title_elem = element.find(['h1', 'h2', 'h3', 'h4'])
-        if not title_elem:
-            return None
-        
-        title = title_elem.get_text(strip=True)
-        
-        # Extract URL
-        link_elem = element.find('a')
-        url = urljoin(base_url, link_elem.get('href', '')) if link_elem else base_url
-        
-        # Extract content
-        content_elem = element.find(['p', 'div'], class_=re.compile(r'contenido|descripcion|resumen'))
-        content_text = content_elem.get_text(strip=True) if content_elem else ""
-        
-        # Extract date
-        date_elem = element.find(['span', 'time'], class_=re.compile(r'fecha|date'))
-        published_at = self._parse_date(date_elem.get_text(strip=True) if date_elem else "")
-        
-        # Determine data type
-        data_type = self._determine_data_type(title, content_text)
-        
-        return {
-            'source': source,
-            'data_type': data_type,
-            'title': title,
-            'content': {'text': content_text} if content_text else None,
-            'published_at': published_at,
-            'url': url,
-            'department': 'ONPE',
-            'metadata': {
-                'extraction_method': 'web_scraping',
-                'content_type': 'html'
-            },
-            'scraped_at': datetime.now()
-        }
-    
-    def _determine_data_type(self, title: str, content: str) -> str:
-        """Determine the type of government data"""
-        title_lower = title.lower()
-        content_lower = content.lower()
-        
-        if any(word in title_lower for word in ['elección', 'electoral', 'voto', 'candidato']):
-            return 'electoral'
-        elif any(word in title_lower for word in ['resolución', 'directiva', 'reglamento']):
-            return 'normative'
-        elif any(word in title_lower for word in ['comunicado', 'nota', 'prensa']):
-            return 'communication'
-        elif any(word in title_lower for word in ['estadística', 'reporte', 'informe']):
-            return 'report'
-        else:
-            return 'general'
-    
-    def _parse_date(self, date_str: str) -> Optional[datetime]:
-        """Parse date string to datetime"""
-        if not date_str:
-            return None
-        
-        # Spanish date patterns
-        patterns = [
-            r'(\d{1,2})/(\d{1,2})/(\d{4})',
-            r'(\d{1,2})-(\d{1,2})-(\d{4})',
-            r'(\d{4})-(\d{1,2})-(\d{1,2})',
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, date_str)
-            if match:
-                try:
-                    if pattern.startswith(r'(\d{4})'):
-                        year, month, day = match.groups()
-                    else:
-                        day, month, year = match.groups()
-                    
-                    return datetime(int(year), int(month), int(day))
-                except ValueError:
-                    continue
-        
-        return None
-    
+        return 0
+
     def _item_exists(self, db: Session, item_data: Dict[str, Any], model_class) -> bool:
-        """Check if government item already exists"""
         existing = db.query(model_class).filter(
-            model_class.url == item_data['url']
+            model_class.url == item_data.get('url', '')
         ).first()
         return existing is not None
 
+
 class INEIScraper(BaseScraper):
-    """Scraper for INEI (Instituto Nacional de Estadística e Informática)"""
-    
+
     def __init__(self):
         super().__init__()
         self.base_url = "https://www.inei.gob.pe"
-        self.sections = [
-            "/estadisticas/",
-            "/prensa/",
-            "/biblioteca-virtual/"
-        ]
-    
+
+    def _parse_content(self, response) -> List[Dict[str, Any]]:
+        return []
+
     def scrape(self, db: Session) -> int:
-        """Scrape INEI data"""
-        all_items = []
-        
-        for section in self.sections:
-            section_url = f"{self.base_url}{section}"
-            
-            if not self._check_robots_txt(self.base_url, section):
-                logger.warning(f"Skipping {section_url} due to robots.txt restrictions")
-                continue
-            
-            response = self._make_request(section_url)
-            if not response:
-                continue
-            
-            items = self._parse_content(response)
-            all_items.extend(items)
-            
-            logger.info(f"Scraped {len(items)} items from INEI {section}")
-        
-        return self._save_items(db, all_items, GovernmentData)
-    
-    def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
-        """Parse INEI HTML content"""
-        soup = BeautifulSoup(response.content, 'html.parser')
-        items = []
-        
-        # Find statistical reports and publications
-        content_elements = soup.find_all(['div', 'article'], class_=re.compile(r'publicacion|estadistica|reporte'))
-        
-        for element in content_elements:
-            try:
-                item_data = self._extract_government_item(element, response.url, 'inei')
-                if item_data:
-                    items.append(item_data)
-            except Exception as e:
-                logger.error(f"Error extracting INEI item: {e}")
-                continue
-        
-        return items
-    
-    def _extract_government_item(self, element: BeautifulSoup, base_url: str, source: str) -> Optional[Dict[str, Any]]:
-        """Extract INEI data item"""
-        
-        title_elem = element.find(['h1', 'h2', 'h3', 'h4'])
-        if not title_elem:
-            return None
-        
-        title = title_elem.get_text(strip=True)
-        
-        link_elem = element.find('a')
-        url = urljoin(base_url, link_elem.get('href', '')) if link_elem else base_url
-        
-        # Extract statistical data if available
-        data_elem = element.find(['table', 'div'], class_=re.compile(r'datos|cifras|estadisticas'))
-        content = self._extract_statistical_data(data_elem) if data_elem else {'text': ''}
-        
-        return {
-            'source': source,
-            'data_type': 'statistical',
-            'title': title,
-            'content': content,
-            'published_at': datetime.now(),  # INEI might need specific date parsing
-            'url': url,
-            'department': 'INEI',
-            'metadata': {
-                'extraction_method': 'web_scraping',
-                'content_type': 'statistical_data'
-            },
-            'scraped_at': datetime.now()
-        }
-    
-    def _extract_statistical_data(self, element: BeautifulSoup) -> Dict[str, Any]:
-        """Extract statistical data from HTML element"""
-        data = {'text': element.get_text(strip=True)}
-        
-        # Try to extract tables
-        tables = element.find_all('table')
-        if tables:
-            table_data = []
-            for table in tables:
-                rows = []
-                for row in table.find_all('tr'):
-                    cells = [cell.get_text(strip=True) for cell in row.find_all(['td', 'th'])]
-                    if cells:
-                        rows.append(cells)
-                if rows:
-                    table_data.append(rows)
-            
-            if table_data:
-                data['tables'] = table_data
-        
-        return data
-    
+        return 0
+
     def _item_exists(self, db: Session, item_data: Dict[str, Any], model_class) -> bool:
-        """Check if INEI item already exists"""
         existing = db.query(model_class).filter(
-            model_class.url == item_data['url']
+            model_class.url == item_data.get('url', '')
         ).first()
         return existing is not None
 
+
 class MEFScraper(BaseScraper):
-    """Scraper for MEF (Ministerio de Economía y Finanzas)"""
-    
+
     def __init__(self):
         super().__init__()
         self.base_url = "https://www.mef.gob.pe"
-        self.sections = [
-            "/es/noticias/",
-            "/es/normatividad/",
-            "/es/estadisticas/"
-        ]
-    
+
+    def _parse_content(self, response) -> List[Dict[str, Any]]:
+        return []
+
     def scrape(self, db: Session) -> int:
-        """Scrape MEF data"""
-        all_items = []
-        
-        for section in self.sections:
-            section_url = f"{self.base_url}{section}"
-            
-            if not self._check_robots_txt(self.base_url, section):
-                logger.warning(f"Skipping {section_url} due to robots.txt restrictions")
-                continue
-            
-            response = self._make_request(section_url)
-            if not response:
-                continue
-            
-            items = self._parse_content(response)
-            all_items.extend(items)
-            
-            logger.info(f"Scraped {len(items)} items from MEF {section}")
-        
-        return self._save_items(db, all_items, GovernmentData)
-    
-    def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
-        """Parse MEF HTML content"""
-        soup = BeautifulSoup(response.content, 'html.parser')
-        items = []
-        
-        # Find economic reports and news
-        content_elements = soup.find_all(['div', 'article'], class_=re.compile(r'noticia|documento|reporte'))
-        
-        for element in content_elements:
-            try:
-                item_data = self._extract_government_item(element, response.url, 'mef')
-                if item_data:
-                    items.append(item_data)
-            except Exception as e:
-                logger.error(f"Error extracting MEF item: {e}")
-                continue
-        
-        return items
-    
-    def _extract_government_item(self, element: BeautifulSoup, base_url: str, source: str) -> Optional[Dict[str, Any]]:
-        """Extract MEF data item"""
-        
-        title_elem = element.find(['h1', 'h2', 'h3', 'h4'])
-        if not title_elem:
-            return None
-        
-        title = title_elem.get_text(strip=True)
-        
-        link_elem = element.find('a')
-        url = urljoin(base_url, link_elem.get('href', '')) if link_elem else base_url
-        
-        content_elem = element.find(['p', 'div'], class_=re.compile(r'contenido|resumen'))
-        content_text = content_elem.get_text(strip=True) if content_elem else ""
-        
-        # Determine if it's economic data
-        data_type = 'economic' if any(word in title.lower() for word in ['presupuesto', 'fiscal', 'económico', 'financiero']) else 'general'
-        
-        return {
-            'source': source,
-            'data_type': data_type,
-            'title': title,
-            'content': {'text': content_text} if content_text else None,
-            'published_at': datetime.now(),
-            'url': url,
-            'department': 'MEF',
-            'metadata': {
-                'extraction_method': 'web_scraping',
-                'content_type': 'economic_data'
-            },
-            'scraped_at': datetime.now()
-        }
-    
+        return 0
+
     def _item_exists(self, db: Session, item_data: Dict[str, Any], model_class) -> bool:
-        """Check if MEF item already exists"""
         existing = db.query(model_class).filter(
-            model_class.url == item_data['url']
+            model_class.url == item_data.get('url', '')
         ).first()
         return existing is not None
