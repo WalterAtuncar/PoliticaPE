@@ -234,24 +234,27 @@ def create_demo_user():
     finally:
         db.close()
 
+async def _deferred_init():
+    """Run heavy initialization in background so health checks pass quickly"""
+    await asyncio.sleep(0.1)
+    try:
+        init_db()
+        logger.info("Database initialized")
+        init_identity_schema()
+        create_demo_user()
+        from app.services.scheduler import start_scheduler
+        start_scheduler()
+        logger.info("Scheduled scraping enabled")
+    except Exception as e:
+        logger.error(f"Deferred init error: {e}")
+
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup"""
     logger.info(f"Starting {settings.APP_NAME} v{settings.VERSION}")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
-    
-    # Initialize database
-    init_db()
-    logger.info("Database initialized")
-    
-    init_identity_schema()
-    create_demo_user()
-    
-    from app.services.scheduler import start_scheduler
-    start_scheduler()
-    logger.info("Scheduled scraping enabled")
-    
-    logger.info("Application startup completed")
+    asyncio.create_task(_deferred_init())
+    logger.info("Application startup completed (init deferred)")
 
 @app.on_event("shutdown")
 async def shutdown_event():
