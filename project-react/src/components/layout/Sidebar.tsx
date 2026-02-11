@@ -8,7 +8,8 @@ import {
   MessageSquare,
   MapPin,
   Building2,
-  BarChart3
+  BarChart3,
+  Settings
 } from 'lucide-react';
 import logo from '../../assets/logo.png';
 
@@ -27,6 +28,7 @@ const menuItems = [
   { id: 'government', label: 'Data Gubernamental', icon: Building2 },
   { id: 'surveys', label: 'Encuestas', icon: BarChart3 },
   { id: 'recommendations', label: 'Recomendaciones IA', icon: Brain },
+  { id: 'settings', label: 'Configuración', icon: Settings },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({

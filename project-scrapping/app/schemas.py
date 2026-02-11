@@ -250,3 +250,46 @@ class CompetitorCampaignResponse(CompetitorCampaignBase):
         if isinstance(v, UUID):
             return str(v)
         return v
+
+
+PLATFORM_CREDENTIAL_FIELDS = {
+    "twitter": {"api_key": "API Key (TwitterAPI.io)"},
+    "youtube": {"api_key": "API Key (YouTube Data v3)"},
+    "instagram": {"access_token": "Access Token", "app_id": "App ID (opcional)", "app_secret": "App Secret (opcional)"},
+    "facebook": {"access_token": "Access Token", "app_id": "App ID (opcional)", "app_secret": "App Secret (opcional)"},
+    "tiktok": {"client_key": "Client Key", "client_secret": "Client Secret (opcional)"},
+}
+
+
+class SocialApiTokenCreate(BaseModel):
+    platform: str
+    label: str
+    credentials: Dict[str, str]
+    is_active: bool = True
+
+
+class SocialApiTokenUpdate(BaseModel):
+    label: Optional[str] = None
+    credentials: Optional[Dict[str, str]] = None
+    is_active: Optional[bool] = None
+
+
+class SocialApiTokenResponse(BaseResponseModel):
+    id: str
+    platform: str
+    label: str
+    credentials_masked: Dict[str, str]
+    is_active: bool
+    status: str
+    last_used_at: Optional[datetime]
+    last_error: Optional[str]
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+
+class PlatformInfo(BaseModel):
+    platform: str
+    display_name: str
+    credential_fields: Dict[str, str]
+    token_count: int
+    active_count: int

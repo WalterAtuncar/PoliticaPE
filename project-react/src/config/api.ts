@@ -31,6 +31,8 @@ export const ENDPOINTS = {
   ANALYZE: '/api/analyze',
   METRICS: '/api/metrics',
   WEBSOCKET: '/ws/stream',
+  SETTINGS_PLATFORMS: '/api/v1/settings/platforms',
+  SETTINGS_TOKENS: '/api/v1/settings/tokens',
 };
 
 export async function fetchFromScrapping(endpoint: string) {

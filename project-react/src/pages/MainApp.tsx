@@ -9,6 +9,7 @@ import { GeoDemographicsPage } from '../components/geo-demographics/GeoDemograph
 import { GovernmentPage } from '../components/government/GovernmentPage';
 import { SurveysPage } from '../components/surveys/SurveysPage';
 import { RecommendationsPage } from '../components/recommendations/RecommendationsPage';
+import { SettingsPage } from '../components/settings/SettingsPage';
 
 export const MainApp: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -30,6 +31,8 @@ export const MainApp: React.FC = () => {
         return <SurveysPage />;
       case 'recommendations':
         return <RecommendationsPage />;
+      case 'settings':
+        return <SettingsPage />;
       default:
         return <Dashboard />;
     }

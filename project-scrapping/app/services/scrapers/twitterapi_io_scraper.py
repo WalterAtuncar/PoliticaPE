@@ -75,8 +75,8 @@ def parse_peru_region(location_text: str) -> Tuple[str, str]:
 
 
 class TwitterAPIioScraper:
-    def __init__(self):
-        self.api_key = os.getenv("TWITTERAPI_IO_KEY")
+    def __init__(self, api_key: str = None):
+        self.api_key = api_key or os.getenv("TWITTERAPI_IO_KEY")
         self.base_url = "https://api.twitterapi.io/twitter"
         self.headers = {
             "X-API-Key": self.api_key,

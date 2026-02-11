@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 class InstagramScraper:
-    def __init__(self):
-        self.access_token = os.getenv("INSTAGRAM_ACCESS_TOKEN")
+    def __init__(self, access_token: str = None):
+        self.access_token = access_token or os.getenv("INSTAGRAM_ACCESS_TOKEN")
         self.base_url = "https://graph.facebook.com/v18.0"
     
     def is_configured(self) -> bool:

@@ -97,6 +97,26 @@ class ScrapedSurvey(Base):
         Index('idx_pollster', 'pollster'),
     )
 
+class SocialApiToken(Base):
+    __tablename__ = "social_api_tokens"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    platform = Column(String(50), nullable=False)
+    label = Column(String(200), nullable=False)
+    credentials = Column(JSON, nullable=False)
+    is_active = Column(Boolean, default=True)
+    status = Column(String(20), default='active')
+    last_used_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    
+    __table_args__ = (
+        Index('idx_token_platform_active', 'platform', 'is_active'),
+        Index('idx_token_status', 'status'),
+    )
+
+
 class ScrapingLog(Base):
     __tablename__ = "scraping_logs"
     

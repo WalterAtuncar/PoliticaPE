@@ -3,7 +3,7 @@ import logging
 import uuid
 import os
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -12,31 +12,44 @@ SCRAPING_INTERVAL_HOURS = int(os.getenv("SCRAPING_INTERVAL_HOURS", "6"))
 _scheduler_task: Optional[asyncio.Task] = None
 
 
-async def run_scheduled_twitter_scraping(db_url: str):
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from app.models import ScrapingLog, RawSocialPost
-    from app.services.sentiment_analyzer import SentimentAnalyzer
+def get_active_tokens(db, platform: str) -> List[Dict]:
+    from app.models import SocialApiToken
+    tokens = db.query(SocialApiToken).filter(
+        SocialApiToken.platform == platform,
+        SocialApiToken.is_active == True
+    ).all()
+    return [{"id": t.id, "label": t.label, "credentials": t.credentials or {}} for t in tokens]
 
-    try:
-        from app.services.scrapers.twitterapi_io_scraper import TwitterAPIioScraper
-        scraper = TwitterAPIioScraper()
-    except Exception as e:
-        logger.warning(f"[Scheduler] TwitterAPI.io no configurado: {e}")
+
+def update_token_status(db, token_id: str, success: bool, error_msg: str = None):
+    from app.models import SocialApiToken
+    token = db.query(SocialApiToken).filter(SocialApiToken.id == token_id).first()
+    if token:
+        token.last_used_at = datetime.now()
+        if success:
+            token.status = "active"
+            token.last_error = None
+        else:
+            token.status = "error"
+            token.last_error = error_msg
+        db.commit()
+
+
+async def run_twitter_with_token(db, token_info: Dict, sentiment_analyzer) -> int:
+    from app.models import RawSocialPost
+    from app.services.scrapers.twitterapi_io_scraper import TwitterAPIioScraper
+
+    creds = token_info["credentials"]
+    api_key = creds.get("api_key", "")
+    if not api_key:
+        logger.warning(f"[Scheduler] Twitter token '{token_info['label']}' sin api_key")
+        update_token_status(db, token_info["id"], False, "Sin api_key configurada")
         return 0
 
-    engine = create_engine(db_url)
-    SessionLocal = sessionmaker(bind=engine)
-    db = SessionLocal()
-
-    log = ScrapingLog(
-        id=str(uuid.uuid4()),
-        source="twitter",
-        scraping_type="social",
-        status="running"
-    )
-    db.add(log)
-    db.commit()
+    scraper = TwitterAPIioScraper(api_key=api_key)
+    if not scraper.is_configured():
+        update_token_status(db, token_info["id"], False, "API key inválida")
+        return 0
 
     try:
         tweets = await scraper.search_tweets(
@@ -44,22 +57,17 @@ async def run_scheduled_twitter_scraping(db_url: str):
             max_results=50
         )
 
-        sentiment_analyzer = SentimentAnalyzer()
         items_added = 0
-
         for tweet in tweets:
             transformed = scraper.transform_tweet(tweet)
-
             existing = db.query(RawSocialPost).filter(
                 RawSocialPost.platform == "twitter",
                 RawSocialPost.post_id == transformed["post_id"]
             ).first()
-
             if existing:
                 continue
 
             sentiment_score = sentiment_analyzer.analyze(transformed.get("content", ""))
-
             post = RawSocialPost(
                 id=str(uuid.uuid4()),
                 platform=transformed["platform"],
@@ -77,57 +85,31 @@ async def run_scheduled_twitter_scraping(db_url: str):
             items_added += 1
 
         db.commit()
-
-        log.status = "completed"
-        log.items_scraped = items_added
-        log.completed_at = datetime.now()
-        log.extra_metadata = {
-            "total_fetched": len(tweets),
-            "duplicates_skipped": len(tweets) - items_added,
-            "source": "twitterapi.io",
-            "triggered_by": "scheduler"
-        }
-        db.commit()
-
-        logger.info(f"[Scheduler] Twitter: {items_added} tweets nuevos agregados")
+        update_token_status(db, token_info["id"], True)
+        logger.info(f"[Scheduler] Twitter '{token_info['label']}': {items_added} tweets nuevos")
         return items_added
 
     except Exception as e:
-        log.status = "failed"
-        log.error_message = str(e)
-        log.completed_at = datetime.now()
-        db.commit()
-        logger.error(f"[Scheduler] Error Twitter: {e}")
+        update_token_status(db, token_info["id"], False, str(e)[:200])
+        logger.error(f"[Scheduler] Error Twitter '{token_info['label']}': {e}")
         return 0
-    finally:
-        db.close()
 
 
-async def run_scheduled_youtube_scraping(db_url: str):
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from app.models import ScrapingLog, RawSocialPost
-    from app.services.sentiment_analyzer import SentimentAnalyzer
+async def run_youtube_with_token(db, token_info: Dict, sentiment_analyzer) -> int:
+    from app.models import RawSocialPost
+    from app.services.scrapers.youtube_scraper import YouTubeScraper
+
+    creds = token_info["credentials"]
+    api_key = creds.get("api_key", "")
+    if not api_key:
+        update_token_status(db, token_info["id"], False, "Sin api_key configurada")
+        return 0
 
     try:
-        from app.services.scrapers.youtube_scraper import YouTubeScraper
-        scraper = YouTubeScraper()
-    except Exception as e:
-        logger.warning(f"[Scheduler] YouTube no configurado: {e}")
+        scraper = YouTubeScraper(api_key=api_key)
+    except ValueError as e:
+        update_token_status(db, token_info["id"], False, str(e))
         return 0
-
-    engine = create_engine(db_url)
-    SessionLocal = sessionmaker(bind=engine)
-    db = SessionLocal()
-
-    log = ScrapingLog(
-        id=str(uuid.uuid4()),
-        source="youtube",
-        scraping_type="social",
-        status="running"
-    )
-    db.add(log)
-    db.commit()
 
     try:
         videos = await scraper.search_videos(
@@ -135,23 +117,18 @@ async def run_scheduled_youtube_scraping(db_url: str):
             max_results=30
         )
 
-        sentiment_analyzer = SentimentAnalyzer()
         items_added = 0
-
         for video in videos:
             post_id = f"yt_{video.get('id', '')}"
-
             existing = db.query(RawSocialPost).filter(
                 RawSocialPost.platform == "youtube",
                 RawSocialPost.post_id == post_id
             ).first()
-
             if existing:
                 continue
 
             content = f"{video.get('title', '')} {video.get('description', '')}"
             sentiment_score = sentiment_analyzer.analyze(content)
-
             post = RawSocialPost(
                 id=str(uuid.uuid4()),
                 platform="youtube",
@@ -173,79 +150,49 @@ async def run_scheduled_youtube_scraping(db_url: str):
             items_added += 1
 
         db.commit()
-
-        log.status = "completed"
-        log.items_scraped = items_added
-        log.completed_at = datetime.now()
-        log.extra_metadata = {
-            "total_fetched": len(videos),
-            "duplicates_skipped": len(videos) - items_added,
-            "triggered_by": "scheduler"
-        }
-        db.commit()
-
-        logger.info(f"[Scheduler] YouTube: {items_added} videos nuevos agregados")
+        update_token_status(db, token_info["id"], True)
+        logger.info(f"[Scheduler] YouTube '{token_info['label']}': {items_added} videos nuevos")
         return items_added
 
     except Exception as e:
-        log.status = "failed"
-        log.error_message = str(e)
-        log.completed_at = datetime.now()
-        db.commit()
-        logger.error(f"[Scheduler] Error YouTube: {e}")
+        update_token_status(db, token_info["id"], False, str(e)[:200])
+        logger.error(f"[Scheduler] Error YouTube '{token_info['label']}': {e}")
         return 0
-    finally:
-        db.close()
 
 
-async def run_scheduled_instagram_scraping(db_url: str):
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from app.models import ScrapingLog, RawSocialPost
-    from app.services.sentiment_analyzer import SentimentAnalyzer
+async def run_instagram_with_token(db, token_info: Dict, sentiment_analyzer) -> int:
+    from app.models import RawSocialPost
+    from app.services.scrapers.instagram_scraper import InstagramScraper
 
-    try:
-        from app.services.scrapers.instagram_scraper import InstagramScraper
-        scraper = InstagramScraper()
-        if not scraper.is_configured():
-            logger.warning("[Scheduler] Instagram no configurado - falta INSTAGRAM_ACCESS_TOKEN")
-            return 0
-    except Exception as e:
-        logger.warning(f"[Scheduler] Instagram no configurado: {e}")
+    creds = token_info["credentials"]
+    access_token = creds.get("access_token", "")
+    if not access_token:
+        update_token_status(db, token_info["id"], False, "Sin access_token configurado")
+        return 0
+
+    scraper = InstagramScraper(access_token=access_token)
+    if not scraper.is_configured():
+        update_token_status(db, token_info["id"], False, "Token inválido")
         return 0
 
     test_result = await scraper.test_connection()
     if not test_result.get("success"):
-        logger.warning(f"[Scheduler] Instagram token inválido o expirado: {test_result.get('error', 'Unknown')}")
+        update_token_status(db, token_info["id"], False, test_result.get("error", "Token expirado"))
+        logger.warning(f"[Scheduler] Instagram '{token_info['label']}' token inválido")
         return 0
 
     accounts = await scraper.get_instagram_accounts()
     if not accounts:
-        logger.warning("[Scheduler] No se encontraron cuentas de Instagram Business")
+        update_token_status(db, token_info["id"], False, "Sin cuentas Business")
         return 0
 
     ig_user_id = accounts[0].get("instagram_id")
     if not ig_user_id:
-        logger.warning("[Scheduler] No se pudo obtener el ID de Instagram")
+        update_token_status(db, token_info["id"], False, "Sin ID de Instagram")
         return 0
-
-    engine = create_engine(db_url)
-    SessionLocal = sessionmaker(bind=engine)
-    db = SessionLocal()
-
-    log = ScrapingLog(
-        id=str(uuid.uuid4()),
-        source="instagram",
-        scraping_type="social",
-        status="running"
-    )
-    db.add(log)
-    db.commit()
 
     try:
         posts = await scraper.scrape_political_content(ig_user_id, max_per_hashtag=10)
-
-        sentiment_analyzer = SentimentAnalyzer()
         items_added = 0
 
         for post in posts:
@@ -253,12 +200,10 @@ async def run_scheduled_instagram_scraping(db_url: str):
                 RawSocialPost.platform == "instagram",
                 RawSocialPost.post_id == post["post_id"]
             ).first()
-
             if existing:
                 continue
 
             sentiment_score = sentiment_analyzer.analyze(post.get("content", ""))
-
             db_post = RawSocialPost(
                 id=str(uuid.uuid4()),
                 platform="instagram",
@@ -279,22 +224,96 @@ async def run_scheduled_instagram_scraping(db_url: str):
             items_added += 1
 
         db.commit()
+        update_token_status(db, token_info["id"], True)
+        logger.info(f"[Scheduler] Instagram '{token_info['label']}': {items_added} posts nuevos")
+        return items_added
+
+    except Exception as e:
+        update_token_status(db, token_info["id"], False, str(e)[:200])
+        logger.error(f"[Scheduler] Error Instagram '{token_info['label']}': {e}")
+        return 0
+
+
+async def run_scheduled_social_scraping(db_url: str, platform: str) -> int:
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.models import ScrapingLog
+    from app.services.sentiment_analyzer import SentimentAnalyzer
+
+    engine = create_engine(db_url)
+    SessionLocal = sessionmaker(bind=engine)
+    db = SessionLocal()
+
+    tokens = get_active_tokens(db, platform)
+
+    if platform == "twitter" and not tokens:
+        api_key = os.getenv("TWITTERAPI_IO_KEY")
+        if api_key:
+            tokens = [{"id": "__env__", "label": "Variable de entorno", "credentials": {"api_key": api_key}}]
+    elif platform == "youtube" and not tokens:
+        api_key = os.getenv("YOUTUBE_API_KEY")
+        if api_key:
+            tokens = [{"id": "__env__", "label": "Variable de entorno", "credentials": {"api_key": api_key}}]
+    elif platform == "instagram" and not tokens:
+        access_token = os.getenv("INSTAGRAM_ACCESS_TOKEN")
+        if access_token:
+            tokens = [{"id": "__env__", "label": "Variable de entorno", "credentials": {"access_token": access_token}}]
+
+    if not tokens:
+        logger.info(f"[Scheduler] {platform}: sin tokens configurados")
+        db.close()
+        return 0
+
+    log = ScrapingLog(
+        id=str(uuid.uuid4()),
+        source=platform,
+        scraping_type="social",
+        status="running"
+    )
+    db.add(log)
+    db.commit()
+
+    try:
+        sentiment_analyzer = SentimentAnalyzer()
+        total_added = 0
+        token_details = {}
+
+        for token_info in tokens:
+            label = token_info["label"]
+            try:
+                if platform == "twitter":
+                    count = await run_twitter_with_token(db, token_info, sentiment_analyzer)
+                elif platform == "youtube":
+                    count = await run_youtube_with_token(db, token_info, sentiment_analyzer)
+                elif platform == "instagram":
+                    count = await run_instagram_with_token(db, token_info, sentiment_analyzer)
+                else:
+                    count = 0
+                total_added += count
+                token_details[label] = count
+            except Exception as e:
+                logger.error(f"[Scheduler] Error en {platform} token '{label}': {e}")
+                token_details[label] = f"error: {str(e)[:100]}"
 
         log.status = "completed"
-        log.items_scraped = items_added
+        log.items_scraped = total_added
         log.completed_at = datetime.now()
-        log.extra_metadata = {"triggered_by": "scheduler"}
+        log.extra_metadata = {
+            "triggered_by": "scheduler",
+            "tokens_used": len(tokens),
+            "per_token": token_details
+        }
         db.commit()
 
-        logger.info(f"[Scheduler] Instagram: {items_added} posts nuevos agregados")
-        return items_added
+        logger.info(f"[Scheduler] {platform}: {total_added} items nuevos ({len(tokens)} tokens)")
+        return total_added
 
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)
         log.completed_at = datetime.now()
         db.commit()
-        logger.error(f"[Scheduler] Error Instagram: {e}")
+        logger.error(f"[Scheduler] Error {platform}: {e}")
         return 0
     finally:
         db.close()
@@ -436,9 +455,9 @@ async def run_all_scrapers():
     logger.info("[Scheduler] Iniciando ciclo de scraping automático...")
 
     total = 0
-    total += await run_scheduled_twitter_scraping(db_url)
-    total += await run_scheduled_youtube_scraping(db_url)
-    total += await run_scheduled_instagram_scraping(db_url)
+    total += await run_scheduled_social_scraping(db_url, "twitter")
+    total += await run_scheduled_social_scraping(db_url, "youtube")
+    total += await run_scheduled_social_scraping(db_url, "instagram")
     total += await run_scheduled_government_scraping(db_url)
     total += await run_scheduled_survey_scraping(db_url)
 

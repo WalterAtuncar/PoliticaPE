@@ -36,6 +36,7 @@ const sectionTitles: Record<string, string> = {
   government: 'Data Gubernamental',
   surveys: 'Encuestas',
   recommendations: 'Recomendaciones IA',
+  settings: 'Configuración',
 };
 
 export const Header: React.FC<HeaderProps> = ({ isCollapsed, activeSection }) => {
