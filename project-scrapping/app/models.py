@@ -97,6 +97,23 @@ class ScrapedSurvey(Base):
         Index('idx_pollster', 'pollster'),
     )
 
+class SearchTag(Base):
+    __tablename__ = "search_tags"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tag = Column(String(200), nullable=False, unique=True)
+    platforms = Column(JSON, nullable=False, default=lambda: ["twitter", "youtube", "instagram"])
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    last_used_at = Column(DateTime, nullable=True)
+    results_count = Column(Integer, default=0)
+
+    __table_args__ = (
+        Index('idx_search_tag_active', 'is_active'),
+    )
+
+
 class SocialApiToken(Base):
     __tablename__ = "social_api_tokens"
     

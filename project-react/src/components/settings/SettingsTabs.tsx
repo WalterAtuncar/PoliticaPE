@@ -8,7 +8,8 @@ import {
   HardDrive, 
   Settings, 
   Activity,
-  Database
+  Database,
+  Tag
 } from 'lucide-react';
 
 interface SettingsTabsProps {
@@ -25,9 +26,15 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
   const tabs = [
     {
       id: 'scraping',
-      name: 'Importar Datos',
+      name: 'Tokens API',
       icon: Database,
-      description: 'Importar de Twitter, YouTube y más'
+      description: 'Tokens de API para redes sociales'
+    },
+    {
+      id: 'tags',
+      name: 'Tags de Búsqueda',
+      icon: Tag,
+      description: 'Términos personalizados para scraping'
     },
     {
       id: 'users',

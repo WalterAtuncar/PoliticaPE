@@ -293,3 +293,26 @@ class PlatformInfo(BaseModel):
     credential_fields: Dict[str, str]
     token_count: int
     active_count: int
+
+
+class SearchTagCreate(BaseModel):
+    tag: str
+    platforms: List[str] = ["twitter", "youtube", "instagram"]
+    is_active: bool = True
+
+
+class SearchTagUpdate(BaseModel):
+    tag: Optional[str] = None
+    platforms: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+
+class SearchTagResponse(BaseResponseModel):
+    id: str
+    tag: str
+    platforms: List[str]
+    is_active: bool
+    created_at: datetime
+    updated_at: Optional[datetime]
+    last_used_at: Optional[datetime]
+    results_count: int

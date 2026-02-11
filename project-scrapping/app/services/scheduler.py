@@ -21,6 +21,29 @@ def get_active_tokens(db, platform: str) -> List[Dict]:
     return [{"id": t.id, "label": t.label, "credentials": t.credentials or {}} for t in tokens]
 
 
+def get_active_tags(db, platform: str) -> List[str]:
+    from app.models import SearchTag
+    from sqlalchemy import cast, String
+    tags = db.query(SearchTag).filter(
+        SearchTag.is_active == True
+    ).all()
+    result = []
+    for t in tags:
+        plats = t.platforms if isinstance(t.platforms, list) else []
+        if platform in plats:
+            result.append(t.tag)
+    return result
+
+
+def update_tag_stats(db, tag_text: str, count: int):
+    from app.models import SearchTag
+    tag = db.query(SearchTag).filter(SearchTag.tag == tag_text).first()
+    if tag:
+        tag.last_used_at = datetime.now()
+        tag.results_count = (tag.results_count or 0) + count
+        db.commit()
+
+
 def update_token_status(db, token_id: str, success: bool, error_msg: str = None):
     from app.models import SocialApiToken
     token = db.query(SocialApiToken).filter(SocialApiToken.id == token_id).first()
@@ -52,41 +75,60 @@ async def run_twitter_with_token(db, token_info: Dict, sentiment_analyzer) -> in
         return 0
 
     try:
-        tweets = await scraper.search_tweets(
-            query="Peru politica OR congreso peru OR presidente peru",
-            max_results=50
-        )
+        tags = get_active_tags(db, "twitter")
+        queries = ["Peru politica OR congreso peru OR presidente peru"]
+        for tag in tags:
+            queries.append(f'"{tag}"')
 
         items_added = 0
-        for tweet in tweets:
-            transformed = scraper.transform_tweet(tweet)
-            existing = db.query(RawSocialPost).filter(
-                RawSocialPost.platform == "twitter",
-                RawSocialPost.post_id == transformed["post_id"]
-            ).first()
-            if existing:
+        for query in queries:
+            try:
+                tweets = await scraper.search_tweets(
+                    query=query,
+                    max_results=50
+                )
+
+                tag_count = 0
+                for tweet in tweets:
+                    transformed = scraper.transform_tweet(tweet)
+                    existing = db.query(RawSocialPost).filter(
+                        RawSocialPost.platform == "twitter",
+                        RawSocialPost.post_id == transformed["post_id"]
+                    ).first()
+                    if existing:
+                        continue
+
+                    sentiment_score = sentiment_analyzer.analyze(transformed.get("content", ""))
+                    post = RawSocialPost(
+                        id=str(uuid.uuid4()),
+                        platform=transformed["platform"],
+                        post_id=transformed["post_id"],
+                        author=transformed["author"],
+                        content=transformed["content"],
+                        created_at=transformed["created_at"],
+                        engagement_metrics=transformed["engagement_metrics"],
+                        geographic_location=transformed.get("geographic_location"),
+                        region=transformed.get("region", "Nacional"),
+                        sentiment_score=sentiment_score,
+                        processed=True
+                    )
+                    db.add(post)
+                    tag_count += 1
+
+                db.commit()
+                items_added += tag_count
+
+                if query.startswith('"') and query.endswith('"'):
+                    tag_text = query.strip('"')
+                    update_tag_stats(db, tag_text, tag_count)
+                    logger.info(f"[Scheduler] Twitter tag '{tag_text}': {tag_count} tweets nuevos")
+
+            except Exception as e:
+                logger.error(f"[Scheduler] Error Twitter query '{query[:50]}': {e}")
                 continue
 
-            sentiment_score = sentiment_analyzer.analyze(transformed.get("content", ""))
-            post = RawSocialPost(
-                id=str(uuid.uuid4()),
-                platform=transformed["platform"],
-                post_id=transformed["post_id"],
-                author=transformed["author"],
-                content=transformed["content"],
-                created_at=transformed["created_at"],
-                engagement_metrics=transformed["engagement_metrics"],
-                geographic_location=transformed.get("geographic_location"),
-                region=transformed.get("region", "Nacional"),
-                sentiment_score=sentiment_score,
-                processed=True
-            )
-            db.add(post)
-            items_added += 1
-
-        db.commit()
         update_token_status(db, token_info["id"], True)
-        logger.info(f"[Scheduler] Twitter '{token_info['label']}': {items_added} tweets nuevos")
+        logger.info(f"[Scheduler] Twitter '{token_info['label']}': {items_added} tweets nuevos total")
         return items_added
 
     except Exception as e:
@@ -112,46 +154,64 @@ async def run_youtube_with_token(db, token_info: Dict, sentiment_analyzer) -> in
         return 0
 
     try:
-        videos = await scraper.search_videos(
-            query="política Perú congreso gobierno",
-            max_results=30
-        )
+        tags = get_active_tags(db, "youtube")
+        queries = ["política Perú congreso gobierno"]
+        for tag in tags:
+            queries.append(tag)
 
         items_added = 0
-        for video in videos:
-            post_id = f"yt_{video.get('id', '')}"
-            existing = db.query(RawSocialPost).filter(
-                RawSocialPost.platform == "youtube",
-                RawSocialPost.post_id == post_id
-            ).first()
-            if existing:
+        for query in queries:
+            try:
+                videos = await scraper.search_videos(
+                    query=query,
+                    max_results=30
+                )
+
+                tag_count = 0
+                for video in videos:
+                    post_id = f"yt_{video.get('id', '')}"
+                    existing = db.query(RawSocialPost).filter(
+                        RawSocialPost.platform == "youtube",
+                        RawSocialPost.post_id == post_id
+                    ).first()
+                    if existing:
+                        continue
+
+                    content = f"{video.get('title', '')} {video.get('description', '')}"
+                    sentiment_score = sentiment_analyzer.analyze(content)
+                    post = RawSocialPost(
+                        id=str(uuid.uuid4()),
+                        platform="youtube",
+                        post_id=post_id,
+                        author=video.get("channel_title", video.get("author", "")),
+                        content=content[:2000],
+                        created_at=video.get("published_at"),
+                        engagement_metrics={
+                            "likes": video.get("likes", 0),
+                            "shares": 0,
+                            "comments": video.get("comments", 0),
+                            "views": video.get("views", 0)
+                        },
+                        region="Nacional",
+                        sentiment_score=sentiment_score,
+                        processed=True
+                    )
+                    db.add(post)
+                    tag_count += 1
+
+                db.commit()
+                items_added += tag_count
+
+                if query != "política Perú congreso gobierno":
+                    update_tag_stats(db, query, tag_count)
+                    logger.info(f"[Scheduler] YouTube tag '{query}': {tag_count} videos nuevos")
+
+            except Exception as e:
+                logger.error(f"[Scheduler] Error YouTube query '{query[:50]}': {e}")
                 continue
 
-            content = f"{video.get('title', '')} {video.get('description', '')}"
-            sentiment_score = sentiment_analyzer.analyze(content)
-            post = RawSocialPost(
-                id=str(uuid.uuid4()),
-                platform="youtube",
-                post_id=post_id,
-                author=video.get("channel_title", video.get("author", "")),
-                content=content[:2000],
-                created_at=video.get("published_at"),
-                engagement_metrics={
-                    "likes": video.get("likes", 0),
-                    "shares": 0,
-                    "comments": video.get("comments", 0),
-                    "views": video.get("views", 0)
-                },
-                region="Nacional",
-                sentiment_score=sentiment_score,
-                processed=True
-            )
-            db.add(post)
-            items_added += 1
-
-        db.commit()
         update_token_status(db, token_info["id"], True)
-        logger.info(f"[Scheduler] YouTube '{token_info['label']}': {items_added} videos nuevos")
+        logger.info(f"[Scheduler] YouTube '{token_info['label']}': {items_added} videos nuevos total")
         return items_added
 
     except Exception as e:
@@ -192,7 +252,8 @@ async def run_instagram_with_token(db, token_info: Dict, sentiment_analyzer) -> 
         return 0
 
     try:
-        posts = await scraper.scrape_political_content(ig_user_id, max_per_hashtag=10)
+        tags = get_active_tags(db, "instagram")
+        posts = await scraper.scrape_political_content(ig_user_id, max_per_hashtag=10, extra_hashtags=tags)
         items_added = 0
 
         for post in posts:

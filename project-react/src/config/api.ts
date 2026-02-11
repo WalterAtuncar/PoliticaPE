@@ -33,6 +33,7 @@ export const ENDPOINTS = {
   WEBSOCKET: '/ws/stream',
   SETTINGS_PLATFORMS: '/api/v1/settings/platforms',
   SETTINGS_TOKENS: '/api/v1/settings/tokens',
+  SETTINGS_TAGS: '/api/v1/settings/tags',
 };
 
 export async function fetchFromScrapping(endpoint: string) {

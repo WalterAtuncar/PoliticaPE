@@ -6,13 +6,16 @@ from datetime import datetime
 import uuid
 
 from app.database import get_db
-from app.models import SocialApiToken
+from app.models import SocialApiToken, SearchTag
 from app.schemas import (
     SocialApiTokenCreate,
     SocialApiTokenUpdate,
     SocialApiTokenResponse,
     PlatformInfo,
     PLATFORM_CREDENTIAL_FIELDS,
+    SearchTagCreate,
+    SearchTagUpdate,
+    SearchTagResponse,
 )
 
 router = APIRouter()
@@ -199,3 +202,72 @@ async def test_token(token_id: str, db: Session = Depends(get_db)):
     
     db.commit()
     return result
+
+
+@router.get("/tags", response_model=List[SearchTagResponse])
+def list_tags(db: Session = Depends(get_db)):
+    tags = db.query(SearchTag).order_by(SearchTag.created_at.desc()).all()
+    return tags
+
+
+@router.post("/tags", response_model=SearchTagResponse)
+def create_tag(data: SearchTagCreate, db: Session = Depends(get_db)):
+    tag_text = data.tag.strip().lower()
+    if not tag_text:
+        raise HTTPException(status_code=400, detail="El tag no puede estar vacío")
+
+    existing = db.query(SearchTag).filter(SearchTag.tag == tag_text).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"El tag '{tag_text}' ya existe")
+
+    valid_platforms = ["twitter", "youtube", "instagram", "facebook", "tiktok"]
+    platforms = [p for p in data.platforms if p in valid_platforms]
+    if not platforms:
+        platforms = ["twitter", "youtube", "instagram"]
+
+    tag = SearchTag(
+        id=str(uuid.uuid4()),
+        tag=tag_text,
+        platforms=platforms,
+        is_active=data.is_active,
+    )
+    db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    return tag
+
+
+@router.put("/tags/{tag_id}", response_model=SearchTagResponse)
+def update_tag(tag_id: str, data: SearchTagUpdate, db: Session = Depends(get_db)):
+    tag = db.query(SearchTag).filter(SearchTag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag no encontrado")
+
+    if data.tag is not None:
+        new_tag = data.tag.strip().lower()
+        if not new_tag:
+            raise HTTPException(status_code=400, detail="El tag no puede estar vacío")
+        existing = db.query(SearchTag).filter(SearchTag.tag == new_tag, SearchTag.id != tag_id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"El tag '{new_tag}' ya existe")
+        tag.tag = new_tag
+    if data.platforms is not None:
+        valid_platforms = ["twitter", "youtube", "instagram", "facebook", "tiktok"]
+        tag.platforms = [p for p in data.platforms if p in valid_platforms]
+    if data.is_active is not None:
+        tag.is_active = data.is_active
+    tag.updated_at = datetime.now()
+
+    db.commit()
+    db.refresh(tag)
+    return tag
+
+
+@router.delete("/tags/{tag_id}")
+def delete_tag(tag_id: str, db: Session = Depends(get_db)):
+    tag = db.query(SearchTag).filter(SearchTag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag no encontrado")
+    db.delete(tag)
+    db.commit()
+    return {"message": "Tag eliminado correctamente"}

@@ -241,7 +241,7 @@ class InstagramScraper:
             logger.error(f"Error getting user media: {e}")
             return []
     
-    async def scrape_political_content(self, ig_user_id: str, max_per_hashtag: int = 25) -> List[Dict[str, Any]]:
+    async def scrape_political_content(self, ig_user_id: str, max_per_hashtag: int = 25, extra_hashtags: List[str] = None) -> List[Dict[str, Any]]:
         political_hashtags = [
             "politicaperu",
             "perupolitico",
@@ -250,6 +250,12 @@ class InstagramScraper:
             "eleccionesperu",
             "peru2026"
         ]
+
+        if extra_hashtags:
+            for tag in extra_hashtags:
+                clean = tag.replace(" ", "").replace("#", "").lower()
+                if clean and clean not in political_hashtags:
+                    political_hashtags.append(clean)
         
         all_posts = []
         
