@@ -1,17 +1,14 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { 
-  BarChart3, 
-  Globe, 
   Activity, 
   Brain, 
-  Database, 
-  Settings, 
   ChevronLeft,
   Home,
-  TrendingUp,
-  Users,
-  MessageSquare
+  MessageSquare,
+  MapPin,
+  Building2,
+  BarChart3
 } from 'lucide-react';
 import logo from '../../assets/logo.png';
 
@@ -24,15 +21,12 @@ interface SidebarProps {
 
 const menuItems = [
   { id: 'dashboard', label: 'Panel Principal', icon: Home },
-  { id: 'analytics', label: 'Analítica', icon: BarChart3 },
-  { id: 'geographic', label: 'Análisis Geográfico', icon: Globe },
   { id: 'monitoring', label: 'Monitoreo Tiempo Real', icon: Activity },
-  { id: 'recommendations', label: 'Recomendaciones IA', icon: Brain },
-  { id: 'campaigns', label: 'Campañas', icon: TrendingUp },
-  { id: 'demographics', label: 'Demografía', icon: Users },
   { id: 'social', label: 'Redes Sociales', icon: MessageSquare },
-  { id: 'data', label: 'Gestión de Datos', icon: Database },
-  { id: 'settings', label: 'Configuración', icon: Settings },
+  { id: 'geo-demographics', label: 'Geográfico y Demográfico', icon: MapPin },
+  { id: 'government', label: 'Data Gubernamental', icon: Building2 },
+  { id: 'surveys', label: 'Encuestas', icon: BarChart3 },
+  { id: 'recommendations', label: 'Recomendaciones IA', icon: Brain },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({

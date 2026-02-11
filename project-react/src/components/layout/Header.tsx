@@ -28,17 +28,14 @@ interface Alert {
   isRead: boolean;
 }
 
-const sectionTitles = {
+const sectionTitles: Record<string, string> = {
   dashboard: 'Panel Principal',
-  analytics: 'Analítica Avanzada',
-  geographic: 'Análisis Geográfico',
   monitoring: 'Monitoreo en Tiempo Real',
-  recommendations: 'Recomendaciones IA',
-  campaigns: 'Gestión de Campañas',
-  demographics: 'Análisis Demográfico',
   social: 'Redes Sociales',
-  data: 'Gestión de Datos',
-  settings: 'Configuración',
+  'geo-demographics': 'Análisis Geográfico y Demográfico',
+  government: 'Data Gubernamental',
+  surveys: 'Encuestas',
+  recommendations: 'Recomendaciones IA',
 };
 
 export const Header: React.FC<HeaderProps> = ({ isCollapsed, activeSection }) => {

@@ -3,15 +3,12 @@ import { Toaster } from 'react-hot-toast';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Header } from '../components/layout/Header';
 import { Dashboard } from '../components/dashboard/Dashboard';
-import { AnalyticsPage } from '../components/analytics/AnalyticsPage';
-import { GeographicPage } from '../components/geographic/GeographicPage';
 import { MonitoringPage } from '../components/monitoring/MonitoringPage';
-import { RecommendationsPage } from '../components/recommendations/RecommendationsPage';
-import { CampaignsPage } from '../components/campaigns/CampaignsPage';
-import { DemographicsPage } from '../components/demographics/DemographicsPage';
 import { SocialPage } from '../components/social/SocialPage';
-import { DataPage } from '../components/data/DataPage';
-import { SettingsPage } from '../components/settings/SettingsPage';
+import { GeoDemographicsPage } from '../components/geo-demographics/GeoDemographicsPage';
+import { GovernmentPage } from '../components/government/GovernmentPage';
+import { SurveysPage } from '../components/surveys/SurveysPage';
+import { RecommendationsPage } from '../components/recommendations/RecommendationsPage';
 
 export const MainApp: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -21,24 +18,18 @@ export const MainApp: React.FC = () => {
     switch (activeSection) {
       case 'dashboard':
         return <Dashboard />;
-      case 'analytics':
-        return <AnalyticsPage />;
-      case 'geographic':
-        return <GeographicPage />;
       case 'monitoring':
         return <MonitoringPage />;
-      case 'recommendations':
-        return <RecommendationsPage />;
-      case 'campaigns':
-        return <CampaignsPage />;
-      case 'demographics':
-        return <DemographicsPage />;
       case 'social':
         return <SocialPage />;
-      case 'data':
-        return <DataPage />;
-      case 'settings':
-        return <SettingsPage />;
+      case 'geo-demographics':
+        return <GeoDemographicsPage />;
+      case 'government':
+        return <GovernmentPage />;
+      case 'surveys':
+        return <SurveysPage />;
+      case 'recommendations':
+        return <RecommendationsPage />;
       default:
         return <Dashboard />;
     }
@@ -46,7 +37,6 @@ export const MainApp: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50/50 via-white to-purple-50/50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      {/* Background Pattern */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-blue-400/10 to-purple-600/10 rounded-full blur-3xl"></div>
         <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-purple-400/10 to-blue-600/10 rounded-full blur-3xl"></div>
