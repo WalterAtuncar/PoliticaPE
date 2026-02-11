@@ -170,18 +170,42 @@ def create_demo_user():
             tenant_id = tenant[0] if tenant else None
             
             if not tenant_id:
-                db.execute(text("""
-                    INSERT INTO identity.tenants (name, slug, is_active, created_at)
-                    VALUES ('PoliticaPE', 'politicape', true, NOW())
-                """))
+                has_status = db.execute(text("""
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_schema='identity' AND table_name='tenants' AND column_name='status'
+                """)).fetchone()
+                
+                if has_status:
+                    db.execute(text("""
+                        INSERT INTO identity.tenants (name, slug, status, created_at)
+                        VALUES ('PoliticaPE', 'politicape', 'active', NOW())
+                    """))
+                else:
+                    db.execute(text("""
+                        INSERT INTO identity.tenants (name, slug, is_active, created_at)
+                        VALUES ('PoliticaPE', 'politicape', true, NOW())
+                    """))
                 db.commit()
                 tenant = db.execute(text("SELECT id FROM identity.tenants LIMIT 1")).fetchone()
                 tenant_id = tenant[0] if tenant else None
             
+            if not tenant_id:
+                logger.error("Could not create tenant for demo user")
+                return
+            
+            has_role_tenant = db.execute(text("""
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_schema='identity' AND table_name='roles' AND column_name='tenant_id'
+            """)).fetchone()
+            
             admin_role = db.execute(text("SELECT id FROM identity.roles WHERE name = 'admin' LIMIT 1")).fetchone()
             if not admin_role:
-                db.execute(text("INSERT INTO identity.roles (name, description) VALUES ('admin', 'Administrator')"))
-                db.execute(text("INSERT INTO identity.roles (name, description) VALUES ('analyst', 'Analyst')"))
+                if has_role_tenant:
+                    db.execute(text("INSERT INTO identity.roles (name, description, tenant_id) VALUES ('admin', 'Administrator', :tid)"), {"tid": tenant_id})
+                    db.execute(text("INSERT INTO identity.roles (name, description, tenant_id) VALUES ('analyst', 'Analyst', :tid)"), {"tid": tenant_id})
+                else:
+                    db.execute(text("INSERT INTO identity.roles (name, description) VALUES ('admin', 'Administrator')"))
+                    db.execute(text("INSERT INTO identity.roles (name, description) VALUES ('analyst', 'Analyst')"))
                 db.commit()
                 admin_role = db.execute(text("SELECT id FROM identity.roles WHERE name = 'admin' LIMIT 1")).fetchone()
             
