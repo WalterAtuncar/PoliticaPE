@@ -1,30 +1,78 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BarChart3, RefreshCw, ExternalLink, Calendar, Users, AlertCircle, Filter, X, FileText, Globe, ChevronRight, Eye, Hash, Search } from 'lucide-react';
+import { BarChart3, RefreshCw, ExternalLink, Calendar, Users, AlertCircle, Filter, X, FileText, ChevronRight, Eye, TrendingUp, Award, Search, Target } from 'lucide-react';
 import { useSurveyData, SurveyItem } from '../../hooks/useSurveyData';
 
 const pollsterColors: Record<string, string> = {
   IEP: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  'Ipsos Perú': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
   Ipsos: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
   Datum: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
   CPI: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  CIT: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400',
+  Imasolu: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400',
 };
 
 const pollsterBorderColors: Record<string, string> = {
   IEP: 'border-l-blue-500',
+  'Ipsos Perú': 'border-l-purple-500',
   Ipsos: 'border-l-purple-500',
   Datum: 'border-l-amber-500',
   CPI: 'border-l-green-500',
+  CIT: 'border-l-rose-500',
+  Imasolu: 'border-l-teal-500',
+};
+
+const medalColors = ['text-amber-500', 'text-gray-400', 'text-orange-600'];
+
+interface CandidateData {
+  candidato: string;
+  porcentaje: number;
+}
+
+const CandidateBar: React.FC<{ candidate: CandidateData; rank: number; maxPct: number }> = ({ candidate, rank, maxPct }) => {
+  const barWidth = maxPct > 0 ? (candidate.porcentaje / maxPct) * 100 : 0;
+  const barColor = rank === 0 ? 'bg-blue-500' : rank === 1 ? 'bg-indigo-400' : rank === 2 ? 'bg-purple-400' : 'bg-gray-300 dark:bg-gray-600';
+
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <div className="w-5 text-center">
+        {rank < 3 ? (
+          <Award className={`w-4 h-4 ${medalColors[rank]}`} />
+        ) : (
+          <span className="text-xs text-gray-400">{rank + 1}</span>
+        )}
+      </div>
+      <span className="text-sm text-gray-700 dark:text-gray-300 w-28 truncate font-medium" title={candidate.candidato}>
+        {candidate.candidato}
+      </span>
+      <div className="flex-1 h-5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${barWidth}%` }}
+          transition={{ duration: 0.5, delay: rank * 0.05 }}
+          className={`h-full ${barColor} rounded-full flex items-center justify-end pr-2`}
+        >
+          {barWidth > 15 && (
+            <span className="text-xs font-bold text-white">{candidate.porcentaje}%</span>
+          )}
+        </motion.div>
+      </div>
+      {barWidth <= 15 && (
+        <span className="text-xs font-bold text-gray-600 dark:text-gray-400 w-10 text-right">{candidate.porcentaje}%</span>
+      )}
+    </div>
+  );
 };
 
 const SurveyDetailModal: React.FC<{ item: SurveyItem; onClose: () => void }> = ({ item, onClose }) => {
-  const rawText = item.results?.raw_text ? String(item.results.raw_text) : '';
-  const summary = item.results?.summary ? String(item.results.summary) : '';
-  const allResults = item.results || {};
-
-  const contentSections = rawText.split(/(?:MÁS INFORMACIÓN|:)/).filter(Boolean).map(s => s.trim());
-
-  const otherKeys = Object.keys(allResults).filter(k => k !== 'raw_text' && k !== 'summary');
+  const results = item.results || {} as Record<string, unknown>;
+  const candidates = (results.candidatos as CandidateData[] | undefined) || [];
+  const hallazgos = (results.hallazgos_clave as string[] | undefined) || [];
+  const porcentajes = (results.porcentajes_mencionados as number[] | undefined) || [];
+  const resumen = (results.resumen as string | undefined) || '';
+  const tipo = (results.tipo as string | undefined) || 'Estudio';
+  const maxPct = candidates.length > 0 ? Math.max(...candidates.map(c => c.porcentaje)) : 0;
 
   return (
     <AnimatePresence>
@@ -49,144 +97,119 @@ const SurveyDetailModal: React.FC<{ item: SurveyItem; onClose: () => void }> = (
                 <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${pollsterColors[item.source] || 'bg-gray-100 text-gray-800'}`}>
                   {item.source}
                 </span>
-                {item.methodology && (
-                  <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
-                    {item.methodology}
-                  </span>
-                )}
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                  {tipo}
+                </span>
               </div>
               <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-snug">
-                {item.title.length > 80 ? item.title.substring(0, 80) + '...' : item.title}
+                {item.title}
               </h2>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0"
-            >
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0">
               <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
 
           <div className="overflow-y-auto max-h-[calc(85vh-140px)] p-5 space-y-5">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {item.sample_size && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-3 border border-blue-100 dark:border-blue-800">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                    <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">Tamaño de muestra</span>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Users className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium uppercase">Muestra</span>
                   </div>
-                  <p className="text-xl font-bold text-blue-800 dark:text-blue-300">{item.sample_size.toLocaleString()}</p>
+                  <p className="text-lg font-bold text-blue-800 dark:text-blue-300">{item.sample_size.toLocaleString()}</p>
                 </div>
               )}
               {item.margin_error && (
                 <div className="bg-orange-50 dark:bg-orange-900/20 rounded-xl p-3 border border-orange-100 dark:border-orange-800">
-                  <div className="flex items-center gap-2 mb-1">
-                    <AlertCircle className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-                    <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">Margen de error</span>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <AlertCircle className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
+                    <span className="text-[10px] text-orange-600 dark:text-orange-400 font-medium uppercase">Margen error</span>
                   </div>
-                  <p className="text-xl font-bold text-orange-800 dark:text-orange-300">±{item.margin_error}%</p>
+                  <p className="text-lg font-bold text-orange-800 dark:text-orange-300">±{item.margin_error}%</p>
                 </div>
               )}
               {item.field_dates && (
                 <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 border border-green-100 dark:border-green-800">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Calendar className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <span className="text-xs text-green-600 dark:text-green-400 font-medium">Fecha de campo</span>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Calendar className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                    <span className="text-[10px] text-green-600 dark:text-green-400 font-medium uppercase">Fecha campo</span>
                   </div>
                   <p className="text-sm font-bold text-green-800 dark:text-green-300">{item.field_dates}</p>
                 </div>
               )}
-              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-3 border border-purple-100 dark:border-purple-800">
-                <div className="flex items-center gap-2 mb-1">
-                  <Calendar className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  <span className="text-xs text-purple-600 dark:text-purple-400 font-medium">Fecha de publicación</span>
-                </div>
-                <p className="text-sm font-bold text-purple-800 dark:text-purple-300">
-                  {item.published_at
-                    ? new Date(item.published_at).toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' })
-                    : 'Sin fecha'}
-                </p>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-3 border border-gray-200 dark:border-gray-600">
-                <div className="flex items-center gap-2 mb-1">
-                  <Hash className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                  <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Recopilado</span>
-                </div>
-                <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
-                  {new Date(item.scraped_at).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
-              {item.pollster && (
-                <div className="bg-teal-50 dark:bg-teal-900/20 rounded-xl p-3 border border-teal-100 dark:border-teal-800">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Globe className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                    <span className="text-xs text-teal-600 dark:text-teal-400 font-medium">Encuestadora</span>
+              {results.diferencia_1_2 !== undefined && (
+                <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-3 border border-purple-100 dark:border-purple-800">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <TrendingUp className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                    <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium uppercase">Diferencia 1°-2°</span>
                   </div>
-                  <p className="text-sm font-bold text-teal-800 dark:text-teal-300">{item.pollster}</p>
+                  <p className="text-lg font-bold text-purple-800 dark:text-purple-300">{String(results.diferencia_1_2)} pts</p>
                 </div>
               )}
             </div>
 
-            {summary && (
-              <div className="bg-white dark:bg-gray-700/30 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
-                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  Resumen
-                </h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{summary}</p>
-              </div>
-            )}
-
-            {rawText && (
-              <div className="bg-white dark:bg-gray-700/30 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
-                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  Contenido completo
-                </h4>
-                {contentSections.length > 1 ? (
-                  <div className="space-y-3">
-                    {contentSections.map((section, idx) => (
-                      <div key={idx} className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 border-l-4 border-l-amber-400">
-                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{section}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap">{rawText}</p>
-                )}
-              </div>
-            )}
-
-            {otherKeys.length > 0 && (
+            {candidates.length > 0 && (
               <div className="bg-white dark:bg-gray-700/30 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
                 <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
                   <BarChart3 className="w-4 h-4" />
-                  Datos adicionales
+                  Intención de voto ({candidates.length} candidatos)
+                </h4>
+                <div className="space-y-1">
+                  {candidates.map((c, i) => (
+                    <CandidateBar key={c.candidato} candidate={c} rank={i} maxPct={maxPct} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {resumen && (
+              <div className="bg-white dark:bg-gray-700/30 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Resumen del análisis
+                </h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{resumen}</p>
+              </div>
+            )}
+
+            {hallazgos.length > 0 && (
+              <div className="bg-white dark:bg-gray-700/30 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                  <Target className="w-4 h-4" />
+                  Hallazgos clave
                 </h4>
                 <div className="space-y-2">
-                  {otherKeys.map(key => {
-                    const value = allResults[key];
-                    return (
-                      <div key={key} className="flex items-start gap-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
-                        <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase min-w-[100px]">{key.replace(/_/g, ' ')}</span>
-                        <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
-                          {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}
-                        </span>
-                      </div>
-                    );
-                  })}
+                  {hallazgos.map((h, i) => (
+                    <div key={i} className="bg-amber-50 dark:bg-amber-900/10 rounded-lg p-3 border-l-4 border-l-amber-400 text-sm text-gray-700 dark:text-gray-300">
+                      {h}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {porcentajes.length > 0 && candidates.length === 0 && (
+              <div className="bg-white dark:bg-gray-700/30 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  Cifras mencionadas
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {porcentajes.map((p, i) => (
+                    <span key={i} className="px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-lg text-sm font-bold">
+                      {p}%
+                    </span>
+                  ))}
                 </div>
               </div>
             )}
 
             {item.url && (
               <div className="pt-2">
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors"
-                >
+                <a href={item.url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors">
                   <ExternalLink className="w-4 h-4" />
                   Abrir fuente original
                 </a>
@@ -215,70 +238,32 @@ export const SurveysPage: React.FC = () => {
 
   const sources = [...new Set(items.map(i => i.source))];
 
-  const stats = {
-    total: items.length,
-    bySource: sources.map(s => ({
-      source: s,
-      count: items.filter(i => i.source === s).length,
-    })),
-    withSampleSize: items.filter(i => i.sample_size).length,
-    withResults: items.filter(i => i.results && Object.keys(i.results).length > 0).length,
-  };
+  const pollItems = items.filter(i => ((i.results?.candidatos as CandidateData[] | undefined) || []).length > 0);
+  const analysisItems = items.filter(i => !((i.results?.candidatos as CandidateData[] | undefined) || []).length && i.results?.datos_encontrados);
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'Sin fecha';
-    return new Date(dateStr).toLocaleDateString('es-PE', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    return new Date(dateStr).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
-  const getContentPreview = (item: SurveyItem): string => {
-    if (!item.results) return '';
-    const raw = item.results.raw_text ? String(item.results.raw_text) : '';
-    const summary = item.results.summary ? String(item.results.summary) : '';
-    const text = summary || raw;
-    if (text.length > 120) return text.substring(0, 120) + '...';
-    return text;
-  };
-
-  const getContentType = (item: SurveyItem): string => {
-    const raw = item.results?.raw_text ? String(item.results.raw_text) : '';
-    if (raw.toLowerCase().includes('encuesta')) return 'Encuesta';
-    if (raw.toLowerCase().includes('focus group')) return 'Focus Group';
-    if (raw.toLowerCase().includes('listening') || raw.toLowerCase().includes('digital')) return 'Digital';
-    if (raw.toLowerCase().includes('comunidades')) return 'Comunidades';
-    if (raw.toLowerCase().includes('behavioral') || raw.toLowerCase().includes('comportamiento')) return 'Comportamiento';
-    if (raw.toLowerCase().includes('research') || raw.toLowerCase().includes('investigación')) return 'Investigación';
-    return 'Estudio';
+  const getTopCandidates = (item: SurveyItem): CandidateData[] => {
+    return ((item.results?.candidatos as CandidateData[] | undefined) || []).slice(0, 3);
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
-    >
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center">
             <BarChart3 className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Encuestas
-            </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Sondeos y encuestas de IEP, Ipsos, Datum y CPI
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Encuestas</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Sondeos electorales e informes de opinión pública</p>
           </div>
         </div>
-        <button
-          onClick={refetch}
-          disabled={isLoading}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-        >
+        <button onClick={refetch} disabled={isLoading}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           Actualizar
         </button>
@@ -286,44 +271,36 @@ export const SurveysPage: React.FC = () => {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 dark:border-gray-700/50">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Total encuestas</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Total registros</p>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">{items.length}</p>
         </div>
-        <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 dark:border-gray-700/50">
-          <p className="text-sm text-gray-500 dark:text-gray-400">Con datos</p>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.withResults}</p>
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200/50 dark:border-blue-700/50">
+          <p className="text-sm text-blue-600 dark:text-blue-400">Con datos de voto</p>
+          <p className="text-2xl font-bold text-blue-800 dark:text-blue-300">{pollItems.length}</p>
         </div>
-        {stats.bySource.map(s => (
-          <div key={s.source} className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-4 border border-gray-200/50 dark:border-gray-700/50">
-            <p className="text-sm text-gray-500 dark:text-gray-400">{s.source}</p>
-            <p className="text-2xl font-bold text-gray-900 dark:text-white">{s.count}</p>
-          </div>
-        ))}
+        <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 border border-amber-200/50 dark:border-amber-700/50">
+          <p className="text-sm text-amber-600 dark:text-amber-400">Informes análisis</p>
+          <p className="text-2xl font-bold text-amber-800 dark:text-amber-300">{analysisItems.length}</p>
+        </div>
+        <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200/50 dark:border-green-700/50">
+          <p className="text-sm text-green-600 dark:text-green-400">Encuestadoras</p>
+          <p className="text-2xl font-bold text-green-800 dark:text-green-300">{sources.length}</p>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-gray-400" />
-          <select
-            value={sourceFilter}
-            onChange={(e) => setSourceFilter(e.target.value)}
-            className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">Todas las encuestadoras</option>
-            {sources.map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
+          <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
+            className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="all">Todas las fuentes</option>
+            {sources.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         <div className="flex-1 min-w-[200px] relative">
           <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder="Buscar por título o encuestadora..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+          <input type="text" placeholder="Buscar encuesta..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
         <span className="text-sm text-gray-500">{filteredItems.length} resultados</span>
       </div>
@@ -336,22 +313,22 @@ export const SurveysPage: React.FC = () => {
 
       {isLoading ? (
         <div className="space-y-4">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="animate-pulse bg-white/60 dark:bg-gray-800/60 rounded-xl p-6 h-32" />
-          ))}
+          {[1, 2, 3].map(i => <div key={i} className="animate-pulse bg-white/60 dark:bg-gray-800/60 rounded-xl p-6 h-32" />)}
         </div>
       ) : !hasData ? (
         <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-xl p-12 text-center border border-gray-200/50 dark:border-gray-700/50">
           <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Sin encuestas disponibles</h3>
-          <p className="text-gray-500 dark:text-gray-400">Importa datos de encuestadoras para ver los resultados.</p>
+          <p className="text-gray-500 dark:text-gray-400">Ejecuta el scraping de encuestas para obtener datos.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {filteredItems.map((item, index) => {
-            const contentPreview = getContentPreview(item);
-            const contentType = getContentType(item);
+            const topCandidates = getTopCandidates(item);
+            const hasCandidates = topCandidates.length > 0;
             const borderColor = pollsterBorderColors[item.source] || 'border-l-gray-400';
+            const hallazgos = (item.results?.hallazgos_clave as string[] | undefined) || [];
+            const porcentajes = (item.results?.porcentajes_mencionados as number[] | undefined) || [];
 
             return (
               <motion.div
@@ -368,38 +345,67 @@ export const SurveysPage: React.FC = () => {
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${pollsterColors[item.source] || 'bg-gray-100 text-gray-800'}`}>
                         {item.source}
                       </span>
-                      {item.pollster && item.pollster !== item.source && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                          {item.pollster}
-                        </span>
-                      )}
                       {item.methodology && (
                         <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
-                          {item.methodology}
+                          {hasCandidates ? 'Intención de voto' : 'Informe de opinión'}
                         </span>
                       )}
-                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                        {contentType}
-                      </span>
+                      {item.field_dates && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{item.field_dates}</span>
+                      )}
                     </div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white mb-1.5 line-clamp-1">
-                      {item.title.length > 100 ? item.title.substring(0, 100) + '...' : item.title}
-                    </h3>
-                    {contentPreview && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 leading-relaxed">
-                        {contentPreview}
-                      </p>
+
+                    {hasCandidates ? (
+                      <div>
+                        <div className="flex items-center gap-3 mb-2">
+                          {topCandidates.map((c, i) => (
+                            <div key={c.candidato} className="flex items-center gap-1.5">
+                              <Award className={`w-4 h-4 ${medalColors[i] || 'text-gray-400'}`} />
+                              <span className="text-sm font-semibold text-gray-900 dark:text-white">{c.candidato}</span>
+                              <span className={`text-sm font-bold ${i === 0 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                                {c.porcentaje}%
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        {item.results?.diferencia_1_2 !== undefined && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Diferencia: {String(item.results.diferencia_1_2)} pts
+                            {item.results.total_candidatos ? ` · ${String(item.results.total_candidatos)} candidatos` : ''}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <h3 className="font-semibold text-gray-900 dark:text-white mb-1 line-clamp-1">{item.title}</h3>
+                        {hallazgos.length > 0 && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">{hallazgos[0]}</p>
+                        )}
+                        {porcentajes.length > 0 && hallazgos.length === 0 && (
+                          <div className="flex gap-1.5 flex-wrap mt-1">
+                            {porcentajes.slice(0, 5).map((p, i) => (
+                              <span key={i} className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded text-xs font-bold">
+                                {p}%
+                              </span>
+                            ))}
+                            {porcentajes.length > 5 && (
+                              <span className="text-xs text-gray-400">+{porcentajes.length - 5} más</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
+
                   <div className="flex flex-col items-end gap-2 flex-shrink-0">
                     {item.sample_size && (
-                      <div className="flex items-center gap-1.5 text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-2 py-1 rounded-lg">
+                      <div className="flex items-center gap-1.5 text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-2.5 py-1 rounded-lg">
                         <Users className="w-3 h-3" />
-                        <span className="font-semibold">{item.sample_size.toLocaleString()}</span>
+                        <span className="font-semibold">n={item.sample_size.toLocaleString()}</span>
                       </div>
                     )}
                     {item.margin_error && (
-                      <div className="flex items-center gap-1.5 text-xs bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 px-2 py-1 rounded-lg">
+                      <div className="flex items-center gap-1.5 text-xs bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 px-2.5 py-1 rounded-lg">
                         <AlertCircle className="w-3 h-3" />
                         <span className="font-semibold">±{item.margin_error}%</span>
                       </div>
@@ -421,12 +427,7 @@ export const SurveysPage: React.FC = () => {
         </div>
       )}
 
-      {selectedItem && (
-        <SurveyDetailModal
-          item={selectedItem}
-          onClose={() => setSelectedItem(null)}
-        />
-      )}
+      {selectedItem && <SurveyDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />}
     </motion.div>
   );
 };

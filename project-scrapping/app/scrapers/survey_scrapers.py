@@ -13,143 +13,336 @@ from app.models import ScrapedSurvey
 from loguru import logger
 
 
+class WikipediaPollScraper(BaseScraper):
+
+    def __init__(self):
+        super().__init__()
+        self.url = "https://es.wikipedia.org/wiki/Elecciones_generales_de_Per%C3%BA_de_2026"
+
+    def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
+        return self._extract_poll_tables(response)
+
+    def scrape(self, db: Session) -> int:
+        response = self._make_request(self.url)
+        if not response:
+            logger.error("Wikipedia: no se pudo acceder a la página")
+            return 0
+
+        all_items = []
+
+        poll_items = self._extract_poll_tables(response)
+        all_items.extend(poll_items)
+        logger.info(f"Wikipedia: {len(poll_items)} encuestas extraídas de tablas")
+
+        return self._save_items(db, all_items, ScrapedSurvey)
+
+    def _extract_poll_tables(self, response: requests.Response) -> List[Dict[str, Any]]:
+        soup = BeautifulSoup(response.content, 'html.parser')
+        items = []
+
+        tables = soup.find_all('table', class_='wikitable')
+
+        for table in tables:
+            rows = table.find_all('tr')
+            if len(rows) < 3:
+                continue
+
+            header_row = rows[0]
+            header_cells = [th.get_text(strip=True) for th in header_row.find_all(['th', 'td'])]
+
+            if not any(kw in ' '.join(header_cells).lower() for kw in ['encuestadora', 'muestra', 'fecha']):
+                continue
+
+            candidate_row = rows[1] if len(rows) > 1 else None
+            candidate_names = []
+            if candidate_row:
+                candidate_names = [td.get_text(strip=True) for td in candidate_row.find_all(['td', 'th'])]
+                has_names = any(re.search(r'[A-ZÁÉÍÓÚ][a-záéíóú]', c) for c in candidate_names if c)
+                if not has_names:
+                    candidate_names = []
+
+            data_start = 2 if candidate_names else 1
+
+            for row in rows[data_start:]:
+                cells = [td.get_text(strip=True) for td in row.find_all(['td', 'th'])]
+                if len(cells) < 4:
+                    continue
+
+                item = self._parse_poll_row(cells, header_cells, candidate_names)
+                if item:
+                    items.append(item)
+
+        return items
+
+    def _parse_poll_row(self, cells: List[str], headers: List[str], candidates: List[str]) -> Optional[Dict[str, Any]]:
+        pollster = cells[0] if len(cells) > 0 else ''
+        date_str = cells[1] if len(cells) > 1 else ''
+        sample_str = cells[2] if len(cells) > 2 else ''
+
+        pollster = re.sub(r'\[.*?\]', '', pollster).replace('\u200b', '').strip()
+        if not pollster or len(pollster) < 2:
+            return None
+
+        sample_size = None
+        sample_clean = re.sub(r'[^\d]', '', sample_str)
+        if sample_clean and len(sample_clean) >= 3:
+            try:
+                sample_size = int(sample_clean)
+            except ValueError:
+                pass
+
+        results = {}
+        percentages = []
+
+        data_cells = cells[3:]
+        for i, val in enumerate(data_cells):
+            val_clean = val.replace(',', '.').replace('―', '').replace('–', '').replace('-', '').strip()
+            try:
+                num = float(val_clean)
+                candidate_name = candidates[i] if i < len(candidates) else f"Opción {i+1}"
+                candidate_name = re.sub(r'\[.*?\]', '', candidate_name).replace('\u200b', '').strip()
+
+                if candidate_name and num > 0:
+                    percentages.append({"candidato": candidate_name, "porcentaje": num})
+            except (ValueError, IndexError):
+                continue
+
+        if not percentages:
+            return None
+
+        exclude_names = {'b/v', 'ns/no', 'dif.', 'dif', 'ns', 'no', 'blanco', 'viciado', 'nr', 'ns/nc'}
+        percentages = [p for p in percentages if p['candidato'].lower() not in exclude_names and not p['candidato'].startswith('Opción')]
+
+        top_candidates = sorted(percentages, key=lambda x: x['porcentaje'], reverse=True)
+
+        results = {
+            "tipo": "Intención de voto presidencial",
+            "candidatos": top_candidates,
+            "total_candidatos": len(top_candidates),
+            "lider": top_candidates[0]["candidato"] if top_candidates else None,
+            "lider_porcentaje": top_candidates[0]["porcentaje"] if top_candidates else None,
+        }
+
+        if len(top_candidates) >= 2:
+            results["diferencia_1_2"] = round(top_candidates[0]["porcentaje"] - top_candidates[1]["porcentaje"], 1)
+            results["segundo"] = top_candidates[1]["candidato"]
+            results["segundo_porcentaje"] = top_candidates[1]["porcentaje"]
+
+        if len(top_candidates) >= 3:
+            results["tercero"] = top_candidates[2]["candidato"]
+            results["tercero_porcentaje"] = top_candidates[2]["porcentaje"]
+
+        published_at = self._parse_wiki_date(date_str)
+
+        source_parts = pollster.split('/')
+        pollster_name = source_parts[0].strip()
+        medio = source_parts[1].strip() if len(source_parts) > 1 else ''
+
+        title = f"Intención de voto: {top_candidates[0]['candidato']} lidera con {top_candidates[0]['porcentaje']}%"
+        if len(top_candidates) >= 2:
+            title += f" vs {top_candidates[1]['candidato']} {top_candidates[1]['porcentaje']}%"
+
+        return {
+            'id': str(uuid.uuid4()),
+            'source': pollster_name,
+            'title': title[:500],
+            'methodology': f"Encuesta de opinión pública{' - ' + medio if medio else ''}",
+            'sample_size': sample_size,
+            'margin_error': self._estimate_margin(sample_size),
+            'field_dates': date_str,
+            'results': results,
+            'published_at': published_at or datetime.now(),
+            'url': self.url,
+            'pollster': pollster,
+            'processed': False
+        }
+
+    def _estimate_margin(self, sample_size: Optional[int]) -> Optional[float]:
+        if not sample_size or sample_size < 100:
+            return None
+        import math
+        return round(1.96 * math.sqrt(0.25 / sample_size) * 100, 1)
+
+    def _parse_wiki_date(self, date_str: str) -> Optional[datetime]:
+        if not date_str:
+            return None
+
+        date_str = date_str.strip()
+
+        meses = {
+            'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'may': 5, 'jun': 6,
+            'jul': 7, 'ago': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dic': 12,
+            'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5,
+            'junio': 6, 'julio': 7, 'agosto': 8, 'septiembre': 9,
+            'octubre': 10, 'noviembre': 11, 'diciembre': 12
+        }
+
+        match = re.search(r'(\d{1,2})\s*(?:de\s+)?(\w+)\s*(?:de\s+)?(\d{4})', date_str)
+        if match:
+            day = int(match.group(1))
+            month_str = match.group(2).lower()[:3]
+            year = int(match.group(3))
+            month = meses.get(month_str)
+            if month:
+                try:
+                    return datetime(year, month, day)
+                except ValueError:
+                    pass
+
+        match = re.search(r'(\d{1,2})/(\d{1,2})/(\d{4})', date_str)
+        if match:
+            try:
+                return datetime(int(match.group(3)), int(match.group(2)), int(match.group(1)))
+            except ValueError:
+                pass
+
+        match = re.search(r'(\d{1,2})[-–].*?(\d{1,2})/(\d{1,2})/(\d{4})', date_str)
+        if match:
+            try:
+                return datetime(int(match.group(4)), int(match.group(3)), int(match.group(2)))
+            except ValueError:
+                pass
+
+        match = re.search(r'(\w+)\s+(\d{4})', date_str)
+        if match:
+            month_str = match.group(1).lower()[:3]
+            year = int(match.group(2))
+            month = meses.get(month_str)
+            if month:
+                try:
+                    return datetime(year, month, 15)
+                except ValueError:
+                    pass
+
+        return None
+
+    def _item_exists(self, db: Session, item_data: Dict[str, Any], model_class) -> bool:
+        existing = db.query(model_class).filter(
+            model_class.source == item_data['source'],
+            model_class.field_dates == item_data.get('field_dates')
+        ).first()
+        return existing is not None
+
+
 class IEPScraper(BaseScraper):
 
     def __init__(self):
         super().__init__()
-        self.base_url = "https://iep.org.pe"
-        self.sections = [
-            "/noticias/",
-            "/publicaciones/",
-        ]
+        self.api_url = "https://estudiosdeopinion.iep.org.pe/wp-json/wp/v2/posts"
+        self.base_url = "https://estudiosdeopinion.iep.org.pe"
+
+    def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
+        return []
 
     def scrape(self, db: Session) -> int:
         all_items = []
 
-        for section in self.sections:
-            section_url = f"{self.base_url}{section}"
-            response = self._make_request(section_url)
-            if not response:
-                continue
-
-            items = self._parse_content(response)
-            all_items.extend(items)
-            logger.info(f"IEP: {len(items)} items de {section}")
+        try:
+            response = requests.get(
+                self.api_url,
+                params={'per_page': 20},
+                headers={'User-Agent': 'Mozilla/5.0'},
+                timeout=15
+            )
+            if response.status_code == 200:
+                posts = response.json()
+                for post in posts:
+                    item = self._parse_wp_post(post)
+                    if item:
+                        all_items.append(item)
+                logger.info(f"IEP API: {len(all_items)} informes extraídos")
+        except Exception as e:
+            logger.error(f"IEP API error: {e}")
 
         return self._save_items(db, all_items, ScrapedSurvey)
 
-    def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
-        soup = BeautifulSoup(response.content, 'html.parser')
-        items = []
+    def _parse_wp_post(self, post: Dict) -> Optional[Dict[str, Any]]:
+        title = post.get('title', {}).get('rendered', '')
+        content_html = post.get('content', {}).get('rendered', '')
+        link = post.get('link', '')
+        date_str = post.get('date', '')
 
-        articles = soup.find_all(['article', 'div'], class_=re.compile(
-            r'post|entry|publicacion|noticia|item|card', re.I
-        ))
+        if not title or not content_html:
+            return None
 
-        if not articles:
-            articles = soup.find_all('a', href=re.compile(r'encuesta|opinion|aprobacion|sondeo', re.I))
+        soup = BeautifulSoup(content_html, 'html.parser')
+        text = soup.get_text()
 
-        for element in articles:
+        if len(text) < 50:
+            return None
+
+        results = self._extract_analysis_data(text, title)
+
+        if not results.get('datos_encontrados'):
+            return None
+
+        published_at = None
+        if date_str:
             try:
-                item = self._extract_survey_item(element, response.url, 'IEP')
-                if item:
-                    items.append(item)
-            except Exception as e:
-                logger.debug(f"Error extrayendo item IEP: {e}")
-                continue
-
-        return items
-
-    def _extract_survey_item(self, element, base_url: str, source: str) -> Optional[Dict[str, Any]]:
-        title_elem = element.find(['h1', 'h2', 'h3', 'h4', 'a'])
-        if not title_elem:
-            return None
-
-        title = title_elem.get_text(strip=True)
-        if not title or len(title) < 10:
-            return None
-
-        survey_keywords = ['encuesta', 'sondeo', 'aprobación', 'opinión', 'percepción',
-                          'intención de voto', 'aprobacion', 'opinion', 'barometro',
-                          'estudio', 'indicador', 'confianza', 'preferencia']
-        title_lower = title.lower()
-        if not any(kw in title_lower for kw in survey_keywords):
-            return None
-
-        link_elem = element.find('a', href=True) if element.name != 'a' else element
-        url = urljoin(base_url, link_elem.get('href', '')) if link_elem else base_url
-
-        date_elem = element.find(['time', 'span', 'div'], class_=re.compile(r'date|fecha|time', re.I))
-        published_at = self._parse_date(date_elem.get_text(strip=True) if date_elem else "")
-
-        content_elem = element.find(['p', 'div'], class_=re.compile(r'excerpt|resumen|content|desc', re.I))
-        summary = content_elem.get_text(strip=True) if content_elem else ""
-
-        results = self._extract_poll_numbers(title + " " + summary)
+                published_at = datetime.fromisoformat(date_str.replace('Z', '+00:00')).replace(tzinfo=None)
+            except (ValueError, TypeError):
+                published_at = datetime.now()
 
         return {
             'id': str(uuid.uuid4()),
-            'source': source,
+            'source': 'IEP',
             'title': title[:500],
-            'methodology': 'Encuesta de opinión pública',
-            'sample_size': results.get('sample_size'),
-            'margin_error': results.get('margin_error'),
+            'methodology': 'Encuesta telefónica a celulares a nivel nacional',
+            'sample_size': results.get('muestra'),
+            'margin_error': results.get('margen_error'),
             'field_dates': None,
             'results': results,
-            'published_at': published_at or datetime.now(),
-            'url': url,
-            'pollster': source,
+            'published_at': published_at,
+            'url': link,
+            'pollster': 'Instituto de Estudios Peruanos (IEP)',
             'processed': False
         }
 
-    def _extract_poll_numbers(self, text: str) -> Dict[str, Any]:
-        results = {"raw_text": text[:500]}
+    def _extract_analysis_data(self, text: str, title: str) -> Dict[str, Any]:
+        results = {
+            "tipo": "Informe de opinión",
+            "resumen": text[:400].strip(),
+            "datos_encontrados": False,
+        }
 
         pct_matches = re.findall(r'(\d{1,3}(?:[.,]\d+)?)\s*%', text)
         if pct_matches:
-            results["percentages"] = [float(p.replace(',', '.')) for p in pct_matches[:10]]
+            results["porcentajes_mencionados"] = [float(p.replace(',', '.')) for p in pct_matches[:15]]
+            results["datos_encontrados"] = True
 
-        approval = re.search(r'aprob\w+\s*(?:del?\s+)?(\d{1,3}(?:[.,]\d+)?)\s*%', text, re.I)
+        approval = re.findall(r'(?:aprob\w+|aprueba\w*)\s*[\w\s]*?(\d{1,3}(?:[.,]\d+)?)\s*%', text, re.I)
         if approval:
-            results["approval_rating"] = float(approval.group(1).replace(',', '.'))
+            results["aprobacion"] = [float(a.replace(',', '.')) for a in approval[:5]]
+            results["datos_encontrados"] = True
 
-        disapproval = re.search(r'desaprob\w+\s*(?:del?\s+)?(\d{1,3}(?:[.,]\d+)?)\s*%', text, re.I)
+        disapproval = re.findall(r'(?:desaprob\w+|desaprueba\w*)\s*[\w\s]*?(\d{1,3}(?:[.,]\d+)?)\s*%', text, re.I)
         if disapproval:
-            results["disapproval_rating"] = float(disapproval.group(1).replace(',', '.'))
+            results["desaprobacion"] = [float(d.replace(',', '.')) for d in disapproval[:5]]
+            results["datos_encontrados"] = True
 
-        sample = re.search(r'(\d{3,5})\s*(?:personas|encuestados|entrevistados)', text, re.I)
+        sentences = re.split(r'[.!?]\s+', text)
+        key_findings = []
+        for sentence in sentences:
+            if re.search(r'\d+\s*%', sentence) and len(sentence) > 30 and len(sentence) < 300:
+                clean = sentence.strip()
+                if any(kw in clean.lower() for kw in ['aprob', 'desaprob', 'confianza', 'intención',
+                    'elección', 'candidato', 'voto', 'ciudadan', 'peruano', 'presidente',
+                    'congreso', 'gobierno', 'vacancia', 'partido']):
+                    key_findings.append(clean)
+
+        if key_findings:
+            results["hallazgos_clave"] = key_findings[:8]
+            results["datos_encontrados"] = True
+
+        sample = re.search(r'(\d{3,5})\s*(?:personas|encuestados|entrevistados|casos)', text, re.I)
         if sample:
-            results["sample_size"] = int(sample.group(1))
+            results["muestra"] = int(sample.group(1))
 
-        margin = re.search(r'(?:margen|error)\s*(?:de\s+)?(?:error\s+)?(?:de\s+)?[+-±]?\s*(\d+(?:[.,]\d+)?)\s*%', text, re.I)
+        margin = re.search(r'(?:margen|error)\s*(?:de\s+)?(?:error\s+)?[+-±]?\s*(\d+(?:[.,]\d+)?)\s*%', text, re.I)
         if margin:
-            results["margin_error"] = float(margin.group(1).replace(',', '.'))
+            results["margen_error"] = float(margin.group(1).replace(',', '.'))
 
         return results
-
-    def _parse_date(self, date_str: str) -> Optional[datetime]:
-        if not date_str:
-            return None
-
-        patterns = [
-            (r'(\d{1,2})/(\d{1,2})/(\d{4})', 'dmy'),
-            (r'(\d{1,2})-(\d{1,2})-(\d{4})', 'dmy'),
-            (r'(\d{4})-(\d{1,2})-(\d{1,2})', 'ymd'),
-        ]
-
-        for pattern, fmt in patterns:
-            match = re.search(pattern, date_str)
-            if match:
-                try:
-                    groups = match.groups()
-                    if fmt == 'ymd':
-                        return datetime(int(groups[0]), int(groups[1]), int(groups[2]))
-                    else:
-                        return datetime(int(groups[2]), int(groups[1]), int(groups[0]))
-                except (ValueError, IndexError):
-                    continue
-
-        return None
 
     def _item_exists(self, db: Session, item_data: Dict[str, Any], model_class) -> bool:
         existing = db.query(model_class).filter(
@@ -220,7 +413,7 @@ class IpsosScraper(BaseScraper):
             'sample_size': None,
             'margin_error': None,
             'field_dates': None,
-            'results': {"raw_text": title},
+            'results': {"raw_text": title, "tipo": "Artículo Ipsos Perú"},
             'published_at': datetime.now(),
             'url': url,
             'pollster': 'Ipsos Perú',
@@ -247,13 +440,13 @@ class DatumScraper(BaseScraper):
             url = f"{self.base_url}{path}"
             response = self._make_request(url)
             if response:
-                items = self._parse_content(response)
+                items = self._parse_content(response, url)
                 all_items.extend(items)
                 logger.info(f"Datum ({path}): {len(items)} items")
 
         return self._save_items(db, all_items, ScrapedSurvey)
 
-    def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
+    def _parse_content(self, response: requests.Response, page_url: str) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(response.content, 'html.parser')
         items = []
 
@@ -287,7 +480,7 @@ class DatumScraper(BaseScraper):
                     'sample_size': None,
                     'margin_error': None,
                     'field_dates': None,
-                    'results': {"raw_text": title},
+                    'results': {"raw_text": title, "tipo": "Publicación Datum"},
                     'published_at': datetime.now(),
                     'url': url,
                     'pollster': 'Datum Internacional',
@@ -355,7 +548,7 @@ class CPIScraper(BaseScraper):
                     'sample_size': None,
                     'margin_error': None,
                     'field_dates': None,
-                    'results': {"raw_text": title},
+                    'results': {"raw_text": title, "tipo": "Publicación CPI"},
                     'published_at': datetime.now(),
                     'url': url,
                     'pollster': 'CPI - Compañía Peruana de Investigación',

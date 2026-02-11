@@ -402,10 +402,11 @@ async def run_scheduled_survey_scraping(db_url: str):
     db.commit()
 
     try:
-        from app.scrapers.survey_scrapers import IEPScraper, IpsosScraper, DatumScraper, CPIScraper
+        from app.scrapers.survey_scrapers import WikipediaPollScraper, IEPScraper, IpsosScraper, DatumScraper, CPIScraper
 
         total_items = 0
         scrapers_info = {
+            "Wikipedia Encuestas": WikipediaPollScraper,
             "IEP": IEPScraper,
             "Ipsos": IpsosScraper,
             "Datum": DatumScraper,
