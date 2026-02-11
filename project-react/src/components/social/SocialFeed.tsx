@@ -129,9 +129,12 @@ export const SocialFeed: React.FC<SocialFeedProps> = ({ posts, isLoading, filter
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center space-x-3">
                       <img
-                        src={post.authorAvatar}
+                        src={post.authorAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author || post.platform)}&background=random&color=fff&size=96&bold=true`}
                         alt={post.author}
                         className="w-12 h-12 rounded-full object-cover border-2 border-white dark:border-gray-800"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author || post.platform)}&background=6366f1&color=fff&size=96&bold=true`;
+                        }}
                       />
                       
                       <div>
