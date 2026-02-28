@@ -233,9 +233,13 @@ class RPPScraper(PeruvianNewsScraper):
             if url in seen or not _is_valid_article_url(url, 'rpp.pe'):
                 continue
             seen.add(url)
-            heading = article_el.find(['h2', 'h3'])
-            title = _clean_text(heading.get_text()) if heading else _clean_text(link.get_text())
-            if not title or len(title) < 15:
+            headings = article_el.find_all(['h2', 'h3'])
+            title = ''
+            for h in headings:
+                t = _clean_text(h.get_text())
+                if len(t) > len(title):
+                    title = t
+            if not title or len(title) < 20:
                 continue
             summary_el = article_el.find('p')
             summary = _clean_text(summary_el.get_text()) if summary_el else ''
@@ -248,21 +252,20 @@ class RPPScraper(PeruvianNewsScraper):
                 'published_at': datetime.now(),
             })
 
-        if len(articles) < 3:
-            for link in soup.find_all('a', href=True):
+        if len(articles) < 5:
+            for heading in soup.find_all(['h2', 'h3']):
+                title = _clean_text(heading.get_text())
+                if not title or len(title) < 20:
+                    continue
+                parent_link = heading.find_parent('a', href=True)
+                child_link = heading.find('a', href=True)
+                link = parent_link or child_link
+                if not link:
+                    continue
                 url = urljoin(self.base_url, link['href'])
                 if url in seen or not _is_valid_article_url(url, 'rpp.pe'):
                     continue
-                parent_heading = link.find_parent(['h2', 'h3'])
-                if not parent_heading:
-                    if link.find(['h2', 'h3']):
-                        pass
-                    else:
-                        continue
                 seen.add(url)
-                title = _clean_text(link.get_text())
-                if not title or len(title) < 15:
-                    continue
                 articles.append({
                     'source': 'RPP Noticias',
                     'title': title,
@@ -271,7 +274,7 @@ class RPPScraper(PeruvianNewsScraper):
                     'category': _detect_category(url, title),
                     'published_at': datetime.now(),
                 })
-        return articles[:20]
+        return articles[:25]
 
 
 class LaRepublicaScraper(PeruvianNewsScraper):
