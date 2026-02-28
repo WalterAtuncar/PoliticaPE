@@ -252,6 +252,91 @@ class CompetitorCampaignResponse(CompetitorCampaignBase):
         return v
 
 
+class PoliticalFigureCreate(BaseModel):
+    full_name: str
+    display_name: str
+    nickname: Optional[str] = None
+    photo_url: Optional[str] = None
+    party_name: Optional[str] = None
+    current_position: Optional[str] = None
+    region: Optional[str] = None
+    search_keywords: List[str] = []
+    social_accounts: List[Dict[str, str]] = []
+    is_active: bool = True
+    monitoring_priority: str = "medium"
+    notes: Optional[str] = None
+
+
+class PoliticalFigureUpdate(BaseModel):
+    full_name: Optional[str] = None
+    display_name: Optional[str] = None
+    nickname: Optional[str] = None
+    photo_url: Optional[str] = None
+    party_name: Optional[str] = None
+    current_position: Optional[str] = None
+    region: Optional[str] = None
+    search_keywords: Optional[List[str]] = None
+    social_accounts: Optional[List[Dict[str, str]]] = None
+    is_active: Optional[bool] = None
+    monitoring_priority: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class PoliticalFigureResponse(BaseResponseModel):
+    id: str
+    full_name: str
+    display_name: str
+    nickname: Optional[str]
+    photo_url: Optional[str]
+    party_name: Optional[str]
+    current_position: Optional[str]
+    region: Optional[str]
+    search_keywords: List[str]
+    social_accounts: List[Dict[str, str]]
+    is_active: bool
+    monitoring_priority: str
+    notes: Optional[str]
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+
+class AIRecommendationResponse(BaseResponseModel):
+    id: str
+    figure_id: str
+    title: str
+    description: str
+    category: str
+    priority: str
+    status: str
+    target_region: Optional[str]
+    target_demographic: Optional[str]
+    identified_weakness: Optional[str]
+    recommended_action: Optional[str]
+    estimated_budget: Optional[Dict[str, Any]]
+    expected_timeline: Optional[str]
+    projected_roi: Optional[float]
+    ai_confidence: Optional[float]
+    resources_needed: Optional[List[str]]
+    success_kpis: Optional[List[str]]
+    risk_factors: Optional[List[str]]
+    user_rating: Optional[int]
+    implementation_progress: int
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+
+class AIRecommendationUpdate(BaseModel):
+    status: Optional[str] = None
+    user_rating: Optional[int] = None
+    implementation_progress: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class GenerateRecommendationsRequest(BaseModel):
+    figure_ids: List[str]
+    focus_areas: List[str] = ["immediate_opportunities", "regional_strengthening", "territorial_recovery", "demographic_expansion"]
+
+
 PLATFORM_CREDENTIAL_FIELDS = {
     "twitter": {"api_key": "API Key (TwitterAPI.io)"},
     "youtube": {"api_key": "API Key (YouTube Data v3)"},

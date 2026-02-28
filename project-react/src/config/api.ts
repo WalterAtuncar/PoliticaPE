@@ -36,6 +36,9 @@ export const ENDPOINTS = {
   SETTINGS_PLATFORMS: '/api/v1/settings/platforms',
   SETTINGS_TOKENS: '/api/v1/settings/tokens',
   SETTINGS_TAGS: '/api/v1/settings/tags',
+  POLITICAL_FIGURES: '/api/v1/political-figures',
+  RECOMMENDATIONS: '/api/v1/recommendations',
+  RECOMMENDATIONS_GENERATE: '/api/v1/recommendations/generate',
 };
 
 export async function fetchFromScrapping(endpoint: string) {

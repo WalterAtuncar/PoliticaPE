@@ -114,6 +114,64 @@ class SearchTag(Base):
     )
 
 
+class PoliticalFigure(Base):
+    __tablename__ = "political_figures"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    full_name = Column(String(300), nullable=False)
+    display_name = Column(String(200), nullable=False)
+    nickname = Column(String(200), nullable=True)
+    photo_url = Column(String(1000), nullable=True)
+    party_name = Column(String(200), nullable=True)
+    current_position = Column(String(300), nullable=True)
+    region = Column(String(100), nullable=True)
+    search_keywords = Column(JSON, nullable=False, default=list)
+    social_accounts = Column(JSON, nullable=False, default=list)
+    is_active = Column(Boolean, default=True)
+    monitoring_priority = Column(String(20), default='medium')
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index('idx_political_figure_active', 'is_active'),
+        Index('idx_political_figure_party', 'party_name'),
+    )
+
+
+class AIRecommendationRecord(Base):
+    __tablename__ = "ai_recommendations"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    figure_id = Column(String, nullable=False)
+    title = Column(String(500), nullable=False)
+    description = Column(Text, nullable=False)
+    category = Column(String(100), nullable=False)
+    priority = Column(String(20), nullable=False)
+    status = Column(String(30), default='generated')
+    target_region = Column(String(100), nullable=True)
+    target_demographic = Column(String(100), nullable=True)
+    identified_weakness = Column(Text, nullable=True)
+    recommended_action = Column(Text, nullable=True)
+    estimated_budget = Column(JSON, nullable=True)
+    expected_timeline = Column(String(100), nullable=True)
+    projected_roi = Column(Float, nullable=True)
+    ai_confidence = Column(Float, nullable=True)
+    resources_needed = Column(JSON, nullable=True)
+    success_kpis = Column(JSON, nullable=True)
+    risk_factors = Column(JSON, nullable=True)
+    user_rating = Column(Integer, nullable=True)
+    implementation_progress = Column(Integer, default=0)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index('idx_recommendation_figure', 'figure_id'),
+        Index('idx_recommendation_status', 'status'),
+        Index('idx_recommendation_category', 'category'),
+    )
+
+
 class SocialApiToken(Base):
     __tablename__ = "social_api_tokens"
     

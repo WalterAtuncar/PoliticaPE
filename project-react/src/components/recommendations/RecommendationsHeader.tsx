@@ -20,6 +20,8 @@ interface RecommendationsHeaderProps {
   onFiltersChange: (filters: RecommendationsFilters) => void;
   onGenerateNew: () => void;
   isGenerating: boolean;
+  onManageFigures?: () => void;
+  figuresCount?: number;
 }
 
 const regions = [
@@ -69,6 +71,8 @@ export const RecommendationsHeader: React.FC<RecommendationsHeaderProps> = ({
   onFiltersChange,
   onGenerateNew,
   isGenerating,
+  onManageFigures,
+  figuresCount,
 }) => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
@@ -154,9 +158,12 @@ export const RecommendationsHeader: React.FC<RecommendationsHeaderProps> = ({
               Exportar
             </Button>
 
-            <Button variant="outline" size="sm">
-              <Settings className="h-4 w-4" />
-            </Button>
+            {onManageFigures && (
+              <Button onClick={onManageFigures} variant="outline" size="sm">
+                <Users className="h-4 w-4 mr-2" />
+                Figuras {figuresCount !== undefined ? `(${figuresCount})` : ''}
+              </Button>
+            )}
           </div>
         </div>
       </div>

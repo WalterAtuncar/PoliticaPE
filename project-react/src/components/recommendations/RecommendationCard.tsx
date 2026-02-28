@@ -25,6 +25,7 @@ interface RecommendationCardProps {
   onSelect: () => void;
   onStatusUpdate: (status: string) => void;
   onRate: (rating: number) => void;
+  figureName?: string;
 }
 
 const priorityColors = {
@@ -58,6 +59,7 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
   onSelect,
   onStatusUpdate,
   onRate,
+  figureName,
 }) => {
   const [showDetails, setShowDetails] = useState(false);
   const [showRating, setShowRating] = useState(false);
@@ -107,6 +109,11 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
                 </span>
               </div>
               
+              {figureName && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 mb-2">
+                  {figureName}
+                </span>
+              )}
               <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">
                 {recommendation.description}
               </p>

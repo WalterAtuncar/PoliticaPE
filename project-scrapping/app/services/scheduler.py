@@ -22,7 +22,7 @@ def get_active_tokens(db, platform: str) -> List[Dict]:
 
 
 def get_active_tags(db, platform: str) -> List[str]:
-    from app.models import SearchTag
+    from app.models import SearchTag, PoliticalFigure
     from sqlalchemy import cast, String
     tags = db.query(SearchTag).filter(
         SearchTag.is_active == True
@@ -32,6 +32,19 @@ def get_active_tags(db, platform: str) -> List[str]:
         plats = t.platforms if isinstance(t.platforms, list) else []
         if platform in plats:
             result.append(t.tag)
+
+    try:
+        figures = db.query(PoliticalFigure).filter(
+            PoliticalFigure.is_active == True
+        ).all()
+        for fig in figures:
+            keywords = fig.search_keywords if isinstance(fig.search_keywords, list) else []
+            for kw in keywords:
+                if kw not in result:
+                    result.append(kw)
+    except Exception as e:
+        logger.warning(f"Error loading political figure keywords: {e}")
+
     return result
 
 

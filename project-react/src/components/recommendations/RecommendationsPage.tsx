@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { RecommendationsHeader } from './RecommendationsHeader';
 import { RecommendationsTabs } from './RecommendationsTabs';
@@ -9,8 +9,10 @@ import { ImpactMap } from './ImpactMap';
 import { ImplementationTimeline } from './ImplementationTimeline';
 import { BudgetCalculator } from './BudgetCalculator';
 import { AIGenerator } from './AIGenerator';
+import { PoliticalFiguresManager } from './PoliticalFiguresManager';
 import { RecommendationsFilters, AIRecommendation } from '../../types/recommendations';
 import { useAIRecommendations } from '../../hooks/useAIRecommendations';
+import { usePoliticalFigures } from '../../hooks/usePoliticalFigures';
 
 const initialFilters: RecommendationsFilters = {
   region: 'all',
@@ -28,7 +30,10 @@ export const RecommendationsPage: React.FC = () => {
   const [selectedRecommendations, setSelectedRecommendations] = useState<string[]>([]);
   const [showComparator, setShowComparator] = useState(false);
   const [showGenerator, setShowGenerator] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [showFiguresManager, setShowFiguresManager] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
+  const { figures, isLoading: figuresLoading, createFigure, updateFigure, deleteFigure } = usePoliticalFigures();
 
   const {
     recommendations,
@@ -63,26 +68,29 @@ export const RecommendationsPage: React.FC = () => {
            rec.estimatedBudget.max <= filters.budgetMax;
   });
 
-  const handleGenerateRecommendations = async () => {
-    setIsGenerating(true);
+  const handleGenerateRecommendations = async (figureIds: string[], focusAreas: string[]) => {
+    setGenerationError(null);
     try {
-      await generateNewRecommendations();
-    } finally {
-      setIsGenerating(false);
+      await generateNewRecommendations(figureIds, focusAreas);
+      setShowGenerator(false);
+    } catch (e: any) {
+      setGenerationError(e.message || 'Error al generar recomendaciones');
     }
   };
 
   const handleSelectRecommendation = (id: string) => {
-    setSelectedRecommendations(prev => 
-      prev.includes(id) 
+    setSelectedRecommendations(prev =>
+      prev.includes(id)
         ? prev.filter(recId => recId !== id)
         : [...prev, id]
     );
   };
 
-  const selectedRecommendationData = recommendations.filter(rec => 
+  const selectedRecommendationData = recommendations.filter(rec =>
     selectedRecommendations.includes(rec.id)
   );
+
+  const figureMap = Object.fromEntries(figures.map(f => [f.id, f]));
 
   return (
     <motion.div
@@ -90,36 +98,45 @@ export const RecommendationsPage: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      {/* Header with Filters and AI Generator */}
       <RecommendationsHeader
         filters={filters}
         onFiltersChange={setFilters}
         onGenerateNew={() => setShowGenerator(true)}
-        isGenerating={isGenerating}
+        isGenerating={isLoading}
+        onManageFigures={() => setShowFiguresManager(true)}
+        figuresCount={figures.filter(f => f.is_active).length}
       />
 
-      {/* AI Generator Modal */}
       {showGenerator && (
         <AIGenerator
-          onClose={() => setShowGenerator(false)}
+          onClose={() => { setShowGenerator(false); setGenerationError(null); }}
           onGenerate={handleGenerateRecommendations}
-          isGenerating={isGenerating}
+          isGenerating={isLoading}
+          figures={figures}
+          error={generationError}
         />
       )}
 
-      {/* Tabs Navigation */}
+      {showFiguresManager && (
+        <PoliticalFiguresManager
+          figures={figures}
+          isLoading={figuresLoading}
+          onClose={() => setShowFiguresManager(false)}
+          onCreate={createFigure}
+          onUpdate={updateFigure}
+          onDelete={deleteFigure}
+        />
+      )}
+
       <RecommendationsTabs
         activeTab={activeTab}
         onTabChange={setActiveTab}
         recommendations={recommendations}
       />
 
-      {/* Main Content Grid */}
       <div className="grid grid-cols-12 gap-6">
-        {/* Recommendations List */}
         <div className="col-span-12 lg:col-span-8 space-y-4">
           {isLoading ? (
-            // Loading Skeletons
             Array.from({ length: 3 }).map((_, index) => (
               <div key={index} className="animate-pulse">
                 <div className="h-48 bg-white/20 dark:bg-gray-800/20 rounded-xl"></div>
@@ -139,6 +156,7 @@ export const RecommendationsPage: React.FC = () => {
                   onSelect={() => handleSelectRecommendation(recommendation.id)}
                   onStatusUpdate={(status) => updateRecommendationStatus(recommendation.id, status)}
                   onRate={(rating) => rateRecommendation(recommendation.id, rating)}
+                  figureName={recommendation.figure_id ? figureMap[recommendation.figure_id]?.display_name : undefined}
                 />
               </motion.div>
             ))
@@ -151,42 +169,47 @@ export const RecommendationsPage: React.FC = () => {
                 No hay recomendaciones disponibles
               </h3>
               <p className="text-gray-600 dark:text-gray-400 mb-4">
-                Genera nuevas recomendaciones basadas en los datos actuales
+                {figures.length === 0
+                  ? 'Primero agrega figuras políticas y luego genera recomendaciones con IA'
+                  : 'Genera nuevas recomendaciones basadas en los datos reales de redes sociales'
+                }
               </p>
-              <button
-                onClick={() => setShowGenerator(true)}
-                className="px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-lg hover:from-purple-600 hover:to-blue-700 transition-all duration-200"
-              >
-                Generar Recomendaciones IA
-              </button>
+              <div className="flex items-center justify-center gap-3">
+                {figures.length === 0 && (
+                  <button
+                    onClick={() => setShowFiguresManager(true)}
+                    className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all duration-200"
+                  >
+                    Gestionar Figuras Políticas
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowGenerator(true)}
+                  className="px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-lg hover:from-purple-600 hover:to-blue-700 transition-all duration-200"
+                >
+                  Generar Recomendaciones IA
+                </button>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Sidebar with Tools */}
         <div className="col-span-12 lg:col-span-4 space-y-6">
-          {/* ROI Dashboard */}
           <ROIDashboard metrics={getROIMetrics()} />
-
-          {/* Budget Calculator */}
           <BudgetCalculator
             selectedRecommendations={selectedRecommendationData}
             onShowComparator={() => setShowComparator(true)}
           />
-
-          {/* Impact Map */}
           <ImpactMap recommendations={recommendations} />
         </div>
       </div>
 
-      {/* Implementation Timeline */}
       <ImplementationTimeline
-        recommendations={recommendations.filter(rec => 
+        recommendations={recommendations.filter(rec =>
           ['approved', 'in_progress', 'completed'].includes(rec.status)
         )}
       />
 
-      {/* Strategy Comparator Modal */}
       {showComparator && selectedRecommendations.length > 1 && (
         <StrategyComparator
           recommendations={selectedRecommendationData}
