@@ -777,12 +777,22 @@ async def run_all_scrapers():
     logger.info("[Scheduler] Iniciando ciclo de scraping automático...")
 
     total = 0
-    total += await run_scheduled_social_scraping(db_url, "twitter")
-    total += await run_scheduled_social_scraping(db_url, "youtube")
-    total += await run_scheduled_social_scraping(db_url, "instagram")
-    total += await run_scheduled_social_scraping(db_url, "facebook")
-    total += await run_scheduled_government_scraping(db_url)
-    total += await run_scheduled_survey_scraping(db_url)
+    for platform in ["twitter", "youtube", "instagram", "facebook"]:
+        try:
+            count = await run_scheduled_social_scraping(db_url, platform)
+            total += count
+        except Exception as e:
+            logger.error(f"[Scheduler] Error en {platform}, continuando con siguiente: {e}")
+
+    try:
+        total += await run_scheduled_government_scraping(db_url)
+    except Exception as e:
+        logger.error(f"[Scheduler] Error en government scraping: {e}")
+
+    try:
+        total += await run_scheduled_survey_scraping(db_url)
+    except Exception as e:
+        logger.error(f"[Scheduler] Error en survey scraping: {e}")
 
     logger.info(f"[Scheduler] Ciclo completado: {total} items nuevos en total")
     return total
@@ -792,8 +802,8 @@ async def scheduler_loop():
     interval_seconds = SCRAPING_INTERVAL_HOURS * 3600
     logger.info(f"[Scheduler] Scraping automático cada {SCRAPING_INTERVAL_HOURS} horas")
 
-    await asyncio.sleep(30)
-    
+    await asyncio.sleep(120)
+
     while True:
         try:
             await run_all_scrapers()

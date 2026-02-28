@@ -236,12 +236,12 @@ def create_demo_user():
 
 async def _deferred_init():
     """Run heavy initialization in background so health checks pass quickly"""
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(2)
     try:
-        init_db()
+        await asyncio.to_thread(init_db)
         logger.info("Database initialized")
-        init_identity_schema()
-        create_demo_user()
+        await asyncio.to_thread(init_identity_schema)
+        await asyncio.to_thread(create_demo_user)
         from app.services.scheduler import start_scheduler
         start_scheduler()
         logger.info("Scheduled scraping enabled")
