@@ -2,7 +2,7 @@ import os
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func, case
@@ -228,7 +228,32 @@ POSTS RECIENTES MÁS RELEVANTES:
 
     focus_text = "\n".join(f"- {k}: {v}" for k, v in focus_areas.items())
 
-    return f"""Eres un consultor político experto en Perú. Analiza los datos reales de redes sociales de las siguientes figuras políticas y genera recomendaciones estratégicas accionables.
+    MESES_ES = {
+        1: "enero", 2: "febrero", 3: "marzo", 4: "abril",
+        5: "mayo", 6: "junio", 7: "julio", 8: "agosto",
+        9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
+    }
+    today = date.today()
+    campaign_deadline = date(2026, 4, 10)
+    days_remaining = max(0, (campaign_deadline - today).days)
+    today_str = f"{today.day} de {MESES_ES[today.month]} de {today.year}"
+
+    if days_remaining == 0:
+        urgency_block = """- La ventana de campaña ya ha finalizado (posterior al 10 de abril de 2026)
+- Genera recomendaciones de análisis post-electoral y estrategia a futuro en lugar de acciones de campaña"""
+    else:
+        urgency_block = f"""- Días restantes para acciones de campaña: {days_remaining} días
+- TODAS las recomendaciones deben ser acciones ejecutables desde HOY hasta el 10 de abril de 2026
+- Las recomendaciones deben considerar la urgencia electoral y priorizar impacto inmediato
+- Los timelines de cada acción NO deben exceder la fecha límite del 10 de abril de 2026"""
+
+    return f"""Eres un consultor político experto en Perú especializado en campañas electorales. Analiza los datos reales de redes sociales de las siguientes figuras políticas y genera recomendaciones estratégicas accionables.
+
+CONTEXTO ELECTORAL CRÍTICO:
+- Fecha actual: {today_str}
+- Elecciones generales en Perú: 12 de abril de 2026
+- Último día permitido para propaganda y campañas: 10 de abril de 2026
+{urgency_block}
 
 DATOS DE LAS FIGURAS POLÍTICAS:
 {figures_text}
@@ -238,7 +263,7 @@ DATOS DE LAS FIGURAS POLÍTICAS:
 
 INSTRUCCIONES:
 1. Genera entre 2 y 4 recomendaciones por cada figura política y por cada área de enfoque
-2. Cada recomendación debe basarse en los datos reales proporcionados
+2. Cada recomendación debe ser una acción inmediata ejecutable dentro del plazo electoral ({days_remaining} días restantes)
 3. Responde EXCLUSIVAMENTE con un JSON array válido, sin texto adicional antes o después
 4. Cada objeto en el array debe tener exactamente esta estructura:
 
@@ -246,15 +271,15 @@ INSTRUCCIONES:
   {{
     "figure_display_name": "nombre de la figura",
     "title": "Título de la recomendación (máx 80 caracteres)",
-    "description": "Descripción detallada de la recomendación (2-3 oraciones)",
+    "description": "Descripción detallada de la recomendación (2-3 oraciones). Debe incluir referencia al contexto electoral y urgencia temporal.",
     "category": "una de: immediate_opportunities, regional_strengthening, territorial_recovery, demographic_expansion",
     "priority": "una de: critical, high, medium, low",
     "target_region": "región objetivo (ej: Lima, Arequipa, Nacional)",
     "target_demographic": "segmento demográfico objetivo (ej: 18-25, NSE C, Mujeres profesionales)",
     "identified_weakness": "debilidad identificada basada en los datos",
-    "recommended_action": "acción concreta a implementar",
+    "recommended_action": "acción concreta a implementar antes del 10 de abril de 2026",
     "estimated_budget": {{"min": 5000, "max": 50000}},
-    "expected_timeline": "plazo estimado (ej: 2-4 semanas)",
+    "expected_timeline": "plazo estimado que NO exceda el 10 de abril de 2026 (ej: 1-2 semanas, fecha específica)",
     "projected_roi": 200,
     "ai_confidence": 85,
     "resources_needed": ["recurso1", "recurso2"],
@@ -267,6 +292,7 @@ Todos los textos deben estar en español.
 Los valores de estimated_budget son en soles peruanos.
 projected_roi es un porcentaje (ej: 200 = 200% retorno).
 ai_confidence es un porcentaje de 0 a 100.
+Recuerda: CADA recomendación debe ser factible de ejecutar entre hoy ({today.strftime("%d/%m/%Y")}) y el 10 de abril de 2026. No propongas acciones a largo plazo que excedan esta ventana.
 
 Responde SOLO con el JSON array, sin explicaciones adicionales."""
 
