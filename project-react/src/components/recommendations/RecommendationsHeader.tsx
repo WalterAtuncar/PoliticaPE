@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Brain, 
-  Sparkles, 
-  Filter, 
-  Download, 
-  Settings,
+import {
+  Brain,
+  Sparkles,
+  Filter,
+  Download,
   MapPin,
   Users,
   DollarSign,
@@ -20,19 +19,18 @@ interface RecommendationsHeaderProps {
   onFiltersChange: (filters: RecommendationsFilters) => void;
   onGenerateNew: () => void;
   isGenerating: boolean;
-  onManageFigures?: () => void;
-  figuresCount?: number;
 }
 
 const regions = [
   { value: 'all', label: 'Todas las regiones' },
-  { value: '150000', label: 'Lima' },
-  { value: '040000', label: 'Arequipa' },
-  { value: '080000', label: 'Cusco' },
-  { value: '130000', label: 'La Libertad' },
-  { value: '200000', label: 'Piura' },
-  { value: '210000', label: 'Puno' },
-  { value: '110000', label: 'Ica' },
+  { value: 'Nacional', label: 'Nacional' },
+  { value: 'Lima', label: 'Lima' },
+  { value: 'Arequipa', label: 'Arequipa' },
+  { value: 'Cusco', label: 'Cusco' },
+  { value: 'La Libertad', label: 'La Libertad' },
+  { value: 'Piura', label: 'Piura' },
+  { value: 'Puno', label: 'Puno' },
+  { value: 'Ica', label: 'Ica' },
 ];
 
 const demographics = [
@@ -71,8 +69,6 @@ export const RecommendationsHeader: React.FC<RecommendationsHeaderProps> = ({
   onFiltersChange,
   onGenerateNew,
   isGenerating,
-  onManageFigures,
-  figuresCount,
 }) => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
@@ -81,30 +77,29 @@ export const RecommendationsHeader: React.FC<RecommendationsHeaderProps> = ({
   };
 
   return (
-    <Card glass className="p-6">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+    <Card glass className="p-5">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-3 mb-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg flex items-center justify-center">
-              <Brain className="h-6 w-6 text-white" />
+          <div className="flex items-center space-x-3 mb-1">
+            <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg flex items-center justify-center">
+              <Brain className="h-5 w-5 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
               Recomendaciones IA
             </h1>
           </div>
-          <p className="text-gray-600 dark:text-gray-400">
-            Estrategias inteligentes generadas automáticamente para optimizar campañas políticas
+          <p className="text-sm text-gray-600 dark:text-gray-400 ml-12">
+            Estrategias de campaña generadas con Claude IA basadas en datos reales
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Quick Filters */}
-          <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
             <div className="relative">
               <select
                 value={filters.region}
                 onChange={(e) => updateFilter('region', e.target.value)}
-                className="appearance-none bg-white/50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-600/50 rounded-lg px-4 py-2 pr-8 text-sm font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 backdrop-blur-sm"
+                className="appearance-none bg-white/50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-600/50 rounded-lg px-3 py-2 pr-8 text-sm font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 backdrop-blur-sm"
               >
                 {regions.map((region) => (
                   <option key={region.value} value={region.value}>
@@ -119,7 +114,7 @@ export const RecommendationsHeader: React.FC<RecommendationsHeaderProps> = ({
               <select
                 value={filters.priority}
                 onChange={(e) => updateFilter('priority', e.target.value)}
-                className="appearance-none bg-white/50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-600/50 rounded-lg px-4 py-2 pr-8 text-sm font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 backdrop-blur-sm"
+                className="appearance-none bg-white/50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-600/50 rounded-lg px-3 py-2 pr-8 text-sm font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 backdrop-blur-sm"
               >
                 {priorities.map((priority) => (
                   <option key={priority.value} value={priority.value}>
@@ -131,49 +126,29 @@ export const RecommendationsHeader: React.FC<RecommendationsHeaderProps> = ({
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             <Button
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
               variant="outline"
               size="sm"
             >
-              <Filter className="h-4 w-4 mr-2" />
+              <Filter className="h-4 w-4 mr-1.5" />
               Filtros
             </Button>
 
-            <Button
-              onClick={onGenerateNew}
-              variant="primary"
-              size="sm"
-              isLoading={isGenerating}
-              className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700"
-            >
-              <Sparkles className="h-4 w-4 mr-2" />
-              {isGenerating ? 'Generando...' : 'Generar IA'}
-            </Button>
-
             <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
+              <Download className="h-4 w-4 mr-1.5" />
               Exportar
             </Button>
-
-            {onManageFigures && (
-              <Button onClick={onManageFigures} variant="outline" size="sm">
-                <Users className="h-4 w-4 mr-2" />
-                Figuras {figuresCount !== undefined ? `(${figuresCount})` : ''}
-              </Button>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Advanced Filters */}
       {showAdvancedFilters && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
-          className="mt-6 pt-6 border-t border-gray-200/50 dark:border-gray-600/50"
+          className="mt-5 pt-5 border-t border-gray-200/50 dark:border-gray-600/50"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>

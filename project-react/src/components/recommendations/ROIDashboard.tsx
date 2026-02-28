@@ -95,7 +95,7 @@ export const ROIDashboard: React.FC<ROIDashboardProps> = ({ metrics }) => {
                 className="h-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full"
                 initial={{ width: 0 }}
                 animate={{ 
-                  width: `${Math.min((metrics.totalBudgetSpent / metrics.totalBudgetAllocated) * 100, 100)}%` 
+                  width: `${metrics.totalBudgetAllocated > 0 ? Math.min((metrics.totalBudgetSpent / metrics.totalBudgetAllocated) * 100, 100) : 0}%` 
                 }}
                 transition={{ duration: 1 }}
               />
