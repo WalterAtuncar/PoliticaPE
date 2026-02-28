@@ -270,46 +270,12 @@ async def healthz():
 
 @app.get("/")
 async def root():
-    """Root endpoint - serves SPA in production or service info in dev"""
-    if SERVE_FRONTEND and os.path.exists(os.path.join(FRONTEND_DIST_PATH, "index.html")):
-        return FileResponse(os.path.join(FRONTEND_DIST_PATH, "index.html"))
-    
-    html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>{settings.APP_NAME}</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }}
-            .container {{ background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-            .header {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 20px; }}
-            .status {{ background: #e8f5e8; padding: 15px; border-radius: 4px; margin: 20px 0; }}
-            .links {{ display: flex; gap: 20px; margin-top: 20px; }}
-            .link {{ background: #3498db; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; }}
-            .link:hover {{ background: #2980b9; }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>{settings.APP_NAME}</h1>
-                <p>Version {settings.VERSION} | Environment: {settings.ENVIRONMENT}</p>
-            </div>
-            <div class="status">
-                <h3>🟢 Service Status: Active</h3>
-                <p>Political data scraping and analysis microservice is running</p>
-            </div>
-            <div class="links">
-                <a href="/docs" class="link">📚 API Documentation</a>
-                <a href="/health" class="link">🔍 Health Check</a>
-                <a href="/api/v1/stats" class="link">📊 Statistics</a>
-                <a href="/metrics" class="link">📈 Metrics</a>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content)
+    """Root endpoint - always responds instantly for health checks, then serves SPA or info page"""
+    if SERVE_FRONTEND:
+        index_path = os.path.join(FRONTEND_DIST_PATH, "index.html")
+        if os.path.isfile(index_path):
+            return FileResponse(index_path)
+    return JSONResponse(content={"status": "ok", "service": settings.APP_NAME, "version": settings.VERSION}, status_code=200)
 
 @app.get("/health")
 @limiter.limit(f"{settings.RATE_LIMIT_CALLS}/minute")
