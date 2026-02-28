@@ -1,77 +1,141 @@
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 import os
 import asyncio
+import json
 
 FRONTEND_DIST_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "project-react", "dist")
 SNIFFING_URL = os.getenv("SNIFFING_URL", "http://localhost:8080")
 SNIFFING_WS_URL = os.getenv("SNIFFING_WS_URL", "ws://localhost:8080")
 SERVE_FRONTEND = os.getenv("SERVE_FRONTEND", "false").lower() == "true"
 
-app = FastAPI(
-    title="Political Data Scraper",
-    description="Comprehensive political data scraping and analysis microservice",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json"
-)
+_fastapi_app = None
+_init_started = False
+_init_done = False
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+HEALTH_RESPONSE = json.dumps({"status": "ok", "service": "Political Data Scraper", "version": "1.0.0"}).encode("utf-8")
+INIT_RESPONSE = json.dumps({"status": "initializing"}).encode("utf-8")
 
 
-@app.get("/")
-async def root():
-    if SERVE_FRONTEND:
-        index_path = os.path.join(FRONTEND_DIST_PATH, "index.html")
-        if os.path.isfile(index_path):
-            return FileResponse(index_path)
-    return JSONResponse(content={"status": "ok", "service": "Political Data Scraper", "version": "1.0.0"}, status_code=200)
+async def _send_json(send, body, status=200):
+    await send({
+        "type": "http.response.start",
+        "status": status,
+        "headers": [
+            [b"content-type", b"application/json"],
+            [b"access-control-allow-origin", b"*"],
+            [b"access-control-allow-methods", b"*"],
+            [b"access-control-allow-headers", b"*"],
+        ],
+    })
+    await send({"type": "http.response.body", "body": body})
 
 
-@app.get("/healthz")
-async def healthz():
-    return JSONResponse(content={"status": "ok"}, status_code=200)
+async def _build_fastapi_app():
+    global _fastapi_app, _init_done
 
+    from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+    from fastapi.staticfiles import StaticFiles
 
-@app.get("/health")
-async def health_check():
-    return JSONResponse(content={"status": "healthy", "service": "Political Data Scraper", "version": "1.0.0"}, status_code=200)
+    _app = FastAPI(
+        title="Political Data Scraper",
+        description="Comprehensive political data scraping and analysis microservice",
+        version="1.0.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json"
+    )
 
+    _app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-_initialized = False
+    @_app.get("/")
+    async def root():
+        if SERVE_FRONTEND:
+            index_path = os.path.join(FRONTEND_DIST_PATH, "index.html")
+            if os.path.isfile(index_path):
+                return FileResponse(index_path)
+        return JSONResponse(content={"status": "ok", "service": "Political Data Scraper", "version": "1.0.0"}, status_code=200)
 
+    @_app.get("/healthz")
+    async def healthz():
+        return JSONResponse(content={"status": "ok"}, status_code=200)
 
-def _sync_heavy_init():
-    global _initialized
-    if _initialized:
-        return
-
-    from loguru import logger
-    from app.config import settings
-    from app.database import init_db
+    @_app.get("/health")
+    async def health_check():
+        return JSONResponse(content={"status": "healthy", "service": "Political Data Scraper", "version": "1.0.0"}, status_code=200)
 
     try:
-        init_db()
+        from loguru import logger
+    except Exception:
+        import logging
+        logger = logging.getLogger(__name__)
+
+    try:
+        from app.database import init_db
+        await asyncio.to_thread(init_db)
         logger.info("Database initialized")
     except Exception as e:
         logger.error(f"DB init error: {e}")
 
     try:
-        _init_identity_schema()
-        _create_demo_user()
+        await asyncio.to_thread(_init_identity_schema)
+        await asyncio.to_thread(_create_demo_user)
     except Exception as e:
         logger.error(f"Identity init error: {e}")
 
-    _initialized = True
+    try:
+        from slowapi import Limiter, _rate_limit_exceeded_handler
+        from slowapi.util import get_remote_address
+        from slowapi.errors import RateLimitExceeded
+        limiter = Limiter(key_func=get_remote_address)
+        _app.state.limiter = limiter
+        _app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    except Exception as e:
+        logger.error(f"Rate limiter error: {e}")
+
+    try:
+        from app.api import api_router
+        _app.include_router(api_router, prefix="/api/v1")
+        logger.info("API routes loaded")
+    except Exception as e:
+        logger.error(f"API router error: {e}")
+
+    try:
+        from app.monitoring import setup_metrics, metrics_middleware
+        from app.config import settings
+        if settings.PROMETHEUS_ENABLED:
+            setup_metrics(_app)
+        logger.info("Monitoring configured")
+    except Exception as e:
+        logger.error(f"Monitoring error: {e}")
+
+    if SERVE_FRONTEND and os.path.exists(FRONTEND_DIST_PATH):
+        try:
+            assets_path = os.path.join(FRONTEND_DIST_PATH, "assets")
+            if os.path.exists(assets_path):
+                _app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+            logger.info("Frontend static files mounted")
+        except Exception as e:
+            logger.error(f"Static files error: {e}")
+
+    try:
+        from app.services.scheduler import start_scheduler
+        start_scheduler()
+        logger.info("Scheduled scraping enabled")
+    except Exception as e:
+        logger.error(f"Scheduler error: {e}")
+
+    _setup_proxy_routes(_app, logger)
+
+    _fastapi_app = _app
+    _init_done = True
+    logger.info("Application fully initialized")
 
 
 def _init_identity_schema():
@@ -221,68 +285,13 @@ def _create_demo_user():
         db.close()
 
 
-async def _deferred_init():
-    await asyncio.sleep(1)
-    from loguru import logger
-
-    try:
-        await asyncio.to_thread(_sync_heavy_init)
-        logger.info("Heavy initialization completed")
-    except Exception as e:
-        logger.error(f"Deferred init error: {e}")
-
-    try:
-        from slowapi import Limiter, _rate_limit_exceeded_handler
-        from slowapi.util import get_remote_address
-        from slowapi.errors import RateLimitExceeded
-        limiter = Limiter(key_func=get_remote_address)
-        app.state.limiter = limiter
-        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-    except Exception as e:
-        logger.error(f"Rate limiter error: {e}")
-
-    try:
-        from app.api import api_router
-        app.include_router(api_router, prefix="/api/v1")
-        logger.info("API routes loaded")
-    except Exception as e:
-        logger.error(f"API router error: {e}")
-
-    try:
-        from app.monitoring import setup_metrics, metrics_middleware
-        from app.config import settings
-        if settings.PROMETHEUS_ENABLED:
-            setup_metrics(app)
-        logger.info("Monitoring configured")
-    except Exception as e:
-        logger.error(f"Monitoring error: {e}")
-
-    if SERVE_FRONTEND and os.path.exists(FRONTEND_DIST_PATH):
-        try:
-            assets_path = os.path.join(FRONTEND_DIST_PATH, "assets")
-            if os.path.exists(assets_path):
-                app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
-            logger.info("Frontend static files mounted")
-        except Exception as e:
-            logger.error(f"Static files error: {e}")
-
-    try:
-        from app.services.scheduler import start_scheduler
-        start_scheduler()
-        logger.info("Scheduled scraping enabled")
-    except Exception as e:
-        logger.error(f"Scheduler error: {e}")
-
-    _setup_proxy_routes()
-    logger.info("Application fully initialized")
-
-
-def _setup_proxy_routes():
+def _setup_proxy_routes(_app, logger):
     import httpx
     import websockets
-    from loguru import logger
+    from fastapi import HTTPException, Request, WebSocket
+    from fastapi.responses import HTMLResponse, JSONResponse
 
-    @app.api_route("/api/metrics", methods=["GET"])
+    @_app.api_route("/api/metrics", methods=["GET"])
     async def proxy_metrics():
         try:
             async with httpx.AsyncClient() as client:
@@ -293,7 +302,7 @@ def _setup_proxy_routes():
         except Exception:
             return JSONResponse(content={"error": "Proxy error"}, status_code=502)
 
-    @app.api_route("/api/analyze", methods=["POST"])
+    @_app.api_route("/api/analyze", methods=["POST"])
     async def proxy_analyze(request: Request):
         try:
             body = await request.json()
@@ -305,7 +314,7 @@ def _setup_proxy_routes():
         except Exception:
             raise HTTPException(status_code=502, detail="Proxy error")
 
-    @app.api_route("/api/recent", methods=["GET"])
+    @_app.api_route("/api/recent", methods=["GET"])
     async def proxy_recent(request: Request):
         try:
             params = dict(request.query_params)
@@ -317,7 +326,7 @@ def _setup_proxy_routes():
         except Exception:
             return JSONResponse(content={"error": "Proxy error"}, status_code=502)
 
-    @app.api_route("/api/crisis-alerts", methods=["GET"])
+    @_app.api_route("/api/crisis-alerts", methods=["GET"])
     async def proxy_crisis_alerts():
         try:
             async with httpx.AsyncClient() as client:
@@ -328,7 +337,7 @@ def _setup_proxy_routes():
         except Exception:
             return JSONResponse(content={"error": "Proxy error"}, status_code=502)
 
-    @app.websocket("/ws/stream")
+    @_app.websocket("/ws/stream")
     async def proxy_websocket(websocket: WebSocket):
         await websocket.accept()
         try:
@@ -357,7 +366,7 @@ def _setup_proxy_routes():
             except Exception:
                 pass
 
-    @app.get("/rapidoc", response_class=HTMLResponse)
+    @_app.get("/rapidoc", response_class=HTMLResponse)
     async def rapidoc():
         return f"""
         <!DOCTYPE html>
@@ -376,18 +385,52 @@ def _setup_proxy_routes():
         """
 
 
-@app.on_event("startup")
-async def startup_event():
-    asyncio.create_task(_deferred_init())
+async def app(scope, receive, send):
+    global _init_started
 
+    if scope["type"] == "lifespan":
+        while True:
+            message = await receive()
+            if message["type"] == "lifespan.startup":
+                _init_started = True
+                asyncio.create_task(_build_fastapi_app())
+                await send({"type": "lifespan.startup.complete"})
+            elif message["type"] == "lifespan.shutdown":
+                try:
+                    from app.services.scheduler import stop_scheduler
+                    stop_scheduler()
+                except Exception:
+                    pass
+                await send({"type": "lifespan.shutdown.complete"})
+                return
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    try:
-        from app.services.scheduler import stop_scheduler
-        stop_scheduler()
-    except Exception:
-        pass
+    if scope["type"] == "http":
+        path = scope.get("path", "")
+
+        if path in ("/", "/healthz", "/health"):
+            if _fastapi_app and _init_done:
+                await _fastapi_app(scope, receive, send)
+            else:
+                await _send_json(send, HEALTH_RESPONSE, 200)
+            return
+
+        if scope.get("method") == "OPTIONS":
+            await _send_json(send, b'{}', 200)
+            return
+
+        if _fastapi_app and _init_done:
+            await _fastapi_app(scope, receive, send)
+        else:
+            await _send_json(send, INIT_RESPONSE, 503)
+        return
+
+    if scope["type"] == "websocket":
+        if _fastapi_app and _init_done:
+            await _fastapi_app(scope, receive, send)
+        return
+
+    if _fastapi_app:
+        await _fastapi_app(scope, receive, send)
 
 
 if __name__ == "__main__":
