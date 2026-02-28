@@ -521,24 +521,50 @@ class AmericaTVScraper(PeruvianNewsScraper):
         super().__init__()
         self.source_key = 'americatv'
         self.base_url = "https://www.americatv.com.pe"
-        self.sections = ["/noticias/actualidad", "/noticias/politica"]
+        self.sections = ["/noticias/actualidad", "/noticias/internacionales"]
 
     def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(response.content, 'html.parser')
         articles = []
-        seen = set()
+        seen_urls = set()
+        url_titles: Dict[str, str] = {}
 
-        for element in soup.find_all(['article', 'div'], class_=re.compile(r'card|item|article|nota')):
-            link = element.find('a', href=True)
+        for link in soup.find_all('a', href=True):
+            href = link['href']
+            if not re.search(r'-n\d+', href):
+                continue
+            url = urljoin(self.base_url, href)
+            if '/noticias/' not in url:
+                continue
+            url = re.sub(r'[?#].*$', '', url)
+            if url in seen_urls:
+                text = _clean_text(link.get_text())
+                if text and len(text) > len(url_titles.get(url, '')):
+                    url_titles[url] = text
+                continue
+            seen_urls.add(url)
+            heading = link.find(['h2', 'h3', 'h4'])
+            title = _clean_text(heading.get_text()) if heading else _clean_text(link.get_text())
+            url_titles[url] = title or ''
+
+        for heading in soup.find_all(['h2', 'h3']):
+            parent_link = heading.find_parent('a', href=True)
+            child_link = heading.find('a', href=True)
+            link = parent_link or child_link
             if not link:
                 continue
-            url = urljoin(self.base_url, link['href'])
-            if url in seen or '/noticias/' not in url:
+            href = link['href']
+            if not re.search(r'-n\d+', href):
                 continue
-            seen.add(url)
-            heading = element.find(['h2', 'h3', 'h4'])
-            title = _clean_text(heading.get_text()) if heading else _clean_text(link.get_text())
-            if not title or len(title) < 10:
+            url = urljoin(self.base_url, href)
+            url = re.sub(r'[?#].*$', '', url)
+            title = _clean_text(heading.get_text())
+            if title and len(title) > len(url_titles.get(url, '')):
+                url_titles[url] = title
+                seen_urls.add(url)
+
+        for url, title in url_titles.items():
+            if not title or len(title) < 15:
                 continue
             articles.append({
                 'source': 'América TV',
@@ -548,28 +574,7 @@ class AmericaTVScraper(PeruvianNewsScraper):
                 'category': _detect_category(url, title),
                 'published_at': datetime.now(),
             })
-
-        if len(articles) < 3:
-            for heading in soup.find_all(['h2', 'h3']):
-                link = heading.find('a', href=True)
-                if not link:
-                    continue
-                url = urljoin(self.base_url, link['href'])
-                if url in seen or '/noticias/' not in url:
-                    continue
-                seen.add(url)
-                title = _clean_text(link.get_text())
-                if not title or len(title) < 10:
-                    continue
-                articles.append({
-                    'source': 'América TV',
-                    'title': title,
-                    'content': '',
-                    'url': url,
-                    'category': _detect_category(url, title),
-                    'published_at': datetime.now(),
-                })
-        return articles[:20]
+        return articles[:25]
 
 
 class PanamericanaScraper(PeruvianNewsScraper):
