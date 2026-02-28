@@ -1,50 +1,24 @@
-from fastapi import FastAPI, Depends, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-import logging
-from loguru import logger
-import sys
 import os
-import httpx
-import websockets
 import asyncio
 
-from app.config import settings
-from app.database import init_db
-from app.api import api_router
-from app.monitoring import setup_metrics, metrics_middleware
-from app.utils.logging import setup_logging
-
-FRONTEND_DIST_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "project-react", "dist")
+FRONTEND_DIST_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "project-react", "dist")
 SNIFFING_URL = os.getenv("SNIFFING_URL", "http://localhost:8080")
 SNIFFING_WS_URL = os.getenv("SNIFFING_WS_URL", "ws://localhost:8080")
 SERVE_FRONTEND = os.getenv("SERVE_FRONTEND", "false").lower() == "true"
 
-# Setup logging
-setup_logging()
-
-# Rate limiter
-limiter = Limiter(key_func=get_remote_address)
-
-# FastAPI application
 app = FastAPI(
-    title=settings.APP_NAME,
+    title="Political Data Scraper",
     description="Comprehensive political data scraping and analysis microservice",
-    version=settings.VERSION,
+    version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json"
 )
 
-# Setup rate limiting
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -53,50 +27,62 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Metrics middleware
-if settings.PROMETHEUS_ENABLED:
-    setup_metrics(app)
-    app.middleware("http")(metrics_middleware)
 
-# Include API routes
-app.include_router(api_router, prefix="/api/v1")
+@app.get("/")
+async def root():
+    if SERVE_FRONTEND:
+        index_path = os.path.join(FRONTEND_DIST_PATH, "index.html")
+        if os.path.isfile(index_path):
+            return FileResponse(index_path)
+    return JSONResponse(content={"status": "ok", "service": "Political Data Scraper", "version": "1.0.0"}, status_code=200)
 
-@app.get("/rapidoc", response_class=HTMLResponse)
-async def rapidoc():
-    html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset=\"utf-8\" />
-        <title>{settings.APP_NAME} API Explorer</title>
-        <script type=\"module\" src=\"https://unpkg.com/rapidoc/dist/rapidoc-min.js\"></script>
-        <style> body {{ margin: 0; font-family: Arial, sans-serif; }} </style>
-    </head>
-    <body>
-        <rapi-doc
-          spec-url=\"/openapi.json\"
-          theme=\"light\"
-          render-style=\"read\"
-          show-header=\"true\"
-          heading-text=\"{settings.APP_NAME}\" 
-          allow-authentication=\"true\"
-          use-path-in-nav-bar=\"true\"
-        ></rapi-doc>
-    </body>
-    </html>
-    """
-    return html_content
 
-def init_identity_schema():
-    """Create identity schema and tables if they don't exist"""
+@app.get("/healthz")
+async def healthz():
+    return JSONResponse(content={"status": "ok"}, status_code=200)
+
+
+@app.get("/health")
+async def health_check():
+    return JSONResponse(content={"status": "healthy", "service": "Political Data Scraper", "version": "1.0.0"}, status_code=200)
+
+
+_initialized = False
+
+
+def _sync_heavy_init():
+    global _initialized
+    if _initialized:
+        return
+
+    from loguru import logger
+    from app.config import settings
+    from app.database import init_db
+
+    try:
+        init_db()
+        logger.info("Database initialized")
+    except Exception as e:
+        logger.error(f"DB init error: {e}")
+
+    try:
+        _init_identity_schema()
+        _create_demo_user()
+    except Exception as e:
+        logger.error(f"Identity init error: {e}")
+
+    _initialized = True
+
+
+def _init_identity_schema():
     from sqlalchemy import text
     from app.database import SessionLocal
-    
+
     db = SessionLocal()
     try:
         db.execute(text("CREATE SCHEMA IF NOT EXISTS identity"))
         db.commit()
-        
+
         db.execute(text("""
             CREATE TABLE IF NOT EXISTS identity.tenants (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -108,7 +94,7 @@ def init_identity_schema():
             )
         """))
         db.commit()
-        
+
         db.execute(text("""
             CREATE TABLE IF NOT EXISTS identity.users (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -123,7 +109,7 @@ def init_identity_schema():
             )
         """))
         db.commit()
-        
+
         db.execute(text("""
             CREATE TABLE IF NOT EXISTS identity.roles (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -133,7 +119,7 @@ def init_identity_schema():
             )
         """))
         db.commit()
-        
+
         db.execute(text("""
             CREATE TABLE IF NOT EXISTS identity.user_roles (
                 user_id UUID REFERENCES identity.users(id),
@@ -143,38 +129,38 @@ def init_identity_schema():
             )
         """))
         db.commit()
-        
-        logger.info("Identity schema initialized successfully")
     except Exception as e:
-        logger.error(f"Error initializing identity schema: {e}")
         db.rollback()
+        from loguru import logger
+        logger.error(f"Error initializing identity schema: {e}")
     finally:
         db.close()
 
-def create_demo_user():
-    """Create demo user if it doesn't exist"""
+
+def _create_demo_user():
     import bcrypt
     from sqlalchemy import text
     from app.database import SessionLocal
-    
+    from loguru import logger
+
     db = SessionLocal()
     try:
         existing = db.execute(
             text("SELECT id FROM identity.users WHERE email = 'admin@politica.pe'")
         ).fetchone()
-        
+
         if not existing:
             password_hash = bcrypt.hashpw("password123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-            
+
             tenant = db.execute(text("SELECT id FROM identity.tenants LIMIT 1")).fetchone()
             tenant_id = tenant[0] if tenant else None
-            
+
             if not tenant_id:
                 has_status = db.execute(text("""
                     SELECT column_name FROM information_schema.columns 
                     WHERE table_schema='identity' AND table_name='tenants' AND column_name='status'
                 """)).fetchone()
-                
+
                 if has_status:
                     db.execute(text("""
                         INSERT INTO identity.tenants (name, slug, status, created_at)
@@ -188,16 +174,16 @@ def create_demo_user():
                 db.commit()
                 tenant = db.execute(text("SELECT id FROM identity.tenants LIMIT 1")).fetchone()
                 tenant_id = tenant[0] if tenant else None
-            
+
             if not tenant_id:
                 logger.error("Could not create tenant for demo user")
                 return
-            
+
             has_role_tenant = db.execute(text("""
                 SELECT column_name FROM information_schema.columns 
                 WHERE table_schema='identity' AND table_name='roles' AND column_name='tenant_id'
             """)).fetchone()
-            
+
             admin_role = db.execute(text("SELECT id FROM identity.roles WHERE name = 'admin' LIMIT 1")).fetchone()
             if not admin_role:
                 if has_role_tenant:
@@ -208,7 +194,7 @@ def create_demo_user():
                     db.execute(text("INSERT INTO identity.roles (name, description) VALUES ('analyst', 'Analyst')"))
                 db.commit()
                 admin_role = db.execute(text("SELECT id FROM identity.roles WHERE name = 'admin' LIMIT 1")).fetchone()
-            
+
             result = db.execute(
                 text("""
                     INSERT INTO identity.users (email, name, password_hash, tenant_id, is_active, created_at)
@@ -217,13 +203,13 @@ def create_demo_user():
                 """),
                 {"password_hash": password_hash, "tenant_id": tenant_id}
             ).fetchone()
-            
+
             if result and admin_role and tenant_id:
                 db.execute(
                     text("INSERT INTO identity.user_roles (user_id, role_id, tenant_id) VALUES (:user_id, :role_id, :tenant_id)"),
                     {"user_id": result[0], "role_id": admin_role[0], "tenant_id": tenant_id}
                 )
-            
+
             db.commit()
             logger.info("Demo user created: admin@politica.pe")
         else:
@@ -234,164 +220,175 @@ def create_demo_user():
     finally:
         db.close()
 
+
 async def _deferred_init():
-    """Run heavy initialization in background so health checks pass quickly"""
-    await asyncio.sleep(2)
+    await asyncio.sleep(1)
+    from loguru import logger
+
     try:
-        await asyncio.to_thread(init_db)
-        logger.info("Database initialized")
-        await asyncio.to_thread(init_identity_schema)
-        await asyncio.to_thread(create_demo_user)
+        await asyncio.to_thread(_sync_heavy_init)
+        logger.info("Heavy initialization completed")
+    except Exception as e:
+        logger.error(f"Deferred init error: {e}")
+
+    try:
+        from slowapi import Limiter, _rate_limit_exceeded_handler
+        from slowapi.util import get_remote_address
+        from slowapi.errors import RateLimitExceeded
+        limiter = Limiter(key_func=get_remote_address)
+        app.state.limiter = limiter
+        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    except Exception as e:
+        logger.error(f"Rate limiter error: {e}")
+
+    try:
+        from app.api import api_router
+        app.include_router(api_router, prefix="/api/v1")
+        logger.info("API routes loaded")
+    except Exception as e:
+        logger.error(f"API router error: {e}")
+
+    try:
+        from app.monitoring import setup_metrics, metrics_middleware
+        from app.config import settings
+        if settings.PROMETHEUS_ENABLED:
+            setup_metrics(app)
+        logger.info("Monitoring configured")
+    except Exception as e:
+        logger.error(f"Monitoring error: {e}")
+
+    if SERVE_FRONTEND and os.path.exists(FRONTEND_DIST_PATH):
+        try:
+            assets_path = os.path.join(FRONTEND_DIST_PATH, "assets")
+            if os.path.exists(assets_path):
+                app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+            logger.info("Frontend static files mounted")
+        except Exception as e:
+            logger.error(f"Static files error: {e}")
+
+    try:
         from app.services.scheduler import start_scheduler
         start_scheduler()
         logger.info("Scheduled scraping enabled")
     except Exception as e:
-        logger.error(f"Deferred init error: {e}")
+        logger.error(f"Scheduler error: {e}")
+
+    _setup_proxy_routes()
+    logger.info("Application fully initialized")
+
+
+def _setup_proxy_routes():
+    import httpx
+    import websockets
+    from loguru import logger
+
+    @app.api_route("/api/metrics", methods=["GET"])
+    async def proxy_metrics():
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(f"{SNIFFING_URL}/api/metrics", timeout=10.0)
+                return JSONResponse(content=response.json(), status_code=response.status_code)
+        except (httpx.ConnectError, httpx.TimeoutException):
+            return JSONResponse(content={"active_streams": 0, "processed_count": 0, "avg_sentiment": 0.0, "crisis_alerts": 0, "trending_topics": 0, "processing_rate": 0.0}, status_code=200)
+        except Exception:
+            return JSONResponse(content={"error": "Proxy error"}, status_code=502)
+
+    @app.api_route("/api/analyze", methods=["POST"])
+    async def proxy_analyze(request: Request):
+        try:
+            body = await request.json()
+            async with httpx.AsyncClient() as client:
+                response = await client.post(f"{SNIFFING_URL}/api/analyze", json=body, timeout=10.0)
+                return JSONResponse(content=response.json(), status_code=response.status_code)
+        except (httpx.ConnectError, httpx.TimeoutException):
+            raise HTTPException(status_code=503, detail="Sniffing service unavailable")
+        except Exception:
+            raise HTTPException(status_code=502, detail="Proxy error")
+
+    @app.api_route("/api/recent", methods=["GET"])
+    async def proxy_recent(request: Request):
+        try:
+            params = dict(request.query_params)
+            async with httpx.AsyncClient() as client:
+                response = await client.get(f"{SNIFFING_URL}/api/recent", params=params, timeout=10.0)
+                return JSONResponse(content=response.json(), status_code=response.status_code)
+        except (httpx.ConnectError, httpx.TimeoutException):
+            return JSONResponse(content={"recent_items": [], "total": 0}, status_code=200)
+        except Exception:
+            return JSONResponse(content={"error": "Proxy error"}, status_code=502)
+
+    @app.api_route("/api/crisis-alerts", methods=["GET"])
+    async def proxy_crisis_alerts():
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(f"{SNIFFING_URL}/api/crisis-alerts", timeout=10.0)
+                return JSONResponse(content=response.json(), status_code=response.status_code)
+        except (httpx.ConnectError, httpx.TimeoutException):
+            return JSONResponse(content={"crisis_alerts": [], "total": 0}, status_code=200)
+        except Exception:
+            return JSONResponse(content={"error": "Proxy error"}, status_code=502)
+
+    @app.websocket("/ws/stream")
+    async def proxy_websocket(websocket: WebSocket):
+        await websocket.accept()
+        try:
+            async with websockets.connect(f"{SNIFFING_WS_URL}/ws/stream") as ws_upstream:
+                async def receive_from_client():
+                    while True:
+                        try:
+                            data = await websocket.receive_text()
+                            await ws_upstream.send(data)
+                        except Exception:
+                            break
+
+                async def receive_from_upstream():
+                    while True:
+                        try:
+                            data = await ws_upstream.recv()
+                            await websocket.send_text(data)
+                        except Exception:
+                            break
+
+                await asyncio.gather(receive_from_client(), receive_from_upstream())
+        except Exception as e:
+            logger.error(f"WebSocket proxy error: {e}")
+            try:
+                await websocket.close()
+            except Exception:
+                pass
+
+    @app.get("/rapidoc", response_class=HTMLResponse)
+    async def rapidoc():
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8" />
+            <title>Political Data Scraper API Explorer</title>
+            <script type="module" src="https://unpkg.com/rapidoc/dist/rapidoc-min.js"></script>
+        </head>
+        <body>
+            <rapi-doc spec-url="/openapi.json" theme="light" render-style="read"
+              show-header="true" heading-text="Political Data Scraper"
+              allow-authentication="true" use-path-in-nav-bar="true"></rapi-doc>
+        </body>
+        </html>
+        """
+
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize application on startup"""
-    logger.info(f"Starting {settings.APP_NAME} v{settings.VERSION}")
-    logger.info(f"Environment: {settings.ENVIRONMENT}")
     asyncio.create_task(_deferred_init())
-    logger.info("Application startup completed (init deferred)")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Cleanup on application shutdown"""
-    from app.services.scheduler import stop_scheduler
-    stop_scheduler()
-    logger.info("Shutting down application")
-
-@app.get("/healthz")
-async def healthz():
-    """Health check endpoint for deployment"""
-    return {"status": "ok"}
-
-@app.get("/")
-async def root():
-    """Root endpoint - always responds instantly for health checks, then serves SPA or info page"""
-    if SERVE_FRONTEND:
-        index_path = os.path.join(FRONTEND_DIST_PATH, "index.html")
-        if os.path.isfile(index_path):
-            return FileResponse(index_path)
-    return JSONResponse(content={"status": "ok", "service": settings.APP_NAME, "version": settings.VERSION}, status_code=200)
-
-@app.get("/health")
-@limiter.limit(f"{settings.RATE_LIMIT_CALLS}/minute")
-async def health_check(request: Request):
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "service": settings.APP_NAME,
-        "version": settings.VERSION,
-        "environment": settings.ENVIRONMENT
-    }
-
-@app.api_route("/api/metrics", methods=["GET"])
-async def proxy_metrics():
-    """Proxy to sniffing service metrics"""
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{SNIFFING_URL}/api/metrics", timeout=10.0)
-            return JSONResponse(content=response.json(), status_code=response.status_code)
-    except (httpx.ConnectError, httpx.TimeoutException) as e:
-        logger.error(f"Sniffing service unavailable: {e}")
-        return JSONResponse(content={"active_streams": 0, "processed_count": 0, "avg_sentiment": 0.0, "crisis_alerts": 0, "trending_topics": 0, "processing_rate": 0.0}, status_code=200)
-    except Exception as e:
-        logger.error(f"Error proxying to sniffing: {e}")
-        return JSONResponse(content={"error": "Proxy error"}, status_code=502)
+        from app.services.scheduler import stop_scheduler
+        stop_scheduler()
+    except Exception:
+        pass
 
-@app.api_route("/api/analyze", methods=["POST"])
-async def proxy_analyze(request: Request):
-    """Proxy to sniffing service analyze"""
-    try:
-        body = await request.json()
-        async with httpx.AsyncClient() as client:
-            response = await client.post(f"{SNIFFING_URL}/api/analyze", json=body, timeout=10.0)
-            return JSONResponse(content=response.json(), status_code=response.status_code)
-    except (httpx.ConnectError, httpx.TimeoutException) as e:
-        logger.error(f"Sniffing service unavailable: {e}")
-        raise HTTPException(status_code=503, detail="Sniffing service unavailable")
-    except Exception as e:
-        logger.error(f"Error proxying to sniffing: {e}")
-        raise HTTPException(status_code=502, detail="Proxy error")
-
-@app.api_route("/api/recent", methods=["GET"])
-async def proxy_recent(request: Request):
-    """Proxy to sniffing service recent items"""
-    try:
-        params = dict(request.query_params)
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{SNIFFING_URL}/api/recent", params=params, timeout=10.0)
-            return JSONResponse(content=response.json(), status_code=response.status_code)
-    except (httpx.ConnectError, httpx.TimeoutException) as e:
-        logger.error(f"Sniffing service unavailable: {e}")
-        return JSONResponse(content={"recent_items": [], "total": 0}, status_code=200)
-    except Exception as e:
-        logger.error(f"Error proxying to sniffing: {e}")
-        return JSONResponse(content={"error": "Proxy error"}, status_code=502)
-
-@app.api_route("/api/crisis-alerts", methods=["GET"])
-async def proxy_crisis_alerts():
-    """Proxy to sniffing service crisis alerts"""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{SNIFFING_URL}/api/crisis-alerts", timeout=10.0)
-            return JSONResponse(content=response.json(), status_code=response.status_code)
-    except (httpx.ConnectError, httpx.TimeoutException) as e:
-        logger.error(f"Sniffing service unavailable: {e}")
-        return JSONResponse(content={"crisis_alerts": [], "total": 0}, status_code=200)
-    except Exception as e:
-        logger.error(f"Error proxying to sniffing: {e}")
-        return JSONResponse(content={"error": "Proxy error"}, status_code=502)
-
-@app.websocket("/ws/stream")
-async def proxy_websocket(websocket: WebSocket):
-    """Proxy WebSocket to sniffing service"""
-    await websocket.accept()
-    try:
-        async with websockets.connect(f"{SNIFFING_WS_URL}/ws/stream") as ws_upstream:
-            async def receive_from_client():
-                while True:
-                    try:
-                        data = await websocket.receive_text()
-                        await ws_upstream.send(data)
-                    except WebSocketDisconnect:
-                        break
-                    except Exception:
-                        break
-            
-            async def receive_from_upstream():
-                while True:
-                    try:
-                        data = await ws_upstream.recv()
-                        await websocket.send_text(data)
-                    except Exception:
-                        break
-            
-            await asyncio.gather(receive_from_client(), receive_from_upstream())
-    except Exception as e:
-        logger.error(f"WebSocket proxy error: {e}")
-        try:
-            await websocket.close()
-        except:
-            pass
-
-if SERVE_FRONTEND and os.path.exists(FRONTEND_DIST_PATH):
-    assets_path = os.path.join(FRONTEND_DIST_PATH, "assets")
-    if os.path.exists(assets_path):
-        app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
-    
-    @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
-        """Serve SPA for all non-API routes"""
-        if full_path.startswith("api/") or full_path.startswith("ws/"):
-            raise HTTPException(status_code=404, detail="Not found")
-        file_path = os.path.join(FRONTEND_DIST_PATH, full_path)
-        if os.path.isfile(file_path):
-            return FileResponse(file_path)
-        return FileResponse(os.path.join(FRONTEND_DIST_PATH, "index.html"))
 
 if __name__ == "__main__":
     import uvicorn
@@ -399,6 +396,6 @@ if __name__ == "__main__":
         "app.main:app",
         host="0.0.0.0",
         port=8000,
-        reload=settings.DEBUG,
-        log_level=settings.LOG_LEVEL.lower()
+        reload=True,
+        log_level="info"
     )
