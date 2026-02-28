@@ -37,7 +37,7 @@ The platform is composed of three integrated sub-projects:
 -   **Configuration System**: A robust system for managing API tokens for social media platforms, including CRUD operations and connectivity testing.
 -   **Regional Engagement Analysis**: Functionality to analyze political engagement based on geographical regions within Peru.
 -   **Political Figures Management**: CRUD system for managing political figures with search keywords, social accounts, and monitoring priority. Keywords automatically sync with the scraping engine's search tags.
--   **AI Recommendations (Claude)**: Integration with Anthropic Claude API to generate strategic political recommendations based on real scraped data. The system gathers post mentions, sentiment, engagement metrics, and news for each selected figure, then sends this context to Claude for personalized strategy generation. Recommendations are persisted in the `ai_recommendations` table with status tracking, rating, and ROI metrics.
+-   **AI Recommendations (Claude)**: Integration with Anthropic Claude API to generate strategic political recommendations based on real scraped data. The system gathers data from ALL sources (social posts, news articles, surveys, government data) within a 120-day window, classifies each mention by sentiment (positive/negative/neutral), extracts specific incidents/events, computes weekly trends, and sanitizes all data before sending to Claude. The AI generates per-incident recommendations: "remediar" for negative events (crisis management, step-by-step recovery plans) and "potenciar" for positive events (amplification strategies). Recommendations are persisted in the `ai_recommendations` table with status tracking, rating, and ROI metrics. Model: claude-sonnet-4-20250514, max_tokens: 8192.
 
 ### Design Choices
 -   **Simplified Infrastructure**: Avoids heavy tools like Redis, Celery, or Kafka by leveraging FastAPI's background tasks and direct WebSocket broadcasting for efficiency in a Replit environment.
@@ -54,10 +54,10 @@ The platform is composed of three integrated sub-projects:
 -   **Monitoring**: Prometheus (for metrics exposure).
 
 ## Key Database Tables
--   `raw_social_posts`: Scraped social media posts (510+ records across YouTube, Twitter, Instagram)
+-   `raw_social_posts`: Scraped social media posts (810+ records across YouTube, Twitter, Instagram)
 -   `political_figures`: Political figures with search keywords, social accounts, monitoring config
 -   `ai_recommendations`: AI-generated strategy recommendations linked to political figures
 -   `search_tags`: Keywords for scraping (auto-synced with political figure keywords)
 -   `social_api_tokens`: API credentials for social media platforms
--   `news_articles`: Scraped news articles from 12 Peruvian media sources (318+ records from El Comercio, La República, Gestión, Panamericana TV, Exitosa, TV Perú, Infobae, Perú21, Canal N, América TV, RPP)
+-   `news_articles`: Scraped news articles from 12 Peruvian media sources (430+ records from El Comercio, La República, Gestión, Panamericana TV, Exitosa, TV Perú, Infobae, Perú21, Canal N, América TV, RPP)
 -   `scraped_surveys`, `government_data`: Other scraped data sources
