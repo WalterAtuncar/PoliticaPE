@@ -22,7 +22,7 @@ interface SidebarProps {
 
 const menuItems = [
   { id: 'dashboard', label: 'Panel Principal', icon: Home },
-  { id: 'monitoring', label: 'Monitoreo Tiempo Real', icon: Activity },
+  { id: 'monitoring', label: 'Monitoreo de Noticias', icon: Activity },
   { id: 'social', label: 'Redes Sociales', icon: MessageSquare },
   { id: 'geo-demographics', label: 'Geográfico y Demográfico', icon: MapPin },
   { id: 'government', label: 'Data Gubernamental', icon: Building2 },

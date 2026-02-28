@@ -25,14 +25,14 @@ The platform is composed of three integrated sub-projects:
 -   **Backend (Scrapping)**: Built with FastAPI, SQLAlchemy for ORM, Pydantic for data validation, and uvicorn as the ASGI server. Authentication uses bcrypt.
 -   **Backend (Sniffing)**: FastAPI microservice focused on real-time data processing and WebSocket communication.
 -   **Database**: PostgreSQL is used as the primary database, featuring a multi-schema design to organize core, real-time, identity, and organization-specific data.
--   **Data Scraping**: Custom scrapers for platforms like TwitterAPI.io and YouTube Data API v3 are integrated, with a flexible multi-token configuration system allowing for robust data collection.
+-   **Data Scraping**: Custom scrapers for social media (TwitterAPI.io, YouTube Data API v3) and 12 Peruvian news sources using BeautifulSoup. News sources include: El Comercio, RPP, La República, Perú21, Gestión, Infobae Perú (prensa), Canal N, América TV, Panamericana TV, TV Perú (TV), Exitosa (radio), Andina (agencia oficial). Flexible multi-token configuration for social media APIs.
 -   **Sentiment Analysis**: A lightweight rule-based Spanish lexicon is used for sentiment analysis, avoiding heavy ML dependencies.
 -   **Deployment**: The `project-scrapping` backend can serve the `project-react` frontend directly in production via a reverse proxy and static file serving capabilities. WebSocket traffic is also proxied.
 
 ### Feature Specifications
 -   **Authentication**: Secure user authentication with bcrypt.
 -   **Data Analytics**: Comprehensive analytics dashboards displaying news, social media trends, government data, and sentiment analysis.
--   **Real-time Monitoring**: Live updates and alerts via WebSocket for immediate insights into political discourse.
+-   **News Monitoring**: Dedicated news monitoring page showing real-time articles scraped from 12 Peruvian media sources (newspapers, TV, radio, agency). Includes filtering by source/category/search, sentiment analysis, auto-refresh, and manual scraping trigger.
 -   **Scraping Management**: Tools to trigger and monitor data scraping jobs, along with managing API tokens for various platforms.
 -   **Configuration System**: A robust system for managing API tokens for social media platforms, including CRUD operations and connectivity testing.
 -   **Regional Engagement Analysis**: Functionality to analyze political engagement based on geographical regions within Peru.
@@ -59,4 +59,5 @@ The platform is composed of three integrated sub-projects:
 -   `ai_recommendations`: AI-generated strategy recommendations linked to political figures
 -   `search_tags`: Keywords for scraping (auto-synced with political figure keywords)
 -   `social_api_tokens`: API credentials for social media platforms
--   `news_articles`, `scraped_surveys`, `government_data`: Other scraped data sources
+-   `news_articles`: Scraped news articles from 12 Peruvian media sources (318+ records from El Comercio, La República, Gestión, Panamericana TV, Exitosa, TV Perú, Infobae, Perú21, Canal N, América TV, RPP)
+-   `scraped_surveys`, `government_data`: Other scraped data sources

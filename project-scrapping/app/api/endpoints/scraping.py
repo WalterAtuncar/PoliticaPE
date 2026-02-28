@@ -256,13 +256,34 @@ async def trigger_social_scraping(
 @router.post("/trigger/news", response_model=ScrapingTaskResponse)
 async def trigger_news_scraping(
     request: ScrapingTaskRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
 ):
-    sources = request.sources or ["elcomercio", "rpp", "gestion"]
+    all_sources = [
+        "elcomercio", "rpp", "larepublica", "peru21", "gestion",
+        "infobae", "andina", "canaln", "americatv", "panamericana",
+        "tvperu", "exitosa"
+    ]
+    sources = request.sources or all_sources
     task_ids = [str(uuid.uuid4()) for _ in sources]
-    
+
+    def _run_news_sync():
+        from app.database import SessionLocal
+        from app.scrapers.news_scrapers import run_news_scraping
+        sync_db = SessionLocal()
+        try:
+            results = run_news_scraping(sync_db, sources)
+            total = sum(results.values())
+            logger.info(f"News scraping completado: {total} artículos nuevos - {results}")
+        except Exception as e:
+            logger.error(f"Error en news scraping: {e}")
+        finally:
+            sync_db.close()
+
+    background_tasks.add_task(_run_news_sync)
+
     return ScrapingTaskResponse(
-        message="News scraping no implementado aún - requiere implementar scrapers de noticias",
+        message=f"Scraping de noticias iniciado para {len(sources)} fuentes: {', '.join(sources)}",
         task_ids=task_ids,
         sources=sources
     )

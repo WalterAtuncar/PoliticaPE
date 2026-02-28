@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { API_CONFIG, ENDPOINTS } from '../config/api';
 
-interface NewsArticle {
+export interface NewsArticle {
   id: string;
   title: string;
   content: string | null;
@@ -16,60 +16,168 @@ interface NewsArticle {
   political_entities: Record<string, unknown> | null;
 }
 
-interface NewsData {
-  articles: NewsArticle[];
-  total: number;
-  isLoading: boolean;
-  error: string | null;
-  hasData: boolean;
+export interface NewsFilters {
+  source: string;
+  category: string;
+  search: string;
+  autoRefresh: boolean;
+  refreshInterval: number;
 }
 
-export const useNewsData = (limit: number = 20) => {
+interface NewsStats {
+  totalArticles: number;
+  sourceBreakdown: Record<string, number>;
+  categoryBreakdown: Record<string, number>;
+  recentCount: number;
+}
+
+interface NewsData {
+  articles: NewsArticle[];
+  stats: NewsStats;
+  isLoading: boolean;
+  isScraping: boolean;
+  error: string | null;
+  lastUpdate: Date | null;
+}
+
+const SOURCE_TYPES: Record<string, string> = {
+  'El Comercio': 'prensa',
+  'RPP Noticias': 'prensa',
+  'La República': 'prensa',
+  'Perú21': 'prensa',
+  'Gestión': 'prensa',
+  'Infobae Perú': 'prensa',
+  'Andina': 'agencia',
+  'Canal N': 'tv',
+  'América TV': 'tv',
+  'Panamericana TV': 'tv',
+  'TV Perú': 'tv',
+  'Exitosa': 'radio',
+};
+
+export const getSourceType = (source: string): string => SOURCE_TYPES[source] || 'prensa';
+
+export const useNewsData = (filters: NewsFilters, limit: number = 200) => {
   const [data, setData] = useState<NewsData>({
     articles: [],
-    total: 0,
+    stats: { totalArticles: 0, sourceBreakdown: {}, categoryBreakdown: {}, recentCount: 0 },
     isLoading: true,
+    isScraping: false,
     error: null,
-    hasData: false,
+    lastUpdate: null,
   });
+
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchNews = useCallback(async () => {
     try {
-      setData(prev => ({ ...prev, isLoading: true, error: null }));
-      
-      const response = await fetch(
-        `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.NEWS}?limit=${limit}`
-      );
-      
-      if (!response.ok) {
-        throw new Error('Error al cargar noticias');
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (filters.source && filters.source !== 'all') {
+        params.set('source', filters.source);
       }
-      
+      if (filters.category && filters.category !== 'all') {
+        params.set('category', filters.category);
+      }
+
+      const response = await fetch(
+        `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.NEWS}?${params}`
+      );
+
+      if (!response.ok) throw new Error('Error al cargar noticias');
+
       const result = await response.json();
-      const articles = Array.isArray(result) ? result : (result.articles || []);
-      
-      setData({
-        articles: articles.slice(0, limit),
-        total: articles.length,
+      const articles: NewsArticle[] = Array.isArray(result) ? result : (result.articles || []);
+
+      let filtered = articles;
+      if (filters.search) {
+        const search = filters.search.toLowerCase();
+        filtered = articles.filter(a =>
+          a.title.toLowerCase().includes(search) ||
+          (a.content && a.content.toLowerCase().includes(search))
+        );
+      }
+
+      const sourceBreakdown: Record<string, number> = {};
+      const categoryBreakdown: Record<string, number> = {};
+      const now = Date.now();
+      let recentCount = 0;
+
+      for (const a of articles) {
+        sourceBreakdown[a.source] = (sourceBreakdown[a.source] || 0) + 1;
+        const cat = a.category || 'Sin categoría';
+        categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + 1;
+        if (a.scraped_at) {
+          const diff = now - new Date(a.scraped_at).getTime();
+          if (diff < 24 * 60 * 60 * 1000) recentCount++;
+        }
+      }
+
+      setData(prev => ({
+        ...prev,
+        articles: filtered,
+        stats: {
+          totalArticles: articles.length,
+          sourceBreakdown,
+          categoryBreakdown,
+          recentCount,
+        },
         isLoading: false,
         error: null,
-        hasData: articles.length > 0,
-      });
+        lastUpdate: new Date(),
+      }));
     } catch (error) {
       console.error('Error fetching news:', error);
-      setData({
-        articles: [],
-        total: 0,
+      setData(prev => ({
+        ...prev,
         isLoading: false,
         error: error instanceof Error ? error.message : 'Error desconocido',
-        hasData: false,
-      });
+      }));
     }
-  }, [limit]);
+  }, [limit, filters.source, filters.category, filters.search]);
+
+  const triggerScraping = useCallback(async (sources?: string[]) => {
+    setData(prev => ({ ...prev, isScraping: true }));
+    try {
+      const body = sources ? { sources } : {};
+      const response = await fetch(
+        `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_NEWS}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }
+      );
+      if (!response.ok) throw new Error('Error al iniciar scraping');
+      const result = await response.json();
+
+      setTimeout(() => {
+        fetchNews();
+        setData(prev => ({ ...prev, isScraping: false }));
+      }, 15000);
+
+      return result;
+    } catch (error) {
+      setData(prev => ({ ...prev, isScraping: false }));
+      throw error;
+    }
+  }, [fetchNews]);
 
   useEffect(() => {
     fetchNews();
   }, [fetchNews]);
 
-  return { ...data, refetch: fetchNews };
+  useEffect(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    if (filters.autoRefresh) {
+      intervalRef.current = setInterval(fetchNews, filters.refreshInterval * 1000);
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [filters.autoRefresh, filters.refreshInterval, fetchNews]);
+
+  return { ...data, refetch: fetchNews, triggerScraping };
 };
