@@ -80,7 +80,7 @@ externalPort = 8080
 
 [deployment]
 deploymentTarget = "vm"
-run = ["bash", "-c", "cd project-scrapping && SERVE_FRONTEND=true gunicorn app.main:app --bind 0.0.0.0:5000 --worker-class uvicorn.workers.UvicornWorker --workers 1 --timeout 120 --reuse-port"]
+run = ["bash", "-c", "cd project-scrapping && SERVE_FRONTEND=true python -m uvicorn app.main:app --host 0.0.0.0 --port 5000"]
 build = ["bash", "-c", "cd project-react && npm install && npm run build"]
 publicDir = "\"\""
 

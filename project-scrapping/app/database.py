@@ -2,31 +2,47 @@ from sqlalchemy import create_engine, MetaData
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
-from app.config import settings
 import logging
 
-# Database engine with connection pooling
-engine = create_engine(
-    settings.DATABASE_URL,
-    poolclass=QueuePool,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,
-    pool_recycle=3600,
-    echo=settings.DEBUG
-)
-
-# Session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Base class for ORM models
 Base = declarative_base()
-
-# Metadata for migrations
 metadata = MetaData()
 
+_engine = None
+_session_factory = None
+
+
+def _get_engine():
+    global _engine
+    if _engine is None:
+        from app.config import settings
+        _engine = create_engine(
+            settings.DATABASE_URL,
+            poolclass=QueuePool,
+            pool_size=5,
+            max_overflow=10,
+            pool_pre_ping=True,
+            pool_recycle=3600,
+            echo=False
+        )
+    return _engine
+
+
+def _get_session_factory():
+    global _session_factory
+    if _session_factory is None:
+        _session_factory = sessionmaker(autocommit=False, autoflush=False, bind=_get_engine())
+    return _session_factory
+
+
+class _SessionLocalCallable:
+    def __call__(self):
+        return _get_session_factory()()
+
+
+SessionLocal = _SessionLocalCallable()
+
+
 def get_db():
-    """Dependency to get database session"""
     db = SessionLocal()
     try:
         yield db
@@ -37,12 +53,14 @@ def get_db():
     finally:
         db.close()
 
+
 def init_db():
-    """Initialize database"""
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=_get_engine())
     logging.info("Database initialized successfully")
 
+
 def close_db():
-    """Close database connections"""
-    engine.dispose()
-    logging.info("Database connections closed")
+    global _engine
+    if _engine:
+        _engine.dispose()
+        logging.info("Database connections closed")
