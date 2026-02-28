@@ -15,18 +15,19 @@ HEALTH_RESPONSE = json.dumps({"status": "ok", "service": "Political Data Scraper
 INIT_RESPONSE = json.dumps({"status": "initializing"}).encode("utf-8")
 
 
-async def _send_json(send, body, status=200):
+async def _send_json(receive, send, body, status=200):
+    await receive()
     await send({
         "type": "http.response.start",
         "status": status,
         "headers": [
-            [b"content-type", b"application/json"],
-            [b"access-control-allow-origin", b"*"],
-            [b"access-control-allow-methods", b"*"],
-            [b"access-control-allow-headers", b"*"],
+            (b"content-type", b"application/json"),
+            (b"access-control-allow-origin", b"*"),
+            (b"access-control-allow-methods", b"*"),
+            (b"access-control-allow-headers", b"*"),
         ],
     })
-    await send({"type": "http.response.body", "body": body})
+    await send({"type": "http.response.body", "body": body, "more_body": False})
 
 
 async def _build_fastapi_app():
@@ -411,17 +412,17 @@ async def app(scope, receive, send):
             if _fastapi_app and _init_done:
                 await _fastapi_app(scope, receive, send)
             else:
-                await _send_json(send, HEALTH_RESPONSE, 200)
+                await _send_json(receive, send, HEALTH_RESPONSE, 200)
             return
 
         if scope.get("method") == "OPTIONS":
-            await _send_json(send, b'{}', 200)
+            await _send_json(receive, send, b'{}', 200)
             return
 
         if _fastapi_app and _init_done:
             await _fastapi_app(scope, receive, send)
         else:
-            await _send_json(send, INIT_RESPONSE, 503)
+            await _send_json(receive, send, INIT_RESPONSE, 503)
         return
 
     if scope["type"] == "websocket":
