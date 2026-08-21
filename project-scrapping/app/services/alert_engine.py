@@ -92,7 +92,15 @@ def suggest_response(figure_name: str, kind: str, severity: str, metrics: dict,
 No inventes hechos. Si la evidencia es insuficiente para una declaracion, di "no emitir declaracion" y explica que dato falta. Respeta que despues del {ec.PROPAGANDA_DEADLINE.isoformat()} no hay propaganda."""
 
     ev_lines = "\n".join(f"- [{e['source']}] {e['snippet']} ({e['url']})" for e in evidence[:10])
-    user = f"""Candidatura propia: {ec.OWN_CANDIDATE or '(sin definir)'}
+    phase = ec.campaign_phase()
+    phase_note = ""
+    if phase in ("closing", "election_day"):
+        phase_note = ("\nFase: cierre - no se puede hacer propaganda; solo declaraciones "
+                      "de prensa y acciones legales.")
+    elif phase == "poll_blackout":
+        phase_note = "\nFase: veda de encuestas - no cites cifras de encuestas en la declaracion."
+
+    user = f"""Candidatura propia: {ec.OWN_CANDIDATE or '(sin definir)'}{phase_note}
 Alerta: {kind} · severidad {severity} · figura afectada: {figure_name}
 Metricas: menciones ultima ventana {metrics.get('mentions_1h')} (linea base {metrics.get('baseline_1h')}), proporcion negativa {metrics.get('neg_share')}, velocidad {metrics.get('velocity')}x
 Tema dominante: {topic or 'sin determinar'}

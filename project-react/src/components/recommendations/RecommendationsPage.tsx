@@ -14,6 +14,7 @@ import { BudgetCalculator } from './BudgetCalculator';
 import { RecommendationsFilters, AIRecommendation } from '../../types/recommendations';
 import { useAIRecommendations } from '../../hooks/useAIRecommendations';
 import { usePoliticalFigures } from '../../hooks/usePoliticalFigures';
+import { useElectoralConfig } from '../../hooks/useElectoralConfig';
 import { Card } from '../ui/Card';
 import { Modal } from '../ui/Modal';
 
@@ -47,6 +48,12 @@ export const RecommendationsPage: React.FC = () => {
   const [selectedFocus, setSelectedFocus] = useState<string[]>([]);
 
   const { figures, isLoading: figuresLoading, createFigure, updateFigure, deleteFigure } = usePoliticalFigures();
+  const { config: electoralConfig } = useElectoralConfig();
+
+  // Cerrada la ventana de propaganda, los focos de calle y pauta ya no son legales.
+  const availableFocusAreas = focusAreaOptions.filter(
+    f => electoralConfig?.propaganda_allowed !== false || !['ground_game', 'digital_push'].includes(f.id)
+  );
 
   const {
     recommendations,
@@ -89,7 +96,7 @@ export const RecommendationsPage: React.FC = () => {
     try {
       const areas = selectedFocus.length > 0
         ? selectedFocus
-        : focusAreaOptions.map(f => f.id);
+        : availableFocusAreas.map(f => f.id);
       await generateNewRecommendations(selectedFigureIds, areas);
     } catch (e: any) {
       setGenerationError(e.message || 'Error al generar recomendaciones');
@@ -314,7 +321,7 @@ export const RecommendationsPage: React.FC = () => {
                 Áreas de enfoque (opcional - si no seleccionas ninguna se analizan todas)
               </h4>
               <div className="grid grid-cols-2 gap-2">
-                {focusAreaOptions.map((area) => {
+                {availableFocusAreas.map((area) => {
                   const Icon = area.icon;
                   const isSelected = selectedFocus.includes(area.id);
                   return (

@@ -7,6 +7,8 @@ import { ShareOfVoiceBars } from './ShareOfVoiceBars';
 import { ZoneSentimentGrid } from './ZoneSentimentGrid';
 import { TopicsToday } from './TopicsToday';
 import { BriefPanel } from './BriefPanel';
+import { ManualPollForm } from './ManualPollForm';
+import { ClosingChecklist } from './ClosingChecklist';
 import { useRace } from '../../hooks/useRace';
 import { usePoliticalFigures } from '../../hooks/usePoliticalFigures';
 import { useElectoralConfig, formatElectoralDate } from '../../hooks/useElectoralConfig';
@@ -83,6 +85,14 @@ export const RacePage: React.FC = () => {
         </div>
         {error && <span className="text-sm text-red-600 dark:text-red-400">{error}</span>}
       </div>
+
+      {!publishable && (
+        <ManualPollForm candidateNames={average.map(a => a.name)} onSaved={refetch} />
+      )}
+
+      {config && config.days_to_election <= 7 && config.days_to_election >= 0 && (
+        <ClosingChecklist config={config} />
+      )}
 
       <PollAverageChart polls={polls} average={average} blackoutFrom={blackoutFrom} figureColors={figureColors} />
 
