@@ -24,7 +24,7 @@ const menuItems = [
   { id: 'monitoring', label: 'Prensa', icon: Activity },
   { id: 'social', label: 'Redes', icon: MessageSquare },
   { id: 'surveys', label: 'Encuestas', icon: BarChart3 },
-  { id: 'geo-demographics', label: 'Territorio', icon: MapPin },
+  { id: 'territory', label: 'Territorio', icon: MapPin },
   { id: 'recommendations', label: 'Recomendaciones IA', icon: Brain },
   { id: 'settings', label: 'Configuración', icon: Settings },
 ];

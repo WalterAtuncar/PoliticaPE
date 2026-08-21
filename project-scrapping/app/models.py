@@ -21,8 +21,8 @@ class RawSocialPost(Base):
     geographic_location = Column(String(100), nullable=True)
     region = Column(String(100), nullable=True)
     scope = Column(String(30), nullable=True)
-    districts = Column(JSON, nullable=True)
-    topics = Column(JSON, nullable=True)
+    districts = Column(JSON(none_as_null=True), nullable=True)
+    topics = Column(JSON(none_as_null=True), nullable=True)
     classified = Column(Boolean, default=False)
     
     __table_args__ = (
@@ -49,8 +49,8 @@ class NewsArticle(Base):
     political_entities = Column(JSON, nullable=True)
     processed = Column(Boolean, default=False)
     scope = Column(String(30), nullable=True)
-    districts = Column(JSON, nullable=True)
-    topics = Column(JSON, nullable=True)
+    districts = Column(JSON(none_as_null=True), nullable=True)
+    topics = Column(JSON(none_as_null=True), nullable=True)
     classified = Column(Boolean, default=False)
     
     __table_args__ = (

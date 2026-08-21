@@ -10,7 +10,7 @@
       "Lima Sur"
     ],
     "zone_classification": "Ipsos/APEIM (la que usan las encuestadoras al segmentar)",
-    "electors_source": "APROXIMADO a partir del padrón 2022 por distrito. En S1-08 reemplazar por el padrón ERM 2026 de ONPE (buscar 'padrón electoral ERM 2026 Lima por distrito' en onpe.gob.pe o plataformaelectoral.jne.gob.pe). Si no se obtiene, dejar estos valores y marcar electors_source='aprox_2022' en la tabla.",
+    "electors_source": "Padron 2026 de Reniec: total de Lima Metropolitana 7,901,379 electores (43 distritos). Exactos los 5 mayores (SJL 823,056; SMP 538,911; Ate 494,341; Comas 452,492; VMT 371,159); el resto se escalo proporcionalmente desde el padron 2022 para cuadrar con el total real. Factor aplicado: 1.14367.",
     "matching_rules": [
       "Normalizar texto: minúsculas, sin tildes, colapsar espacios.",
       "Match por límite de palabra (\\b) sobre name y aliases.",
@@ -26,7 +26,7 @@
       "name": "Lima",
       "display": "Cercado de Lima",
       "zone": "Lima Centro",
-      "electors_approx": 230000,
+      "electors_approx": 263000,
       "aliases": [
         "Cercado de Lima",
         "Lima Cercado",
@@ -47,7 +47,7 @@
       "name": "Ancón",
       "display": "Ancón",
       "zone": "Lima Norte",
-      "electors_approx": 40000,
+      "electors_approx": 45700,
       "aliases": [
         "Ancon"
       ]
@@ -57,7 +57,7 @@
       "name": "Ate",
       "display": "Ate",
       "zone": "Lima Este",
-      "electors_approx": 430000,
+      "electors_approx": 494341,
       "aliases": [
         "Ate Vitarte",
         "Vitarte",
@@ -73,7 +73,7 @@
       "name": "Barranco",
       "display": "Barranco",
       "zone": "Lima Moderna",
-      "electors_approx": 30000,
+      "electors_approx": 34300,
       "aliases": []
     },
     {
@@ -81,7 +81,7 @@
       "name": "Breña",
       "display": "Breña",
       "zone": "Lima Centro",
-      "electors_approx": 80000,
+      "electors_approx": 91500,
       "aliases": [
         "Brena"
       ]
@@ -91,7 +91,7 @@
       "name": "Carabayllo",
       "display": "Carabayllo",
       "zone": "Lima Norte",
-      "electors_approx": 240000,
+      "electors_approx": 274500,
       "aliases": [
         "Lomas de Carabayllo"
       ]
@@ -101,7 +101,7 @@
       "name": "Chaclacayo",
       "display": "Chaclacayo",
       "zone": "Lima Este",
-      "electors_approx": 35000,
+      "electors_approx": 40000,
       "aliases": []
     },
     {
@@ -109,7 +109,7 @@
       "name": "Chorrillos",
       "display": "Chorrillos",
       "zone": "Lima Sur",
-      "electors_approx": 270000,
+      "electors_approx": 308800,
       "aliases": [
         "Los Pantanos de Villa",
         "La Campiña"
@@ -120,7 +120,7 @@
       "name": "Cieneguilla",
       "display": "Cieneguilla",
       "zone": "Lima Este",
-      "electors_approx": 30000,
+      "electors_approx": 34300,
       "aliases": []
     },
     {
@@ -128,7 +128,7 @@
       "name": "Comas",
       "display": "Comas",
       "zone": "Lima Norte",
-      "electors_approx": 410000,
+      "electors_approx": 452492,
       "aliases": [
         "Collique",
         "La Pascana"
@@ -139,7 +139,7 @@
       "name": "El Agustino",
       "display": "El Agustino",
       "zone": "Lima Este",
-      "electors_approx": 160000,
+      "electors_approx": 183000,
       "aliases": [
         "Agustino"
       ]
@@ -149,7 +149,7 @@
       "name": "Independencia",
       "display": "Independencia",
       "zone": "Lima Norte",
-      "electors_approx": 180000,
+      "electors_approx": 205900,
       "aliases": [
         "Tahuantinsuyo",
         "Ermitaño",
@@ -161,7 +161,7 @@
       "name": "Jesús María",
       "display": "Jesús María",
       "zone": "Lima Moderna",
-      "electors_approx": 70000,
+      "electors_approx": 80100,
       "aliases": [
         "Jesus Maria",
         "Campo de Marte"
@@ -172,7 +172,7 @@
       "name": "La Molina",
       "display": "La Molina",
       "zone": "Lima Moderna",
-      "electors_approx": 130000,
+      "electors_approx": 148700,
       "aliases": []
     },
     {
@@ -180,7 +180,7 @@
       "name": "La Victoria",
       "display": "La Victoria",
       "zone": "Lima Centro",
-      "electors_approx": 160000,
+      "electors_approx": 183000,
       "aliases": [
         "Gamarra",
         "La Parada",
@@ -192,7 +192,7 @@
       "name": "Lince",
       "display": "Lince",
       "zone": "Lima Moderna",
-      "electors_approx": 50000,
+      "electors_approx": 57200,
       "aliases": []
     },
     {
@@ -200,7 +200,7 @@
       "name": "Los Olivos",
       "display": "Los Olivos",
       "zone": "Lima Norte",
-      "electors_approx": 300000,
+      "electors_approx": 343100,
       "aliases": [
         "Olivos",
         "Covida"
@@ -211,7 +211,7 @@
       "name": "Lurigancho",
       "display": "Lurigancho-Chosica",
       "zone": "Lima Este",
-      "electors_approx": 180000,
+      "electors_approx": 205900,
       "aliases": [
         "Chosica",
         "Lurigancho-Chosica",
@@ -224,7 +224,7 @@
       "name": "Lurín",
       "display": "Lurín",
       "zone": "Lima Sur",
-      "electors_approx": 70000,
+      "electors_approx": 80100,
       "aliases": [
         "Lurin"
       ]
@@ -234,7 +234,7 @@
       "name": "Magdalena del Mar",
       "display": "Magdalena del Mar",
       "zone": "Lima Moderna",
-      "electors_approx": 55000,
+      "electors_approx": 62900,
       "aliases": [
         "Magdalena"
       ]
@@ -244,7 +244,7 @@
       "name": "Pueblo Libre",
       "display": "Pueblo Libre",
       "zone": "Lima Moderna",
-      "electors_approx": 75000,
+      "electors_approx": 85800,
       "aliases": [
         "Magdalena Vieja"
       ]
@@ -254,7 +254,7 @@
       "name": "Miraflores",
       "display": "Miraflores",
       "zone": "Lima Moderna",
-      "electors_approx": 90000,
+      "electors_approx": 102900,
       "aliases": [
         "Parque Kennedy",
         "Larcomar"
@@ -265,7 +265,7 @@
       "name": "Pachacámac",
       "display": "Pachacámac",
       "zone": "Lima Sur",
-      "electors_approx": 90000,
+      "electors_approx": 102900,
       "aliases": [
         "Pachacamac",
         "Manchay"
@@ -276,7 +276,7 @@
       "name": "Pucusana",
       "display": "Pucusana",
       "zone": "Lima Sur",
-      "electors_approx": 12000,
+      "electors_approx": 13700,
       "aliases": []
     },
     {
@@ -284,7 +284,7 @@
       "name": "Puente Piedra",
       "display": "Puente Piedra",
       "zone": "Lima Norte",
-      "electors_approx": 250000,
+      "electors_approx": 285900,
       "aliases": [
         "Zapallal"
       ]
@@ -294,7 +294,7 @@
       "name": "Punta Hermosa",
       "display": "Punta Hermosa",
       "zone": "Lima Sur",
-      "electors_approx": 8000,
+      "electors_approx": 9100,
       "aliases": []
     },
     {
@@ -302,7 +302,7 @@
       "name": "Punta Negra",
       "display": "Punta Negra",
       "zone": "Lima Sur",
-      "electors_approx": 7000,
+      "electors_approx": 8000,
       "aliases": []
     },
     {
@@ -310,7 +310,7 @@
       "name": "Rímac",
       "display": "Rímac",
       "zone": "Lima Centro",
-      "electors_approx": 150000,
+      "electors_approx": 171600,
       "aliases": [
         "Rimac",
         "Alameda de los Descalzos",
@@ -323,7 +323,7 @@
       "name": "San Bartolo",
       "display": "San Bartolo",
       "zone": "Lima Sur",
-      "electors_approx": 7000,
+      "electors_approx": 8000,
       "aliases": []
     },
     {
@@ -331,7 +331,7 @@
       "name": "San Borja",
       "display": "San Borja",
       "zone": "Lima Moderna",
-      "electors_approx": 100000,
+      "electors_approx": 114400,
       "aliases": [
         "Pentagonito"
       ]
@@ -341,7 +341,7 @@
       "name": "San Isidro",
       "display": "San Isidro",
       "zone": "Lima Moderna",
-      "electors_approx": 60000,
+      "electors_approx": 68600,
       "aliases": [
         "El Olivar"
       ]
@@ -351,7 +351,7 @@
       "name": "San Juan de Lurigancho",
       "display": "San Juan de Lurigancho",
       "zone": "Lima Este",
-      "electors_approx": 770000,
+      "electors_approx": 823056,
       "aliases": [
         "SJL",
         "Canto Grande",
@@ -372,7 +372,7 @@
       "name": "San Juan de Miraflores",
       "display": "San Juan de Miraflores",
       "zone": "Lima Sur",
-      "electors_approx": 320000,
+      "electors_approx": 365920,
       "aliases": [
         "SJM",
         "Ciudad de Dios",
@@ -386,7 +386,7 @@
       "name": "San Luis",
       "display": "San Luis",
       "zone": "Lima Centro",
-      "electors_approx": 55000,
+      "electors_approx": 62900,
       "aliases": []
     },
     {
@@ -394,7 +394,7 @@
       "name": "San Martín de Porres",
       "display": "San Martín de Porres",
       "zone": "Lima Norte",
-      "electors_approx": 520000,
+      "electors_approx": 538911,
       "aliases": [
         "SMP",
         "San Martin de Porres",
@@ -410,7 +410,7 @@
       "name": "San Miguel",
       "display": "San Miguel",
       "zone": "Lima Moderna",
-      "electors_approx": 130000,
+      "electors_approx": 148700,
       "aliases": [
         "Maranga",
         "Plaza San Miguel"
@@ -421,7 +421,7 @@
       "name": "Santa Anita",
       "display": "Santa Anita",
       "zone": "Lima Este",
-      "electors_approx": 170000,
+      "electors_approx": 194400,
       "aliases": [
         "Mercado de Santa Anita"
       ]
@@ -431,7 +431,7 @@
       "name": "Santa María del Mar",
       "display": "Santa María del Mar",
       "zone": "Lima Sur",
-      "electors_approx": 1500,
+      "electors_approx": 1700,
       "aliases": [
         "Santa Maria del Mar"
       ]
@@ -441,7 +441,7 @@
       "name": "Santa Rosa",
       "display": "Santa Rosa",
       "zone": "Lima Norte",
-      "electors_approx": 20000,
+      "electors_approx": 22900,
       "aliases": []
     },
     {
@@ -449,7 +449,7 @@
       "name": "Santiago de Surco",
       "display": "Santiago de Surco",
       "zone": "Lima Moderna",
-      "electors_approx": 300000,
+      "electors_approx": 343100,
       "aliases": [
         "Surco",
         "Chacarilla",
@@ -463,7 +463,7 @@
       "name": "Surquillo",
       "display": "Surquillo",
       "zone": "Lima Moderna",
-      "electors_approx": 90000,
+      "electors_approx": 102900,
       "aliases": []
     },
     {
@@ -471,7 +471,7 @@
       "name": "Villa El Salvador",
       "display": "Villa El Salvador",
       "zone": "Lima Sur",
-      "electors_approx": 320000,
+      "electors_approx": 366000,
       "aliases": [
         "VES",
         "Villa el Salvador",
@@ -483,7 +483,7 @@
       "name": "Villa María del Triunfo",
       "display": "Villa María del Triunfo",
       "zone": "Lima Sur",
-      "electors_approx": 330000,
+      "electors_approx": 371159,
       "aliases": [
         "VMT",
         "Villa Maria del Triunfo",

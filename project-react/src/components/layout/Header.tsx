@@ -33,7 +33,7 @@ const sectionTitles: Record<string, string> = {
   monitoring: 'Prensa — Lima Metropolitana',
   social: 'Redes sociales',
   surveys: 'Encuestas',
-  'geo-demographics': 'Territorio',
+  territory: 'Territorio — Lima Metropolitana',
   recommendations: 'Recomendaciones IA',
   settings: 'Configuración',
 };
