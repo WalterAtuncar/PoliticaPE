@@ -483,7 +483,6 @@ async def generate_recommendations_for_figures(
     figure_ids: List[str],
     focus_areas: List[str],
 ) -> List[Dict[str, Any]]:
-    import httpx
 
     api_key = os.getenv("ANTHROPIC_API_KEY", "")
     if not api_key:
@@ -510,29 +509,21 @@ async def generate_recommendations_for_figures(
 
     logger.info(f"Sending prompt to Claude ({len(prompt)} chars) for {len(figures)} figure(s)")
 
-    async with httpx.AsyncClient(timeout=90.0) as client:
-        response = await client.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 8192,
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ],
-            },
-        )
+    import asyncio as _asyncio
+    from app.services.claude_client import get_client, model as claude_model
 
-    if response.status_code != 200:
-        logger.error(f"Claude API error: {response.status_code} - {response.text}")
-        raise ValueError(f"Error en la API de Claude: {response.status_code}")
+    response = await _asyncio.to_thread(
+        get_client().messages.create,
+        model=claude_model(),
+        max_tokens=16000,
+        thinking={"type": "adaptive"},
+        output_config={"effort": "high"},
+        messages=[{"role": "user", "content": prompt}],
+    )
 
-    result = response.json()
-    text_content = result["content"][0]["text"]
+    text_content = next((b.text for b in response.content if b.type == "text"), "")
+    if not text_content:
+        raise ValueError("Claude no devolvio texto en la respuesta")
 
     recommendations = parse_claude_response(text_content, figures)
 

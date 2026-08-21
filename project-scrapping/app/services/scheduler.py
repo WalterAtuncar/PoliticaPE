@@ -8,8 +8,10 @@ from typing import Optional, List, Dict
 logger = logging.getLogger(__name__)
 
 SCRAPING_INTERVAL_HOURS = int(os.getenv("SCRAPING_INTERVAL_HOURS", "6"))
+CLASSIFY_INTERVAL_MINUTES = int(os.getenv("CLASSIFY_INTERVAL_MINUTES", "15"))
 
 _scheduler_task: Optional[asyncio.Task] = None
+_classify_task: Optional[asyncio.Task] = None
 
 
 def get_active_tokens(db, platform: str) -> List[Dict]:
@@ -873,16 +875,42 @@ async def scheduler_loop():
         await asyncio.sleep(interval_seconds)
 
 
+async def classification_loop():
+    from app.config import settings
+    from app.services.classifier import run_classification_cycle
+    from app.services.claude_client import has_key
+
+    logger.info(f"[Classifier] Clasificacion automatica cada {CLASSIFY_INTERVAL_MINUTES} minutos")
+    await asyncio.sleep(90)
+
+    while True:
+        try:
+            if has_key():
+                result = await asyncio.to_thread(run_classification_cycle, settings.DATABASE_URL)
+                logger.info(f"[Classifier] {result}")
+            else:
+                logger.info("[Classifier] ANTHROPIC_API_KEY ausente; ciclo omitido")
+        except Exception as e:
+            logger.error(f"[Classifier] Error en ciclo: {e}")
+        await asyncio.sleep(CLASSIFY_INTERVAL_MINUTES * 60)
+
+
 def start_scheduler():
-    global _scheduler_task
+    global _scheduler_task, _classify_task
+    loop = asyncio.get_event_loop()
     if _scheduler_task is None or _scheduler_task.done():
-        loop = asyncio.get_event_loop()
         _scheduler_task = loop.create_task(scheduler_loop())
         logger.info("[Scheduler] Scheduler iniciado")
+    if _classify_task is None or _classify_task.done():
+        _classify_task = loop.create_task(classification_loop())
+        logger.info("[Classifier] Clasificador iniciado")
 
 
 def stop_scheduler():
-    global _scheduler_task
+    global _scheduler_task, _classify_task
     if _scheduler_task and not _scheduler_task.done():
         _scheduler_task.cancel()
         logger.info("[Scheduler] Scheduler detenido")
+    if _classify_task and not _classify_task.done():
+        _classify_task.cancel()
+        logger.info("[Classifier] Clasificador detenido")

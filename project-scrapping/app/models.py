@@ -326,3 +326,32 @@ class CompetitorCampaign(Base):
     sentiment_score = Column(Numeric(4,3), nullable=True)
     key_messages = Column(JSON, nullable=True)
     platforms = Column(JSON, nullable=True)
+
+
+class ContentClassification(Base):
+    __tablename__ = "content_classifications"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    content_type = Column(String(10), nullable=False)
+    content_id = Column(String, nullable=False)
+    figure_id = Column(String, nullable=True)
+    stance = Column(Float, nullable=True)
+    stance_label = Column(String(10), nullable=True)
+    topic = Column(String(40), nullable=False)
+    secondary_topics = Column(JSON(none_as_null=True), nullable=True)
+    is_attack = Column(Boolean, default=False)
+    attacker_figure_id = Column(String, nullable=True)
+    attacked_figure_id = Column(String, nullable=True)
+    districts = Column(JSON(none_as_null=True), nullable=True)
+    zone = Column(String(20), nullable=True)
+    summary = Column(String(300), nullable=True)
+    relevance = Column(Float, nullable=True)
+    model = Column(String(60), nullable=True)
+    classified_at = Column(DateTime, default=func.now())
+    content_published_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index('idx_cc_figure_time', 'figure_id', 'content_published_at'),
+        Index('idx_cc_topic_time', 'topic', 'content_published_at'),
+        Index('idx_cc_zone', 'zone'),
+    )
