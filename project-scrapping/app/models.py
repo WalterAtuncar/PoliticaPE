@@ -130,6 +130,11 @@ class PoliticalFigure(Base):
     is_active = Column(Boolean, default=True)
     monitoring_priority = Column(String(20), default='medium')
     notes = Column(Text, nullable=True)
+    figure_role = Column(String(30), default='candidate')
+    is_own_candidate = Column(Boolean, default=False)
+    list_name = Column(String(200), nullable=True)
+    color = Column(String(20), nullable=True)
+    zone_strength = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 

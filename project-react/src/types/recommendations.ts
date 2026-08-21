@@ -12,6 +12,11 @@ export interface PoliticalFigure {
   is_active: boolean;
   monitoring_priority: 'high' | 'medium' | 'low';
   notes?: string;
+  figure_role?: 'candidate' | 'incumbent' | 'national_actor' | 'institution';
+  is_own_candidate?: boolean;
+  list_name?: string;
+  color?: string;
+  zone_strength?: Record<string, number>;
   created_at: string;
   updated_at?: string;
 }

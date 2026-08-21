@@ -18,7 +18,7 @@ ON CONFLICT (code) DO NOTHING;
 -- Campaña municipal. party_id: el partido de OWN_CANDIDATE si existe en organization.parties; si no, el primero (placeholder).
 INSERT INTO organization.campaigns (tenant_id, party_id, name, description, election, start_date, end_date, status, region_code, objective, budget)
 SELECT t.id,
-       COALESCE((SELECT id FROM organization.parties WHERE slug = :own_party_slug LIMIT 1), (SELECT id FROM organization.parties LIMIT 1)),
+       COALESCE((SELECT id FROM organization.parties WHERE slug = %(own_party_slug)s LIMIT 1), (SELECT id FROM organization.parties LIMIT 1)),
        'Lima Metropolitana 2026',
        'Campaña municipal de Lima Metropolitana — ERM 2026 (4 de octubre de 2026)',
        'municipal', DATE '2026-08-21', DATE '2026-10-04', 'active', '1501', 'mobilization', 0
@@ -27,5 +27,5 @@ WHERE t.slug IN ('politica-pe', 'politicape')
   AND NOT EXISTS (SELECT 1 FROM organization.campaigns WHERE name = 'Lima Metropolitana 2026')
 LIMIT 1;
 
--- NOTA para el runner: este archivo usa el parámetro :own_party_slug. scripts/apply_migrations.py debe ejecutar
--- los .sql con db.execute(text(sql), {"own_party_slug": os.getenv("OWN_PARTY_SLUG", "")}).
+-- NOTA para el runner: este archivo usa el parametro %(own_party_slug)s (formato pyformat de psycopg2).
+-- scripts/apply_migrations.py lo pasa con conn.exec_driver_sql(sql, {"own_party_slug": os.getenv("OWN_PARTY_SLUG", "")}).

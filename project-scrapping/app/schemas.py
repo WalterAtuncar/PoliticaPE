@@ -265,6 +265,11 @@ class PoliticalFigureCreate(BaseModel):
     is_active: bool = True
     monitoring_priority: str = "medium"
     notes: Optional[str] = None
+    figure_role: str = "candidate"
+    is_own_candidate: bool = False
+    list_name: Optional[str] = None
+    color: Optional[str] = None
+    zone_strength: Optional[Dict[str, Any]] = None
 
 
 class PoliticalFigureUpdate(BaseModel):
@@ -280,6 +285,11 @@ class PoliticalFigureUpdate(BaseModel):
     is_active: Optional[bool] = None
     monitoring_priority: Optional[str] = None
     notes: Optional[str] = None
+    figure_role: Optional[str] = None
+    is_own_candidate: Optional[bool] = None
+    list_name: Optional[str] = None
+    color: Optional[str] = None
+    zone_strength: Optional[Dict[str, Any]] = None
 
 
 class PoliticalFigureResponse(BaseResponseModel):
@@ -296,6 +306,11 @@ class PoliticalFigureResponse(BaseResponseModel):
     is_active: bool
     monitoring_priority: str
     notes: Optional[str]
+    figure_role: Optional[str] = None
+    is_own_candidate: Optional[bool] = None
+    list_name: Optional[str] = None
+    color: Optional[str] = None
+    zone_strength: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: Optional[datetime]
 

@@ -23,9 +23,19 @@
       "figure_role": "candidate",
       "monitoring_priority": "high",
       "color": "#00AEEF",
-      "search_keywords": ["López Aliaga", "Lopez Aliaga", "Rafael López Aliaga", "Porky", "RLA"],
+      "search_keywords": [
+        "López Aliaga",
+        "Lopez Aliaga",
+        "Rafael López Aliaga",
+        "Porky",
+        "RLA"
+      ],
       "social_accounts": [
-        {"platform": "twitter", "handle": "rlopezaliaga1", "profile_url": "https://x.com/rlopezaliaga1", "verify": true}
+        {
+          "platform": "twitter",
+          "handle": "rlopezaliaga1",
+          "profile_url": "https://x.com/rlopezaliaga1"
+        }
       ],
       "notes": "Lidera encuestas de agosto (Ipsos 21, Datum 16, CIT 32). Fuerte Lima Moderna/Sur, débil Lima Este. Tema-marco: legalidad de la sucesión (Res. 1758-2026-JNE)."
     },
@@ -40,9 +50,17 @@
       "figure_role": "candidate",
       "monitoring_priority": "high",
       "color": "#FE0000",
-      "search_keywords": ["Carlos Bruce", "Bruce"],
+      "search_keywords": [
+        "Carlos Bruce",
+        "Bruce"
+      ],
       "social_accounts": [
-        {"platform": "twitter", "handle": "carlosbruce", "profile_url": "https://x.com/carlosbruce", "verify": true}
+        {
+          "platform": "twitter",
+          "handle": "carlosbruce",
+          "profile_url": "https://x.com/carlosbruce",
+          "verify": true
+        }
       ],
       "notes": "Segundo en todas las encuestas de agosto (13-17 %). Lideraba en julio."
     },
@@ -57,9 +75,16 @@
       "figure_role": "candidate",
       "monitoring_priority": "high",
       "color": "#6A1B9A",
-      "search_keywords": ["Urresti", "Daniel Urresti"],
+      "search_keywords": [
+        "Urresti",
+        "Daniel Urresti"
+      ],
       "social_accounts": [
-        {"platform": "twitter", "handle": "DanielUrresti1", "profile_url": "https://x.com/DanielUrresti1", "verify": true}
+        {
+          "platform": "twitter",
+          "handle": "DanielUrresti1",
+          "profile_url": "https://x.com/DanielUrresti1"
+        }
       ],
       "notes": "7-14 % en agosto. Históricamente fuerte en Lima Norte y Este."
     },
@@ -74,7 +99,10 @@
       "figure_role": "candidate",
       "monitoring_priority": "high",
       "color": "#2E3192",
-      "search_keywords": ["Allison", "Francis Allison"],
+      "search_keywords": [
+        "Allison",
+        "Francis Allison"
+      ],
       "social_accounts": [],
       "notes": "9 % Ipsos/Datum. Compite por el mismo votante que Bruce y López Aliaga."
     },
@@ -89,9 +117,16 @@
       "figure_role": "candidate",
       "monitoring_priority": "high",
       "color": "#E91E63",
-      "search_keywords": ["Susel Paredes", "Susel"],
+      "search_keywords": [
+        "Susel Paredes",
+        "Susel"
+      ],
       "social_accounts": [
-        {"platform": "twitter", "handle": "SuselParedes", "profile_url": "https://x.com/SuselParedes", "verify": true}
+        {
+          "platform": "twitter",
+          "handle": "suselparedes",
+          "profile_url": "https://x.com/suselparedes"
+        }
       ],
       "notes": "6-9 %. Única opción progresista con tracción."
     },
@@ -106,7 +141,10 @@
       "figure_role": "candidate",
       "monitoring_priority": "medium",
       "color": "#FF6600",
-      "search_keywords": ["Samuel Daza", "Daza Taype"],
+      "search_keywords": [
+        "Samuel Daza",
+        "Daza Taype"
+      ],
       "social_accounts": [],
       "notes": "Cayó de 10 % (julio) a 6 % (agosto, Ipsos)."
     },
@@ -121,7 +159,12 @@
       "figure_role": "candidate",
       "monitoring_priority": "medium",
       "color": "#795548",
-      "search_keywords": ["Belmont", "Ricardo Belmont", "Hermanón", "Hermanon"],
+      "search_keywords": [
+        "Belmont",
+        "Ricardo Belmont",
+        "Hermanón",
+        "Hermanon"
+      ],
       "social_accounts": [],
       "notes": "5-11 %. Reconocimiento alto, intención baja."
     },
@@ -136,7 +179,10 @@
       "figure_role": "candidate",
       "monitoring_priority": "medium",
       "color": "#BB0000",
-      "search_keywords": ["Alberto Tejada", "Tejada Noriega"],
+      "search_keywords": [
+        "Alberto Tejada",
+        "Tejada Noriega"
+      ],
       "social_accounts": [],
       "notes": "2-6 %."
     },
@@ -151,7 +197,10 @@
       "figure_role": "candidate",
       "monitoring_priority": "low",
       "color": "#003399",
-      "search_keywords": ["Elio Riera", "Riera Garro"],
+      "search_keywords": [
+        "Elio Riera",
+        "Riera Garro"
+      ],
       "social_accounts": [],
       "notes": ""
     },
@@ -166,7 +215,10 @@
       "figure_role": "candidate",
       "monitoring_priority": "low",
       "color": "#008000",
-      "search_keywords": ["Oswaldo Vargas Cuéllar", "Oswaldo Vargas Cuellar"],
+      "search_keywords": [
+        "Oswaldo Vargas Cuéllar",
+        "Oswaldo Vargas Cuellar"
+      ],
       "social_accounts": [],
       "notes": "Nombre común: usar nombre completo como keyword."
     },
@@ -181,7 +233,9 @@
       "figure_role": "candidate",
       "monitoring_priority": "low",
       "color": "#C90016",
-      "search_keywords": ["Yuri Castro"],
+      "search_keywords": [
+        "Yuri Castro"
+      ],
       "social_accounts": [],
       "notes": ""
     },
@@ -196,7 +250,12 @@
       "figure_role": "candidate",
       "monitoring_priority": "low",
       "color": "#FFC107",
-      "search_keywords": ["Elizabeth León", "Elizabeth Leon", "León Chinchay", "Leon Chinchay"],
+      "search_keywords": [
+        "Elizabeth León",
+        "Elizabeth Leon",
+        "León Chinchay",
+        "Leon Chinchay"
+      ],
       "social_accounts": [],
       "notes": ""
     },
@@ -211,7 +270,11 @@
       "figure_role": "candidate",
       "monitoring_priority": "low",
       "color": "#D32F2F",
-      "search_keywords": ["Mónica Yaya", "Monica Yaya", "Yaya Luyo"],
+      "search_keywords": [
+        "Mónica Yaya",
+        "Monica Yaya",
+        "Yaya Luyo"
+      ],
       "social_accounts": [],
       "notes": ""
     },
@@ -226,7 +289,10 @@
       "figure_role": "candidate",
       "monitoring_priority": "low",
       "color": "#1B5E20",
-      "search_keywords": ["Edgardo de Pomar", "De Pomar Vizcarra"],
+      "search_keywords": [
+        "Edgardo de Pomar",
+        "De Pomar Vizcarra"
+      ],
       "social_accounts": [],
       "notes": ""
     },
@@ -241,7 +307,10 @@
       "figure_role": "candidate",
       "monitoring_priority": "low",
       "color": "#0D47A1",
-      "search_keywords": ["Segundo Valdez", "Valdez Zavala"],
+      "search_keywords": [
+        "Segundo Valdez",
+        "Valdez Zavala"
+      ],
       "social_accounts": [],
       "notes": ""
     },
@@ -256,7 +325,11 @@
       "figure_role": "candidate",
       "monitoring_priority": "low",
       "color": "#662D91",
-      "search_keywords": ["Victoria La Cruz", "La Cruz Garcés", "La Cruz Garces"],
+      "search_keywords": [
+        "Victoria La Cruz",
+        "La Cruz Garcés",
+        "La Cruz Garces"
+      ],
       "social_accounts": [],
       "notes": ""
     },
@@ -271,7 +344,9 @@
       "figure_role": "candidate",
       "monitoring_priority": "low",
       "color": "#455A64",
-      "search_keywords": ["Sandro Caller"],
+      "search_keywords": [
+        "Sandro Caller"
+      ],
       "social_accounts": [],
       "notes": ""
     },
@@ -286,7 +361,9 @@
       "figure_role": "candidate",
       "monitoring_priority": "low",
       "color": "#2E7D32",
-      "search_keywords": ["Flor Hurtado"],
+      "search_keywords": [
+        "Flor Hurtado"
+      ],
       "social_accounts": [],
       "notes": ""
     },
@@ -301,7 +378,10 @@
       "figure_role": "candidate",
       "monitoring_priority": "low",
       "color": "#B71C1C",
-      "search_keywords": ["Juan Alvarado Mestanza", "Alvarado Mestanza"],
+      "search_keywords": [
+        "Juan Alvarado Mestanza",
+        "Alvarado Mestanza"
+      ],
       "social_accounts": [],
       "notes": "Nombre común: usar nombre completo."
     },
@@ -316,7 +396,10 @@
       "figure_role": "candidate",
       "monitoring_priority": "low",
       "color": "#00796B",
-      "search_keywords": ["Luis Llanos Carrillo", "Llanos Carrillo"],
+      "search_keywords": [
+        "Luis Llanos Carrillo",
+        "Llanos Carrillo"
+      ],
       "social_accounts": [],
       "notes": ""
     },
@@ -331,7 +414,10 @@
       "figure_role": "candidate",
       "monitoring_priority": "low",
       "color": "#5D4037",
-      "search_keywords": ["Carlos Gallardo Neyra", "Gallardo Neyra"],
+      "search_keywords": [
+        "Carlos Gallardo Neyra",
+        "Gallardo Neyra"
+      ],
       "social_accounts": [],
       "notes": ""
     },
@@ -346,7 +432,10 @@
       "figure_role": "incumbent",
       "monitoring_priority": "high",
       "color": "#0097A7",
-      "search_keywords": ["Reggiardo", "Renzo Reggiardo"],
+      "search_keywords": [
+        "Reggiardo",
+        "Renzo Reggiardo"
+      ],
       "social_accounts": [],
       "notes": "Su gestión es el 'récord' que defiende o ataca cada candidato. Aprobación vía Datum."
     },
@@ -361,9 +450,21 @@
       "figure_role": "institution",
       "monitoring_priority": "medium",
       "color": "#607D8B",
-      "search_keywords": ["Municipalidad de Lima", "Municipalidad Metropolitana", "alcaldía de Lima", "alcaldia de Lima", "MML", "Concejo Metropolitano"],
+      "search_keywords": [
+        "Municipalidad de Lima",
+        "Municipalidad Metropolitana",
+        "alcaldía de Lima",
+        "alcaldia de Lima",
+        "MML",
+        "Concejo Metropolitano"
+      ],
       "social_accounts": [
-        {"platform": "twitter", "handle": "MuniLima", "profile_url": "https://x.com/MuniLima", "verify": true}
+        {
+          "platform": "twitter",
+          "handle": "MuniLima",
+          "profile_url": "https://x.com/MuniLima",
+          "verify": true
+        }
       ],
       "notes": "Permite medir temas de gestión (basura, obras, serenazgo) sin atribuirlos a un candidato."
     },
@@ -378,12 +479,30 @@
       "figure_role": "national_actor",
       "monitoring_priority": "medium",
       "color": "#FF6600",
-      "search_keywords": ["Keiko Fujimori", "presidenta Fujimori", "Gobierno de Keiko"],
+      "search_keywords": [
+        "Keiko Fujimori",
+        "presidenta Fujimori",
+        "Gobierno de Keiko"
+      ],
       "social_accounts": [
-        {"platform": "twitter", "handle": "KeikoFujimori", "profile_url": "https://x.com/KeikoFujimori", "verify": true}
+        {
+          "platform": "twitter",
+          "handle": "KeikoFujimori",
+          "profile_url": "https://x.com/KeikoFujimori",
+          "verify": true
+        }
       ],
       "notes": "Gobierno central nuevo. Medidas en seguridad/transporte/presupuesto rebotan en la campaña limeña. Arrastre (negativo) sobre Samuel Daza."
     }
   ],
-  "deactivate_search_tags": ["Boluarte", "Dina Boluarte", "acuña", "carlos álvarez", "forsyth", "lópez chau", "presidenta Peru", "test"]
+  "deactivate_search_tags": [
+    "Boluarte",
+    "Dina Boluarte",
+    "acuña",
+    "carlos álvarez",
+    "forsyth",
+    "lópez chau",
+    "presidenta Peru",
+    "test"
+  ]
 }
