@@ -5,7 +5,9 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from urllib.parse import urljoin
 import json
+import os
 import re
+import unicodedata
 import uuid
 
 from app.scrapers.base import BaseScraper
@@ -13,148 +15,221 @@ from app.models import ScrapedSurvey
 from loguru import logger
 
 
+
+CANDIDATE_ALIASES = {
+    "lopez aliaga": "Rafael López Aliaga", "rafael lopez aliaga": "Rafael López Aliaga",
+    "bruce": "Carlos Bruce", "carlos bruce": "Carlos Bruce",
+    "urresti": "Daniel Urresti", "daniel urresti": "Daniel Urresti",
+    "allison": "Francis Allison", "francis allison": "Francis Allison",
+    "paredes": "Susel Paredes", "susel paredes": "Susel Paredes",
+    "daza": "Samuel Daza", "samuel daza": "Samuel Daza",
+    "belmont": "Ricardo Belmont", "ricardo belmont": "Ricardo Belmont",
+    "tejada": "Alberto Tejada", "alberto tejada": "Alberto Tejada",
+    "riera": "Elio Riera", "elio riera": "Elio Riera",
+    "oswaldo vargas": "Oswaldo Vargas",
+    "yuri castro": "Yuri Castro",
+    "elizabeth leon": "Elizabeth León",
+    "yaya": "Mónica Yaya", "monica yaya": "Mónica Yaya",
+    "de pomar": "Edgardo de Pomar", "edgardo de pomar": "Edgardo de Pomar",
+    "valdez": "Segundo Valdez", "segundo valdez": "Segundo Valdez",
+    "la cruz": "Victoria La Cruz", "victoria la cruz": "Victoria La Cruz",
+    "caller": "Sandro Caller", "sandro caller": "Sandro Caller",
+    "flor hurtado": "Flor Hurtado",
+    "juan alvarado": "Juan Alvarado Mestanza", "alvarado mestanza": "Juan Alvarado Mestanza",
+    "llanos": "Luis Llanos", "luis llanos": "Luis Llanos",
+    "carlos gallardo": "Carlos Gallardo", "gallardo neyra": "Carlos Gallardo",
+    "rubio": "Luis Rubio", "luis rubio": "Luis Rubio",
+}
+
+NON_CANDIDATE_COLUMNS = {"dif", "dif.", "ventaja", "otros", "otro", "otr", "otr.", "b/v", "blanco/viciado",
+                         "blanco", "viciado", "ns/nr", "ns/no", "nsnr", "no precisa", "ninguno", "indecisos", "nr"}
+
+MESES_ABR = {'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'may': 5, 'jun': 6, 'jul': 7, 'ago': 8,
+             'sep': 9, 'set': 9, 'oct': 10, 'nov': 11, 'dic': 12}
+
+
+def _norm(s: str) -> str:
+    s = unicodedata.normalize('NFKD', s or '').encode('ascii', 'ignore').decode()
+    s = re.sub(r'\[.*?\]', '', s).replace('​', '')
+    s = re.sub(r'\s*/\s*', '/', s)
+    return re.sub(r'\s+', ' ', s).strip().lower()
+
+
 class WikipediaPollScraper(BaseScraper):
 
     def __init__(self):
         super().__init__()
-        self.url = "https://es.wikipedia.org/wiki/Elecciones_generales_de_Per%C3%BA_de_2026"
+        self.url = os.getenv("WIKIPEDIA_POLLS_URL",
+                             "https://es.wikipedia.org/wiki/Elecciones_municipales_de_Lima_de_2026")
 
     def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
         return self._extract_poll_tables(response)
 
     def scrape(self, db: Session) -> int:
-        response = self._make_request(self.url)
+        response = self._make_request(
+            self.url, headers={'User-Agent': 'PoliticaPE/1.0 (contacto: walter150976@gmail.com)'}
+        )
         if not response:
-            logger.error("Wikipedia: no se pudo acceder a la página")
+            logger.error("Wikipedia: no se pudo acceder a la pagina de encuestas")
             return 0
-
-        all_items = []
-
-        poll_items = self._extract_poll_tables(response)
-        all_items.extend(poll_items)
-        logger.info(f"Wikipedia: {len(poll_items)} encuestas extraídas de tablas")
-
-        return self._save_items(db, all_items, ScrapedSurvey)
+        items = self._extract_poll_tables(response)
+        logger.info(f"Wikipedia municipal Lima: {len(items)} filas de encuesta extraidas")
+        return self._save_items(db, items, ScrapedSurvey)
 
     def _extract_poll_tables(self, response: requests.Response) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(response.content, 'html.parser')
         items = []
-
-        tables = soup.find_all('table', class_='wikitable')
-
-        for table in tables:
+        for table in soup.find_all('table', class_='wikitable'):
             rows = table.find_all('tr')
-            if len(rows) < 3:
+            if len(rows) < 2:
                 continue
-
-            header_row = rows[0]
-            header_cells = [th.get_text(strip=True) for th in header_row.find_all(['th', 'td'])]
-
-            if not any(kw in ' '.join(header_cells).lower() for kw in ['encuestadora', 'muestra', 'fecha']):
+            header_cells = rows[0].find_all(['th', 'td'])
+            headers = [_norm(c.get_text(" ", strip=True)) for c in header_cells]
+            if not headers or 'encuestadora' not in headers[0]:
                 continue
-
-            candidate_row = rows[1] if len(rows) > 1 else None
-            candidate_names = []
-            if candidate_row:
-                candidate_names = [td.get_text(strip=True) for td in candidate_row.find_all(['td', 'th'])]
-                has_names = any(re.search(r'[A-ZÁÉÍÓÚ][a-záéíóú]', c) for c in candidate_names if c)
-                if not has_names:
-                    candidate_names = []
-
-            data_start = 2 if candidate_names else 1
-
-            for row in rows[data_start:]:
-                cells = [td.get_text(strip=True) for td in row.find_all(['td', 'th'])]
+            columns = self._map_columns(header_cells)
+            has_raw_cols = any(c['kind'] in ('blank', 'undecided') for c in columns)
+            base = 'total' if has_raw_cols else 'validos'
+            for row in rows[1:]:
+                cells = [c.get_text(" ", strip=True) for c in row.find_all(['td', 'th'])]
                 if len(cells) < 4:
                     continue
-
-                item = self._parse_poll_row(cells, header_cells, candidate_names)
+                if len(cells) != len(columns):
+                    # Filas con rowspan (escenarios alternativos de la misma encuestadora):
+                    # las columnas quedan corridas, guardarlas produciria datos falsos.
+                    logger.debug(
+                        f"Wikipedia: fila descartada por desalineacion "
+                        f"({len(cells)} celdas vs {len(columns)} columnas): {cells[0][:40]}"
+                    )
+                    continue
+                item = self._parse_poll_row(cells, columns, base)
                 if item:
                     items.append(item)
-
         return items
 
-    def _parse_poll_row(self, cells: List[str], headers: List[str], candidates: List[str]) -> Optional[Dict[str, Any]]:
-        pollster = cells[0] if len(cells) > 0 else ''
-        date_str = cells[1] if len(cells) > 1 else ''
-        sample_str = cells[2] if len(cells) > 2 else ''
+    def _map_columns(self, header_cells) -> List[Dict[str, Any]]:
+        columns = []
+        for i, cell in enumerate(header_cells):
+            raw = cell.get_text(" ", strip=True)
+            link = cell.find('a')
+            label = _norm(link.get_text(strip=True)) if link else _norm(raw)
+            full = _norm(raw)
+            if i == 0:
+                columns.append({'kind': 'pollster', 'name': 'pollster'})
+            elif i == 1:
+                columns.append({'kind': 'date', 'name': 'date'})
+            elif i == 2:
+                columns.append({'kind': 'sample', 'name': 'sample'})
+            elif full.startswith('dif') or 'ventaja' in full:
+                columns.append({'kind': 'diff', 'name': 'diff'})
+            elif any(k in full for k in ('ns/nr', 'ns/no', 'no precisa', 'indeciso')):
+                columns.append({'kind': 'undecided', 'name': 'undecided'})
+            elif any(k in full for k in ('blanco', 'viciado', 'b/v')):
+                columns.append({'kind': 'blank', 'name': 'blank'})
+            elif full in NON_CANDIDATE_COLUMNS or full.startswith('otr'):
+                columns.append({'kind': 'other', 'name': 'otros'})
+            else:
+                name = self._canonical_candidate(label) or self._canonical_candidate(full)
+                if name:
+                    columns.append({'kind': 'candidate', 'name': name})
+                else:
+                    cleaned = re.sub(r'\[.*?\]', '', raw).strip()
+                    columns.append({'kind': 'candidate', 'name': cleaned[:60] or f'Columna {i}'})
+        return columns
 
-        pollster = re.sub(r'\[.*?\]', '', pollster).replace('\u200b', '').strip()
-        if not pollster or len(pollster) < 2:
+    def _canonical_candidate(self, text: str) -> Optional[str]:
+        t = _norm(text)
+        if not t:
+            return None
+        if t in CANDIDATE_ALIASES:
+            return CANDIDATE_ALIASES[t]
+        for alias, canon in sorted(CANDIDATE_ALIASES.items(), key=lambda kv: -len(kv[0])):
+            if re.search(r'\b' + re.escape(alias) + r'\b', t):
+                return canon
+        return None
+
+    @staticmethod
+    def _to_float(val: str) -> Optional[float]:
+        v = (val or '').replace(',', '.').replace('%', '').strip()
+        if v in ('', '-', '–', '—', '―'):
+            return None
+        v = re.sub(r'[^\d.]', '', v)
+        if not v or v == '.':
+            return None
+        try:
+            return float(v)
+        except ValueError:
             return None
 
-        sample_size = None
-        sample_clean = re.sub(r'[^\d]', '', sample_str)
-        if sample_clean and len(sample_clean) >= 3:
-            try:
-                sample_size = int(sample_clean)
-            except ValueError:
-                pass
+    def _parse_poll_row(self, cells: List[str], columns: List[Dict[str, Any]], base: str) -> Optional[Dict[str, Any]]:
+        pollster_raw = re.sub(r'\[.*?\]', '', cells[0]).replace('​', '').strip()
+        if len(pollster_raw) < 2:
+            return None
+        date_str = cells[1].strip()
+        if not date_str:
+            return None
+        sample_clean = re.sub(r'[^\d]', '', cells[2])
+        sample_size = int(sample_clean) if len(sample_clean) >= 2 else None
 
-        results = {}
-        percentages = []
-
-        data_cells = cells[3:]
-        for i, val in enumerate(data_cells):
-            val_clean = val.replace(',', '.').replace('―', '').replace('–', '').replace('-', '').strip()
-            try:
-                num = float(val_clean)
-                candidate_name = candidates[i] if i < len(candidates) else f"Opción {i+1}"
-                candidate_name = re.sub(r'\[.*?\]', '', candidate_name).replace('\u200b', '').strip()
-
-                if candidate_name and num > 0:
-                    percentages.append({"candidato": candidate_name, "porcentaje": num})
-            except (ValueError, IndexError):
+        candidates, undecided, blank, others, diff = [], None, None, None, None
+        for i, col in enumerate(columns):
+            if i >= len(cells) or i < 3:
                 continue
+            num = self._to_float(cells[i])
+            if col['kind'] == 'candidate':
+                candidates.append({'candidato': col['name'], 'porcentaje': num})
+            elif col['kind'] == 'undecided':
+                undecided = num
+            elif col['kind'] == 'blank':
+                blank = num
+            elif col['kind'] == 'other':
+                others = num
+            elif col['kind'] == 'diff':
+                diff = num
 
-        if not percentages:
+        ranked = sorted([c for c in candidates if c['porcentaje'] is not None],
+                        key=lambda c: -c['porcentaje'])
+        if not ranked:
             return None
-
-        exclude_names = {'b/v', 'ns/no', 'dif.', 'dif', 'ns', 'no', 'blanco', 'viciado', 'nr', 'ns/nc'}
-        percentages = [p for p in percentages if p['candidato'].lower() not in exclude_names and not p['candidato'].startswith('Opción')]
-
-        top_candidates = sorted(percentages, key=lambda x: x['porcentaje'], reverse=True)
 
         results = {
-            "tipo": "Intención de voto presidencial",
-            "candidatos": top_candidates,
-            "total_candidatos": len(top_candidates),
-            "lider": top_candidates[0]["candidato"] if top_candidates else None,
-            "lider_porcentaje": top_candidates[0]["porcentaje"] if top_candidates else None,
+            'tipo': 'Intencion de voto municipal',
+            'ambito': 'lima_metropolitana',
+            'base': base,
+            'candidatos': candidates,
+            'ranking': ranked,
+            'total_candidatos': len(ranked),
+            'lider': ranked[0]['candidato'],
+            'lider_porcentaje': ranked[0]['porcentaje'],
+            'segundo': ranked[1]['candidato'] if len(ranked) > 1 else None,
+            'segundo_porcentaje': ranked[1]['porcentaje'] if len(ranked) > 1 else None,
+            'diferencia_1_2': round(ranked[0]['porcentaje'] - ranked[1]['porcentaje'], 1) if len(ranked) > 1 else diff,
+            'indecisos': undecided,
+            'blanco_viciado': blank,
+            'otros': others,
         }
 
-        if len(top_candidates) >= 2:
-            results["diferencia_1_2"] = round(top_candidates[0]["porcentaje"] - top_candidates[1]["porcentaje"], 1)
-            results["segundo"] = top_candidates[1]["candidato"]
-            results["segundo_porcentaje"] = top_candidates[1]["porcentaje"]
-
-        if len(top_candidates) >= 3:
-            results["tercero"] = top_candidates[2]["candidato"]
-            results["tercero_porcentaje"] = top_candidates[2]["porcentaje"]
-
         published_at = self._parse_wiki_date(date_str)
-
-        source_parts = pollster.split('/')
-        pollster_name = source_parts[0].strip()
-        medio = source_parts[1].strip() if len(source_parts) > 1 else ''
-
-        title = f"Intención de voto: {top_candidates[0]['candidato']} lidera con {top_candidates[0]['porcentaje']}%"
-        if len(top_candidates) >= 2:
-            title += f" vs {top_candidates[1]['candidato']} {top_candidates[1]['porcentaje']}%"
+        parts = [p.strip() for p in pollster_raw.split('/')]
+        pollster_name, medio = parts[0], (parts[1] if len(parts) > 1 else '')
+        base_label = 'validos' if base == 'validos' else 'total de encuestados'
+        title = f"Lima 2026 ({base_label}): {ranked[0]['candidato']} {ranked[0]['porcentaje']}%"
+        if len(ranked) > 1:
+            title += f" vs {ranked[1]['candidato']} {ranked[1]['porcentaje']}%"
 
         return {
             'id': str(uuid.uuid4()),
             'source': pollster_name,
             'title': title[:500],
-            'methodology': f"Encuesta de opinión pública{' - ' + medio if medio else ''}",
+            'methodology': f"Encuesta de intencion de voto - base: {base_label}{' - ' + medio if medio else ''}",
             'sample_size': sample_size,
             'margin_error': self._estimate_margin(sample_size),
             'field_dates': date_str,
             'results': results,
             'published_at': published_at or datetime.now(),
             'url': self.url,
-            'pollster': pollster,
-            'processed': False
+            'pollster': pollster_raw,
+            'processed': False,
         }
 
     def _estimate_margin(self, sample_size: Optional[int]) -> Optional[float]:
@@ -164,64 +239,37 @@ class WikipediaPollScraper(BaseScraper):
         return round(1.96 * math.sqrt(0.25 / sample_size) * 100, 1)
 
     def _parse_wiki_date(self, date_str: str) -> Optional[datetime]:
-        if not date_str:
-            return None
-
-        date_str = date_str.strip()
-
-        meses = {
-            'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'may': 5, 'jun': 6,
-            'jul': 7, 'ago': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dic': 12,
-            'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5,
-            'junio': 6, 'julio': 7, 'agosto': 8, 'septiembre': 9,
-            'octubre': 10, 'noviembre': 11, 'diciembre': 12
-        }
-
-        match = re.search(r'(\d{1,2})\s*(?:de\s+)?(\w+)\s*(?:de\s+)?(\d{4})', date_str)
-        if match:
-            day = int(match.group(1))
-            month_str = match.group(2).lower()[:3]
-            year = int(match.group(3))
-            month = meses.get(month_str)
-            if month:
+        """Devuelve la fecha FINAL del trabajo de campo. Acepta '13-15 ago 2026', '26 jul-2 ago 2026',
+        '15 de agosto de 2026', 'agosto 2026'."""
+        raw = (date_str or '').replace('–', '-').replace('—', '-').replace('―', '-')
+        s = _norm(raw)
+        m = re.search(r'(\d{1,2})\s*(?:de\s+)?([a-z]+)?\s*-\s*(\d{1,2})\s*(?:de\s+)?([a-z]+)\s*(?:de\s+)?(\d{4})', s)
+        if m:
+            mon = MESES_ABR.get(m.group(4)[:3])
+            if mon:
                 try:
-                    return datetime(year, month, day)
+                    return datetime(int(m.group(5)), mon, int(m.group(3)))
                 except ValueError:
                     pass
-
-        match = re.search(r'(\d{1,2})/(\d{1,2})/(\d{4})', date_str)
-        if match:
-            try:
-                return datetime(int(match.group(3)), int(match.group(2)), int(match.group(1)))
-            except ValueError:
-                pass
-
-        match = re.search(r'(\d{1,2})[-–].*?(\d{1,2})/(\d{1,2})/(\d{4})', date_str)
-        if match:
-            try:
-                return datetime(int(match.group(4)), int(match.group(3)), int(match.group(2)))
-            except ValueError:
-                pass
-
-        match = re.search(r'(\w+)\s+(\d{4})', date_str)
-        if match:
-            month_str = match.group(1).lower()[:3]
-            year = int(match.group(2))
-            month = meses.get(month_str)
-            if month:
+        m = re.search(r'(\d{1,2})\s*(?:de\s+)?([a-z]+)\s*(?:de\s+)?(\d{4})', s)
+        if m:
+            mon = MESES_ABR.get(m.group(2)[:3])
+            if mon:
                 try:
-                    return datetime(year, month, 15)
+                    return datetime(int(m.group(3)), mon, int(m.group(1)))
                 except ValueError:
                     pass
-
+        m = re.search(r'([a-z]+)\s+(\d{4})', s)
+        if m and MESES_ABR.get(m.group(1)[:3]):
+            return datetime(int(m.group(2)), MESES_ABR[m.group(1)[:3]], 15)
         return None
 
     def _item_exists(self, db: Session, item_data: Dict[str, Any], model_class) -> bool:
-        existing = db.query(model_class).filter(
+        return db.query(model_class).filter(
             model_class.source == item_data['source'],
-            model_class.field_dates == item_data.get('field_dates')
-        ).first()
-        return existing is not None
+            model_class.field_dates == item_data.get('field_dates'),
+            model_class.methodology == item_data.get('methodology'),
+        ).first() is not None
 
 
 class IEPScraper(BaseScraper):

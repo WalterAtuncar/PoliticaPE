@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, Boolean, Float, Index, Date, ForeignKey, Numeric
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.sql import func
 from app.database import Base
 import uuid
@@ -6,7 +7,7 @@ import uuid
 class RawSocialPost(Base):
     __tablename__ = "raw_social_posts"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(PGUUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     platform = Column(String(50), nullable=False)
     post_id = Column(String(255), nullable=False)
     author = Column(String(255), nullable=True)
@@ -30,7 +31,7 @@ class RawSocialPost(Base):
 class NewsArticle(Base):
     __tablename__ = "news_articles"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(PGUUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     source = Column(String(100), nullable=False)
     title = Column(String(500), nullable=False)
     content = Column(Text, nullable=True)
@@ -54,7 +55,7 @@ class NewsArticle(Base):
 class GovernmentData(Base):
     __tablename__ = "government_data"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(PGUUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     source = Column(String(100), nullable=False)
     data_type = Column(String(100), nullable=False)
     title = Column(String(500), nullable=False)
@@ -76,7 +77,7 @@ class GovernmentData(Base):
 class ScrapedSurvey(Base):
     __tablename__ = "scraped_surveys"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(PGUUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     source = Column(String(100), nullable=False)
     title = Column(String(500), nullable=False)
     methodology = Column(Text, nullable=True)
@@ -200,7 +201,7 @@ class SocialApiToken(Base):
 class ScrapingLog(Base):
     __tablename__ = "scraping_logs"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(PGUUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     source = Column(String(100), nullable=False)
     scraping_type = Column(String(50), nullable=False)
     status = Column(String(20), nullable=False)
