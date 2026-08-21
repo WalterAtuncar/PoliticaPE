@@ -6,9 +6,11 @@ import { DistrictPanel } from './DistrictPanel';
 import { ZoneSummary } from './ZoneSummary';
 import { OpportunityList } from './OpportunityList';
 import { EventsPanel } from './EventsPanel';
+import { ResultsPanel } from './ResultsPanel';
 import { useTerritory } from '../../hooks/useTerritory';
 import { useOpportunity } from '../../hooks/useEvents';
 import { usePoliticalFigures } from '../../hooks/usePoliticalFigures';
+import { useElectoralConfig } from '../../hooks/useElectoralConfig';
 import { TOTAL_ELECTORS } from '../../data/limaDistricts';
 
 const PERIODS = [
@@ -24,9 +26,9 @@ const METRICS: { value: MapMetric; label: string }[] = [
   { value: 'opportunity', label: 'Oportunidad' },
 ];
 
-type TabId = 'map' | 'opportunity' | 'events';
+type TabId = 'map' | 'opportunity' | 'events' | 'results';
 
-const TABS: { id: TabId; label: string }[] = [
+const BASE_TABS: { id: TabId; label: string }[] = [
   { id: 'map', label: 'Mapa' },
   { id: 'opportunity', label: 'Oportunidad' },
   { id: 'events', label: 'Eventos' },
@@ -41,6 +43,7 @@ export const TerritoryPage: React.FC = () => {
   const [presetUbigeo, setPresetUbigeo] = useState<string | null>(null);
 
   const { figures } = usePoliticalFigures();
+  const { config } = useElectoralConfig();
   const { districts, zones, isLoading, error, refetch } = useTerritory({ days, figureId: figureId || undefined });
 
   const localFigures = useMemo(
@@ -64,6 +67,9 @@ export const TerritoryPage: React.FC = () => {
     () => districts.find(d => d.ubigeo === selected) || null,
     [districts, selected]
   );
+
+  const showResults = config?.phase === 'election_day' || config?.phase === 'post';
+  const TABS = showResults ? [...BASE_TABS, { id: 'results' as TabId, label: 'Resultados' }] : BASE_TABS;
 
   const scheduleAt = (ubigeo: string) => {
     setPresetUbigeo(ubigeo);
@@ -208,6 +214,8 @@ export const TerritoryPage: React.FC = () => {
       {tab === 'events' && (
         <EventsPanel presetUbigeo={presetUbigeo} onPresetUsed={() => setPresetUbigeo(null)} />
       )}
+
+      {tab === 'results' && <ResultsPanel />}
     </motion.div>
   );
 };

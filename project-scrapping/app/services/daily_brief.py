@@ -120,7 +120,18 @@ Estructura obligatoria (usa estos encabezados, en este orden):
 Maximo 550 palabras. Nada de introducciones ni despedidas."""
 
 
-def build_prompts(data: Dict[str, Any], brief_date: date):
+POSTELECTORAL_EXTRA = """
+ATENCION: este NO es el brief diario, es el INFORME POST-ELECTORAL. Ignora la estructura anterior y usa esta:
+# <titular con el resultado>
+## Resultado global (votos y porcentaje por lista, actas contabilizadas)
+## Resultado por zona (las cinco zonas de Lima)
+## Donde acertamos y donde no (usa vs_opportunity: correlacion de Spearman, distritos de alto score que ganamos y los que no)
+## Que explico la diferencia (temas, ataques y alertas de la ultima semana)
+## Lecciones para la gestion o la oposicion
+Maximo 700 palabras."""
+
+
+def build_prompts(data: Dict[str, Any], brief_date: date, kind: str = "daily"):
     own = data.get("own_candidate") or ""
     system = SYSTEM_TEMPLATE.format(
         own_candidate=own if own else "(sin definir: escribe el brief en modo observador comparando a los tres punteros)",
@@ -131,6 +142,8 @@ def build_prompts(data: Dict[str, Any], brief_date: date):
     )
     if data.get("phase") in ("poll_blackout", "closing", "election_day"):
         system += "\n\nATENCION: rige la veda de publicacion de encuestas. Encabeza el brief con la linea `> VEDA DE ENCUESTAS - uso interno. No difundir cifras.`"
+    if kind == "postelectoral":
+        system += "\n" + POSTELECTORAL_EXTRA
 
     user = (
         f"Fecha del brief: {brief_date.isoformat()} "
@@ -152,8 +165,10 @@ def _strip_polls_section(markdown: str) -> str:
 
 
 def generate(db: Session, brief_date: Optional[date] = None, send: bool = False,
-             force: bool = False) -> Dict[str, Any]:
+             force: bool = False, kind: str = "daily") -> Dict[str, Any]:
     brief_date = brief_date or datetime.now(LIMA).date()
+    if kind == "postelectoral":
+        brief_date = ec.ELECTION_DATE + timedelta(days=1)
 
     existing = db.execute(text("SELECT * FROM daily_briefs WHERE brief_date = :d"), {"d": brief_date}).fetchone()
     if existing and not force and not send:
@@ -163,7 +178,22 @@ def generate(db: Session, brief_date: Optional[date] = None, send: bool = False,
         raise RuntimeError("ANTHROPIC_API_KEY no esta configurada")
 
     data = collect_data(db, brief_date)
-    system, user = build_prompts(data, brief_date)
+    data["kind"] = kind
+    if kind == "postelectoral":
+        try:
+            from app.models import PoliticalFigure
+            from app.services import results as results_service
+            own = db.query(PoliticalFigure).filter(PoliticalFigure.is_own_candidate == True).first()
+            source = db.execute(text(
+                "SELECT source FROM election_results ORDER BY loaded_at DESC LIMIT 1"
+            )).scalar() or "onpe"
+            data["results"] = results_service.summary(db, source)
+            if own:
+                data["vs_opportunity"] = results_service.vs_opportunity(db, own.id, source)
+        except Exception as e:
+            logger.warning(f"[Brief] resultados no disponibles: {e}")
+            data["results"] = {}
+    system, user = build_prompts(data, brief_date, kind)
     model_name = model()
 
     response = get_client().messages.create(

@@ -16,6 +16,7 @@ _scheduler_task: Optional[asyncio.Task] = None
 _classify_task: Optional[asyncio.Task] = None
 _brief_task: Optional[asyncio.Task] = None
 _alert_task: Optional[asyncio.Task] = None
+_results_task: Optional[asyncio.Task] = None
 
 
 def get_active_tokens(db, platform: str) -> List[Dict]:
@@ -950,8 +951,39 @@ async def alert_loop():
         await asyncio.sleep(interval * 60)
 
 
+async def results_loop():
+    """Solo corre el dia de la eleccion y las 72 h siguientes."""
+    from datetime import timedelta
+
+    from app import electoral_config as ec
+    from app.config import settings
+    from app.database import SessionLocal
+    from app.scrapers.onpe_results import OnpeResultsScraper
+    from app.services import results as results_service
+
+    while True:
+        phase = ec.campaign_phase()
+        deadline = datetime.combine(ec.ELECTION_DATE, datetime.min.time()) + timedelta(days=3)
+        if phase in ("election_day", "post") and datetime.utcnow() < deadline:
+            scraper = OnpeResultsScraper()
+            if scraper.is_configured():
+                db = SessionLocal()
+                try:
+                    rows = await asyncio.to_thread(scraper.fetch_lima_districts)
+                    saved = await asyncio.to_thread(results_service.upsert_results, db, rows, "onpe")
+                    logger.info(f"[Results] {saved} filas de ONPE cargadas")
+                except Exception as e:
+                    logger.error(f"[Results] Error: {e}")
+                finally:
+                    db.close()
+                    scraper.close()
+            else:
+                logger.info("[Results] ONPE_RESULTS_URL sin configurar; se espera carga por CSV")
+        await asyncio.sleep(15 * 60)
+
+
 def start_scheduler():
-    global _scheduler_task, _classify_task, _brief_task, _alert_task
+    global _scheduler_task, _classify_task, _brief_task, _alert_task, _results_task
     loop = asyncio.get_event_loop()
     if _scheduler_task is None or _scheduler_task.done():
         _scheduler_task = loop.create_task(scheduler_loop())
@@ -965,10 +997,12 @@ def start_scheduler():
     if _alert_task is None or _alert_task.done():
         _alert_task = loop.create_task(alert_loop())
         logger.info("[Alerts] Motor de alertas iniciado")
+    if _results_task is None or _results_task.done():
+        _results_task = loop.create_task(results_loop())
 
 
 def stop_scheduler():
-    global _scheduler_task, _classify_task, _brief_task, _alert_task
+    global _scheduler_task, _classify_task, _brief_task, _alert_task, _results_task
     if _scheduler_task and not _scheduler_task.done():
         _scheduler_task.cancel()
         logger.info("[Scheduler] Scheduler detenido")
@@ -979,3 +1013,5 @@ def stop_scheduler():
         _brief_task.cancel()
     if _alert_task and not _alert_task.done():
         _alert_task.cancel()
+    if _results_task and not _results_task.done():
+        _results_task.cancel()

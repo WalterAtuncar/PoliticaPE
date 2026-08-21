@@ -36,7 +36,13 @@ def main():
                 if "%(own_party_slug)s" in sql:
                     conn.exec_driver_sql(sql, params)
                 else:
-                    conn.exec_driver_sql(sql)
+                    # Sin parametros se usa el cursor crudo: psycopg2 solo interpola cuando
+                    # se le pasan argumentos, asi un '%' en un comentario no rompe la migracion.
+                    cursor = conn.connection.cursor()
+                    try:
+                        cursor.execute(sql)
+                    finally:
+                        cursor.close()
                 conn.exec_driver_sql(
                     "INSERT INTO public.schema_migrations (filename) VALUES (%(f)s)", {"f": path.name}
                 )

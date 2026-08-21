@@ -144,11 +144,12 @@ def get_latest_brief(current_user: dict = Depends(get_current_user), db: Session
 def post_generate_brief(
     send: bool = Query(False, description="enviar por Telegram y correo"),
     force: bool = Query(True, description="regenerar aunque ya exista el de hoy"),
+    kind: str = Query("daily", pattern="^(daily|postelectoral)$"),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     try:
-        return {"brief": daily_brief.generate(db, send=send, force=force)}
+        return {"brief": daily_brief.generate(db, send=send, force=force, kind=kind)}
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

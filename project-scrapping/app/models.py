@@ -465,3 +465,22 @@ class Volunteer(Base):
     status = Column(String(20), default='active')
     assigned_event_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=func.now())
+
+
+class ElectionResult(Base):
+    __tablename__ = "election_results"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    ubigeo = Column(String(6), nullable=False)
+    district_name = Column(String(100), nullable=True)
+    figure_id = Column(String, nullable=True)
+    list_name = Column(String(200), nullable=False)
+    votes = Column(Integer, nullable=True)
+    pct_valid = Column(Numeric(5, 2), nullable=True)
+    actas_pct = Column(Numeric(5, 2), nullable=True)
+    source = Column(String(50), nullable=False)
+    loaded_at = Column(DateTime, default=func.now())
+
+    __table_args__ = (
+        Index('idx_results_ubigeo_col', 'ubigeo'),
+    )

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import data, scraping, analysis, auth, campaigns, competitors, settings, political_figures, recommendations, electoral, territory, race, alerts, events
+from app.api.endpoints import data, scraping, analysis, auth, campaigns, competitors, settings, political_figures, recommendations, electoral, territory, race, alerts, events, results
 
 api_router = APIRouter()
 
@@ -17,3 +17,4 @@ api_router.include_router(territory.router, prefix="/territory", tags=["territor
 api_router.include_router(race.router, prefix="/race", tags=["race"])
 api_router.include_router(alerts.router, prefix="/alerts", tags=["alerts"])
 api_router.include_router(events.router, prefix="/events", tags=["events"])
+api_router.include_router(results.router, prefix="/results", tags=["results"])
