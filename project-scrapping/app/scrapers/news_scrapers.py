@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urljoin, urlparse
 import re
 import uuid
@@ -10,6 +10,7 @@ import uuid
 from app.scrapers.base import BaseScraper
 from app.models import NewsArticle
 from app.services.sentiment_analyzer import SentimentAnalyzer
+from app.services.lima_geo import detect_scope, figure_keywords
 from loguru import logger
 
 sentiment_analyzer = SentimentAnalyzer()
@@ -125,22 +126,31 @@ class PeruvianNewsScraper(BaseScraper):
 
     def _save_articles(self, db: Session, items: List[Dict[str, Any]]) -> int:
         saved = 0
+        try:
+            keywords = figure_keywords(db)
+        except Exception as e:
+            logger.warning(f"[{self.source_key}] No se pudieron cargar keywords de figuras: {e}")
+            keywords = []
         for item in items:
             try:
                 score = sentiment_analyzer.analyze(item.get('title', '') + ' ' + item.get('content', ''))
+                scope, districts = detect_scope(item.get('title', ''), item.get('content', '') or '', keywords)
                 article = NewsArticle(
                     id=str(uuid.uuid4()),
                     source=item['source'],
                     title=item['title'][:500],
                     content=item.get('content', '')[:5000] if item.get('content') else None,
                     author=item.get('author'),
-                    published_at=item.get('published_at') or datetime.now(),
-                    scraped_at=datetime.now(),
+                    published_at=item.get('published_at') or datetime.utcnow(),
+                    scraped_at=datetime.utcnow(),
                     url=item['url'][:1000],
                     category=item.get('category', 'Actualidad'),
                     tags=item.get('tags'),
                     sentiment_score=score.get('compound', 0) if isinstance(score, dict) else (score if isinstance(score, (int, float)) else 0),
                     processed=True,
+                    scope=scope,
+                    districts=districts or None,
+                    classified=False,
                 )
                 db.add(article)
                 saved += 1
@@ -177,7 +187,7 @@ class ElComercioScraper(PeruvianNewsScraper):
         super().__init__()
         self.source_key = 'elcomercio'
         self.base_url = "https://elcomercio.pe"
-        self.sections = ["/politica/", "/economia/", "/peru/"]
+        self.sections = ["/politica/", "/lima/", "/economia/", "/peru/"]
 
     def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(response.content, 'html.parser')
@@ -218,7 +228,7 @@ class RPPScraper(PeruvianNewsScraper):
         super().__init__()
         self.source_key = 'rpp'
         self.base_url = "https://rpp.pe"
-        self.sections = ["/politica", "/economia", "/peru"]
+        self.sections = ["/politica", "/lima", "/economia", "/peru"]
 
     def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(response.content, 'html.parser')
@@ -320,7 +330,7 @@ class Peru21Scraper(PeruvianNewsScraper):
         super().__init__()
         self.source_key = 'peru21'
         self.base_url = "https://peru21.pe"
-        self.sections = ["/politica/", "/economia/", "/peru/"]
+        self.sections = ["/politica/", "/lima/", "/economia/", "/peru/"]
 
     def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(response.content, 'html.parser')
@@ -429,44 +439,68 @@ class InfobaeScraper(PeruvianNewsScraper):
 
 
 class AndinaScraper(PeruvianNewsScraper):
+    """Andina renderiza sus secciones con JavaScript, por eso se usa su RSS,
+    que si expone titulo, enlace, resumen y fecha de publicacion."""
+
     def __init__(self):
         super().__init__()
         self.source_key = 'andina'
         self.base_url = "https://andina.pe"
-        self.sections = ["/agencia/seccion-politica-17.aspx", "/agencia/seccion-economia-2.aspx"]
+        self.sections = ["/agencia/rss.aspx"]
 
     def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
-        soup = BeautifulSoup(response.content, 'html.parser')
+        try:
+            soup = BeautifulSoup(response.content, 'xml')
+        except Exception:
+            soup = BeautifulSoup(response.content, 'html.parser')
+        if not soup.find('item'):
+            soup = BeautifulSoup(response.content, 'html.parser')
+
         articles = []
         seen = set()
-
-        # Andina uses both single-quoted and double-quoted href attributes.
-        # Article links follow the pattern: noticia-<slug>-<id>.aspx (relative)
-        # or https://andina.pe/agencia/noticia-<slug>-<id>.aspx (absolute)
-        for link in soup.find_all('a', href=True):
-            href = link['href']
-            # Match both relative and absolute noticia links
-            if 'noticia-' not in href:
-                continue
-            # Skip social share links
-            if any(domain in href for domain in ['facebook.com', 'twitter.com', 'linkedin.com']):
-                continue
-            url = urljoin(self.base_url + '/agencia/', href)
-            if url in seen:
+        for item in soup.find_all('item'):
+            link_tag = item.find('link')
+            url = (link_tag.get_text(strip=True) if link_tag else '') or ''
+            if not url:
+                guid = item.find('guid')
+                url = guid.get_text(strip=True) if guid else ''
+            if not url or 'noticia-' not in url or url in seen:
                 continue
             seen.add(url)
-            title = _clean_text(link.get_text())
+
+            title_tag = item.find('title')
+            title = _clean_text(title_tag.get_text()) if title_tag else ''
             if not title or len(title) < 15:
                 continue
+
+            desc_tag = item.find('description')
+            content = _clean_text(desc_tag.get_text()) if desc_tag else ''
+
+            published_at = None
+            date_tag = item.find('pubDate')
+            if date_tag:
+                published_at = self._parse_rss_date(date_tag.get_text(strip=True))
+
             articles.append({
                 'source': 'Andina',
                 'title': title,
-                'content': '',
+                'content': content,
                 'url': url,
                 'category': _detect_category(url, title),
-                'published_at': datetime.now(),
+                'published_at': published_at or datetime.utcnow(),
             })
-        return articles[:20]
+        return articles[:40]
+
+    @staticmethod
+    def _parse_rss_date(value: str) -> Optional[datetime]:
+        if not value:
+            return None
+        from email.utils import parsedate_to_datetime
+        try:
+            dt = parsedate_to_datetime(value)
+            return dt.replace(tzinfo=None) - (dt.utcoffset() or timedelta(0))
+        except Exception:
+            return None
 
 
 class CanalNScraper(PeruvianNewsScraper):
@@ -476,7 +510,7 @@ class CanalNScraper(PeruvianNewsScraper):
         super().__init__()
         self.source_key = 'canaln'
         self.base_url = "https://canaln.pe"
-        self.sections = ["/actualidad", "/politica"]
+        self.sections = ["/actualidad", "/peru"]
 
     def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(response.content, 'html.parser')
@@ -609,7 +643,7 @@ class PanamericanaScraper(PeruvianNewsScraper):
         super().__init__()
         self.source_key = 'panamericana'
         self.base_url = "https://panamericana.pe"
-        self.sections = ["/politica", "/nacionales"]
+        self.sections = ["/politica", "/locales", "/nacionales"]
 
     def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(response.content, 'html.parser')
@@ -647,7 +681,7 @@ class TVPeruScraper(PeruvianNewsScraper):
         super().__init__()
         self.source_key = 'tvperu'
         self.base_url = "https://www.tvperu.gob.pe"
-        self.sections = ["/noticias", "/noticias/seccion/politica"]
+        self.sections = ["/noticias", "/noticias/seccion/politica", "/noticias/seccion/locales"]
 
     def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(response.content, 'html.parser')

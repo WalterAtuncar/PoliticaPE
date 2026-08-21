@@ -26,6 +26,9 @@ class NewsArticleResponse(BaseResponseModel):
     tags: Optional[List[str]]
     sentiment_score: Optional[float]
     political_entities: Optional[Dict[str, Any]]
+    scope: Optional[str] = None
+    districts: Optional[List[Dict[str, Any]]] = None
+    topics: Optional[Dict[str, Any]] = None
 
 class SocialPostResponse(BaseResponseModel):
     id: str
@@ -38,6 +41,9 @@ class SocialPostResponse(BaseResponseModel):
     engagement_metrics: Optional[Dict[str, Any]]
     sentiment_score: Optional[float]
     geographic_location: Optional[str]
+    scope: Optional[str] = None
+    districts: Optional[List[Dict[str, Any]]] = None
+    topics: Optional[Dict[str, Any]] = None
 
 class GovernmentDataResponse(BaseResponseModel):
     id: str

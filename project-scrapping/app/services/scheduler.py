@@ -89,6 +89,8 @@ async def run_twitter_with_token(db, token_info: Dict, sentiment_analyzer, days_
 
     try:
         from datetime import timedelta
+        from app.services.lima_geo import detect_scope, figure_keywords
+        fig_keywords = figure_keywords(db)
         tags = get_active_tags(db, "twitter")
         queries = ["Peru politica OR congreso peru OR presidente peru"]
         for tag in tags:
@@ -120,6 +122,7 @@ async def run_twitter_with_token(db, token_info: Dict, sentiment_analyzer, days_
                         continue
 
                     sentiment_score = sentiment_analyzer.analyze(transformed.get("content", ""))
+                    scope, districts = detect_scope("", transformed.get("content", ""), fig_keywords)
                     post = RawSocialPost(
                         id=str(uuid.uuid4()),
                         platform=transformed["platform"],
@@ -128,10 +131,13 @@ async def run_twitter_with_token(db, token_info: Dict, sentiment_analyzer, days_
                         content=transformed["content"],
                         created_at=transformed["created_at"],
                         engagement_metrics=transformed["engagement_metrics"],
-                        geographic_location=transformed.get("geographic_location"),
-                        region=transformed.get("region", "Nacional"),
+                        geographic_location=districts[0]["name"] if districts else transformed.get("geographic_location"),
+                        region="Lima Metropolitana" if districts else transformed.get("region", "Nacional"),
                         sentiment_score=sentiment_score,
-                        processed=True
+                        processed=True,
+                        scope=scope,
+                        districts=districts or None,
+                        classified=False
                     )
                     db.add(post)
                     tag_count += 1
@@ -175,6 +181,8 @@ async def run_youtube_with_token(db, token_info: Dict, sentiment_analyzer, days_
         return 0
 
     try:
+        from app.services.lima_geo import detect_scope, figure_keywords
+        fig_keywords = figure_keywords(db)
         tags = get_active_tags(db, "youtube")
         queries = ["política Perú congreso gobierno"]
         for tag in tags:
@@ -211,6 +219,7 @@ async def run_youtube_with_token(db, token_info: Dict, sentiment_analyzer, days_
                         if not content:
                             content = f"{video.get('title', '')} {video.get('description', '')}"
                         sentiment_score = sentiment_analyzer.analyze(content)
+                        scope, districts = detect_scope("", content, fig_keywords)
                         post = RawSocialPost(
                             id=str(uuid.uuid4()),
                             platform="youtube",
@@ -221,9 +230,13 @@ async def run_youtube_with_token(db, token_info: Dict, sentiment_analyzer, days_
                             engagement_metrics=video.get("engagement_metrics", {
                                 "likes": 0, "shares": 0, "comments": 0, "views": 0
                             }),
-                            region=video.get("region", "Nacional"),
+                            geographic_location=districts[0]["name"] if districts else None,
+                            region="Lima Metropolitana" if districts else video.get("region", "Nacional"),
                             sentiment_score=sentiment_score,
-                            processed=True
+                            processed=True,
+                            scope=scope,
+                            districts=districts or None,
+                            classified=False
                         )
                         db.add(post)
                         tag_count += 1
@@ -478,7 +491,7 @@ async def run_scheduled_social_scraping(db_url: str, platform: str, days_back: i
 
         log.status = "completed"
         log.items_scraped = total_added
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         log.extra_metadata = {
             "triggered_by": "scheduler",
             "tokens_used": len(tokens),
@@ -492,7 +505,7 @@ async def run_scheduled_social_scraping(db_url: str, platform: str, days_back: i
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         db.commit()
         logger.error(f"[Scheduler] Error {platform}: {e}")
         return 0
@@ -546,7 +559,7 @@ async def run_scheduled_government_scraping(db_url: str):
 
         log.status = "completed"
         log.items_scraped = total_items
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         log.extra_metadata = {
             "triggered_by": "scheduler",
             "sources": details
@@ -559,7 +572,7 @@ async def run_scheduled_government_scraping(db_url: str):
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         db.commit()
         logger.error(f"[Scheduler] Error datos gubernamentales: {e}")
         return 0
@@ -612,7 +625,7 @@ def run_government_scraping_sync(db_url: str):
 
         log.status = "completed"
         log.items_scraped = total_items
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         log.extra_metadata = {
             "triggered_by": "trigger_endpoint",
             "sources": details
@@ -625,7 +638,7 @@ def run_government_scraping_sync(db_url: str):
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         db.commit()
         logger.error(f"[Scheduler] Error datos gubernamentales: {e}")
         import traceback
@@ -680,7 +693,7 @@ async def run_scheduled_survey_scraping(db_url: str):
 
         log.status = "completed"
         log.items_scraped = total_items
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         log.extra_metadata = {
             "triggered_by": "scheduler",
             "pollsters": details
@@ -693,7 +706,7 @@ async def run_scheduled_survey_scraping(db_url: str):
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         db.commit()
         logger.error(f"[Scheduler] Error encuestas: {e}")
         return 0
@@ -747,7 +760,7 @@ async def run_historical_scraping() -> Dict:
 
         log.status = "completed"
         log.items_scraped = total
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         log.extra_metadata = {
             "triggered_by": "historical_endpoint",
             "days_back": HISTORICAL_DAYS_BACK,
@@ -761,12 +774,52 @@ async def run_historical_scraping() -> Dict:
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)[:500]
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         db.commit()
         logger.error(f"[Historical] Error general: {e}")
         return {"status": "failed", "error": str(e)[:200]}
     finally:
         _historical_running = False
+        db.close()
+
+
+async def run_scheduled_news_scraping(db_url: str) -> int:
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.models import ScrapingLog
+    from app.scrapers.news_scrapers import run_news_scraping
+
+    engine = create_engine(db_url)
+    SessionLocal = sessionmaker(bind=engine)
+    db = SessionLocal()
+
+    log = ScrapingLog(
+        id=str(uuid.uuid4()),
+        source="news",
+        scraping_type="news",
+        status="running"
+    )
+    db.add(log)
+    db.commit()
+
+    try:
+        results = await asyncio.to_thread(run_news_scraping, db, None)
+        total = sum(results.values())
+        log.status = "completed"
+        log.items_scraped = total
+        log.completed_at = datetime.utcnow()
+        log.extra_metadata = {"triggered_by": "scheduler", "sources": results}
+        db.commit()
+        logger.info(f"[Scheduler] Noticias: {total} articulos nuevos")
+        return total
+    except Exception as e:
+        log.status = "failed"
+        log.error_message = str(e)[:500]
+        log.completed_at = datetime.utcnow()
+        db.commit()
+        logger.error(f"[Scheduler] Error noticias: {e}")
+        return 0
+    finally:
         db.close()
 
 
@@ -777,6 +830,12 @@ async def run_all_scrapers():
     logger.info("[Scheduler] Iniciando ciclo de scraping automático...")
 
     total = 0
+
+    try:
+        total += await run_scheduled_news_scraping(db_url)
+    except Exception as e:
+        logger.error(f"[Scheduler] Error en news scraping: {e}")
+
     for platform in ["twitter", "youtube", "instagram", "facebook"]:
         try:
             count = await run_scheduled_social_scraping(db_url, platform)
@@ -802,7 +861,7 @@ async def scheduler_loop():
     interval_seconds = SCRAPING_INTERVAL_HOURS * 3600
     logger.info(f"[Scheduler] Scraping automático cada {SCRAPING_INTERVAL_HOURS} horas")
 
-    await asyncio.sleep(120)
+    await asyncio.sleep(30)
 
     while True:
         try:

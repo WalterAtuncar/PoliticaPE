@@ -34,6 +34,7 @@ const SOURCE_TYPE_CONFIG: Record<string, { icon: React.ElementType; label: strin
 const initialFilters: NewsFilters = {
   source: 'all',
   category: 'all',
+  scope: 'lima_metropolitana',
   search: '',
   autoRefresh: false,
   refreshInterval: 60,
@@ -233,6 +234,18 @@ export const MonitoringPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => setFilters(f => ({ ...f, scope: f.scope === 'lima_metropolitana' ? 'all' : 'lima_metropolitana' }))}
+              className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                filters.scope === 'lima_metropolitana'
+                  ? 'bg-teal-600 text-white border-teal-600'
+                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600'
+              }`}
+              title="Mostrar solo noticias de Lima Metropolitana"
+            >
+              Solo Lima
+            </button>
+
             <select
               value={filters.source}
               onChange={e => setFilters(f => ({ ...f, source: e.target.value }))}
@@ -399,6 +412,15 @@ const NewsCard: React.FC<{ article: NewsArticle; index: number }> = ({ article, 
                   {article.category}
                 </span>
               )}
+              {(article.districts || []).slice(0, 3).map(d => (
+                <span
+                  key={d.ubigeo}
+                  title={d.zone}
+                  className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300"
+                >
+                  {d.name}
+                </span>
+              ))}
               <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1 ml-auto">
                 <Clock className="h-3 w-3" />
                 {formatTimeAgo(article.scraped_at)}

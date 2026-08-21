@@ -20,6 +20,10 @@ class RawSocialPost(Base):
     sentiment_score = Column(Float, nullable=True)
     geographic_location = Column(String(100), nullable=True)
     region = Column(String(100), nullable=True)
+    scope = Column(String(30), nullable=True)
+    districts = Column(JSON, nullable=True)
+    topics = Column(JSON, nullable=True)
+    classified = Column(Boolean, default=False)
     
     __table_args__ = (
         Index('idx_platform_post_id', 'platform', 'post_id'),
@@ -44,6 +48,10 @@ class NewsArticle(Base):
     sentiment_score = Column(Float, nullable=True)
     political_entities = Column(JSON, nullable=True)
     processed = Column(Boolean, default=False)
+    scope = Column(String(30), nullable=True)
+    districts = Column(JSON, nullable=True)
+    topics = Column(JSON, nullable=True)
+    classified = Column(Boolean, default=False)
     
     __table_args__ = (
         Index('idx_source_published', 'source', 'published_at'),

@@ -14,11 +14,14 @@ export interface NewsArticle {
   author: string | null;
   tags: string[] | null;
   political_entities: Record<string, unknown> | null;
+  scope?: string | null;
+  districts?: { ubigeo: string; name: string; zone: string }[] | null;
 }
 
 export interface NewsFilters {
   source: string;
   category: string;
+  scope: 'all' | 'lima_metropolitana' | 'nacional';
   search: string;
   autoRefresh: boolean;
   refreshInterval: number;
@@ -78,6 +81,9 @@ export const useNewsData = (filters: NewsFilters, limit: number = 200) => {
       if (filters.category && filters.category !== 'all') {
         params.set('category', filters.category);
       }
+      if (filters.scope && filters.scope !== 'all') {
+        params.set('scope', filters.scope);
+      }
 
       const response = await fetch(
         `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.NEWS}?${params}`,
@@ -134,7 +140,7 @@ export const useNewsData = (filters: NewsFilters, limit: number = 200) => {
         error: error instanceof Error ? error.message : 'Error desconocido',
       }));
     }
-  }, [limit, filters.source, filters.category, filters.search]);
+  }, [limit, filters.source, filters.category, filters.scope, filters.search]);
 
   const triggerScraping = useCallback(async (sources?: string[]) => {
     setData(prev => ({ ...prev, isScraping: true }));
