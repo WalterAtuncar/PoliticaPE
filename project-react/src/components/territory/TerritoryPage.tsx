@@ -4,7 +4,10 @@ import { MapPin, RefreshCw } from 'lucide-react';
 import { LimaMap, MapMetric } from './LimaMap';
 import { DistrictPanel } from './DistrictPanel';
 import { ZoneSummary } from './ZoneSummary';
+import { OpportunityList } from './OpportunityList';
+import { EventsPanel } from './EventsPanel';
 import { useTerritory } from '../../hooks/useTerritory';
+import { useOpportunity } from '../../hooks/useEvents';
 import { usePoliticalFigures } from '../../hooks/usePoliticalFigures';
 import { TOTAL_ELECTORS } from '../../data/limaDistricts';
 
@@ -18,6 +21,15 @@ const PERIODS = [
 const METRICS: { value: MapMetric; label: string }[] = [
   { value: 'mentions', label: 'Menciones' },
   { value: 'sentiment', label: 'Sentimiento' },
+  { value: 'opportunity', label: 'Oportunidad' },
+];
+
+type TabId = 'map' | 'opportunity' | 'events';
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'map', label: 'Mapa' },
+  { id: 'opportunity', label: 'Oportunidad' },
+  { id: 'events', label: 'Eventos' },
 ];
 
 export const TerritoryPage: React.FC = () => {
@@ -25,6 +37,8 @@ export const TerritoryPage: React.FC = () => {
   const [metric, setMetric] = useState<MapMetric>('mentions');
   const [figureId, setFigureId] = useState<string>('');
   const [selected, setSelected] = useState<string | null>(null);
+  const [tab, setTab] = useState<TabId>('map');
+  const [presetUbigeo, setPresetUbigeo] = useState<string | null>(null);
 
   const { figures } = usePoliticalFigures();
   const { districts, zones, isLoading, error, refetch } = useTerritory({ days, figureId: figureId || undefined });
@@ -34,10 +48,27 @@ export const TerritoryPage: React.FC = () => {
     [figures]
   );
 
+  const ownFigure = useMemo(
+    () => figures.find(f => f.is_own_candidate) || null,
+    [figures]
+  );
+  const opportunityFigureId = figureId || ownFigure?.id;
+  const { districts: opportunity, isLoading: oppLoading, error: oppError } = useOpportunity(opportunityFigureId);
+
+  const opportunityScores = useMemo(
+    () => Object.fromEntries(opportunity.map(d => [d.ubigeo, d.score])),
+    [opportunity]
+  );
+
   const selectedDistrict = useMemo(
     () => districts.find(d => d.ubigeo === selected) || null,
     [districts, selected]
   );
+
+  const scheduleAt = (ubigeo: string) => {
+    setPresetUbigeo(ubigeo);
+    setTab('events');
+  };
 
   const covered = districts.filter(d => d.mentions > 0).length;
   const totalMentions = districts.reduce((s, d) => s + d.mentions, 0);
@@ -122,20 +153,61 @@ export const TerritoryPage: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <LimaMap
-            districts={districts}
-            metric={metric}
-            selected={selected}
-            onSelect={setSelected}
-          />
-        </div>
-        <div className="space-y-4">
-          <ZoneSummary zones={zones} isLoading={isLoading} />
-          <DistrictPanel district={selectedDistrict} figures={figures} />
-        </div>
+      <div className="border-b border-gray-200/50 dark:border-gray-700/50">
+        <nav className="flex space-x-6">
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`py-2 px-1 border-b-2 text-sm font-medium transition-colors ${
+                tab === t.id
+                  ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
       </div>
+
+      {tab === 'map' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <LimaMap
+              districts={districts}
+              metric={metric}
+              selected={selected}
+              onSelect={setSelected}
+              scores={opportunityScores}
+            />
+          </div>
+          <div className="space-y-4">
+            <ZoneSummary zones={zones} isLoading={isLoading} />
+            <DistrictPanel district={selectedDistrict} figures={figures} />
+          </div>
+        </div>
+      )}
+
+      {tab === 'opportunity' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <OpportunityList
+              districts={opportunity}
+              isLoading={oppLoading}
+              error={oppError}
+              onScheduleEvent={scheduleAt}
+            />
+          </div>
+          <div>
+            <LimaMap districts={districts} metric="opportunity" scores={opportunityScores} height={420} compact />
+          </div>
+        </div>
+      )}
+
+      {tab === 'events' && (
+        <EventsPanel presetUbigeo={presetUbigeo} onPresetUsed={() => setPresetUbigeo(null)} />
+      )}
     </motion.div>
   );
 };

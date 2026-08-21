@@ -393,3 +393,75 @@ class Alert(Base):
         Index('idx_alerts_status_time', 'status', 'created_at'),
         Index('idx_alerts_figure_col', 'figure_id'),
     )
+
+
+# --- Modulo territorial y de campana (S2-12) ---
+
+class Venue(Base):
+    __tablename__ = "venues"
+    __table_args__ = {'schema': 'organization'}
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False)
+    name = Column(String(200), nullable=False)
+    address = Column(String(500), nullable=True)
+    region_code = Column(String(10), nullable=True)
+    capacity = Column(Integer, nullable=True)
+    latitude = Column(Numeric(10, 8), nullable=True)
+    longitude = Column(Numeric(11, 8), nullable=True)
+    contact_name = Column(String(200), nullable=True)
+    contact_phone = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+
+class Event(Base):
+    __tablename__ = "events"
+    __table_args__ = {'schema': 'organization'}
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False)
+    campaign_id = Column(String, nullable=False)
+    venue_id = Column(String, nullable=True)
+    event_type = Column(String(30), nullable=False)
+    title = Column(String(300), nullable=False)
+    description = Column(Text, nullable=True)
+    start_at = Column(DateTime(timezone=True), nullable=False)
+    end_at = Column(DateTime(timezone=True), nullable=True)
+    region_code = Column(String(10), nullable=True)
+    expected_attendance = Column(Integer, nullable=True)
+    actual_attendance = Column(Integer, nullable=True)
+    status = Column(String(20), default='scheduled')
+    created_at = Column(DateTime(timezone=True), default=func.now())
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+    __table_args__ = {'schema': 'organization'}
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False)
+    campaign_id = Column(String, nullable=True)
+    event_id = Column(String, nullable=True)
+    title = Column(String(300), nullable=False)
+    status = Column(String(20), default='todo')
+    priority = Column(String(20), default='medium')
+    assigned_user_id = Column(String, nullable=True)
+    created_by_user_id = Column(String, nullable=True)
+    due_date = Column(DateTime(timezone=True), nullable=True)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+
+class Volunteer(Base):
+    __tablename__ = "volunteers"
+    __table_args__ = {'schema': 'organization'}
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False)
+    name = Column(String(200), nullable=False)
+    phone = Column(String(50), nullable=True)
+    email = Column(String(255), nullable=True)
+    region_code = Column(String(10), nullable=True)
+    status = Column(String(20), default='active')
+    assigned_event_id = Column(String, nullable=True)
+    created_at = Column(DateTime, default=func.now())
