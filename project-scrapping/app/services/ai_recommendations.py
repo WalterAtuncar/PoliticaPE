@@ -13,6 +13,7 @@ from app.models import (
     PoliticalFigure, RawSocialPost, NewsArticle,
     AIRecommendationRecord, ScrapedSurvey, GovernmentData,
 )
+from app import electoral_config as ec
 
 logger = logging.getLogger(__name__)
 
@@ -632,30 +633,28 @@ NOTICIAS NEGATIVAS (para REMEDIAR):
 
     focus_text = "\n".join(f"- {k}: {v}" for k, v in focus_areas.items())
 
-    MESES_ES = {
-        1: "enero", 2: "febrero", 3: "marzo", 4: "abril",
-        5: "mayo", 6: "junio", 7: "julio", 8: "agosto",
-        9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
-    }
     today = date.today()
-    campaign_deadline = date(2026, 4, 10)
-    days_remaining = max(0, (campaign_deadline - today).days)
-    today_str = f"{today.day} de {MESES_ES[today.month]} de {today.year}"
+    days_remaining = max(0, ec.days_to(ec.PROPAGANDA_DEADLINE, today) or 0)
+    today_str = ec.fmt_es(today)
+    deadline_str = ec.fmt_es(ec.PROPAGANDA_DEADLINE)
+    election_str = ec.fmt_es(ec.ELECTION_DATE)
+    deadline_short = ec.PROPAGANDA_DEADLINE.strftime("%d/%m/%Y")
+    rounds_txt = f"{ec.ELECTION_ROUNDS} vuelta" + ("s" if ec.ELECTION_ROUNDS > 1 else "")
 
     if days_remaining == 0:
-        urgency_block = """- La ventana de campaña ya ha finalizado (posterior al 10 de abril de 2026)
-- Genera recomendaciones de análisis post-electoral y estrategia a futuro"""
+        urgency_block = f"""- La ventana de propaganda ya ha finalizado (posterior al {deadline_str})
+- Genera recomendaciones de respuesta de prensa, defensa legal y análisis post-electoral"""
     else:
         urgency_block = f"""- Días restantes para acciones de campaña: {days_remaining} días
-- TODAS las recomendaciones deben ser ejecutables desde HOY hasta el 10 de abril de 2026
+- TODAS las recomendaciones deben ser ejecutables desde HOY hasta el {deadline_str}
 - Priorizar impacto inmediato dado el plazo electoral"""
 
     return f"""Eres un consultor político estratégico experto en campañas electorales en Perú. Tu trabajo es analizar TODOS los datos reales recopilados sobre figuras políticas y generar recomendaciones estratégicas ultra-específicas y accionables.
 
 CONTEXTO ELECTORAL CRÍTICO:
 - Fecha actual: {today_str}
-- Elecciones generales en Perú: 12 de abril de 2026
-- Último día permitido para propaganda y campañas: 10 de abril de 2026
+- {ec.ELECTION_NAME}: {election_str} ({rounds_txt}, circunscripción {ec.ELECTORAL_DISTRICT})
+- Último día permitido para propaganda y campañas: {deadline_str}
 {urgency_block}
 
 ================================================================================
@@ -708,9 +707,9 @@ Responde EXCLUSIVAMENTE con un JSON array válido, sin texto adicional.
     "target_region": "región objetivo específica basada en los datos",
     "target_demographic": "segmento demográfico objetivo",
     "identified_weakness": "El evento/incidente/dato específico que fundamenta esta recomendación. Citar el contenido real del post/noticia.",
-    "recommended_action": "Plan de acción paso a paso: Paso 1: [acción]. Paso 2: [acción]. Paso 3: [acción]. Cada paso debe ser concreto y ejecutable antes del 10 de abril de 2026.",
+    "recommended_action": "Plan de acción paso a paso: Paso 1: [acción]. Paso 2: [acción]. Paso 3: [acción]. Cada paso debe ser concreto y ejecutable antes del {deadline_str}.",
     "estimated_budget": {{"min": 5000, "max": 50000}},
-    "expected_timeline": "plazo concreto (ej: 1-2 semanas, fecha específica) que NO exceda el 10 de abril de 2026",
+    "expected_timeline": "plazo concreto (ej: 1-2 semanas, fecha específica) que NO exceda el {deadline_str}",
     "projected_roi": 200,
     "ai_confidence": 85,
     "resources_needed": ["recurso1", "recurso2", "recurso3"],
@@ -726,7 +725,7 @@ REGLAS FINALES:
 - ai_confidence es porcentaje de 0 a 100
 - identified_weakness DEBE citar contenido real de los datos proporcionados
 - recommended_action DEBE ser un plan paso a paso concreto
-- CADA recomendación debe ser ejecutable entre hoy ({today.strftime("%d/%m/%Y")}) y el 10/04/2026
+- CADA recomendación debe ser ejecutable entre hoy ({today.strftime("%d/%m/%Y")}) y el {deadline_short}
 - NO inventes datos. Solo usa la información proporcionada arriba
 
 Responde SOLO con el JSON array."""
