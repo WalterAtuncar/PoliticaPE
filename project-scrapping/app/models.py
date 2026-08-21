@@ -369,3 +369,27 @@ class DailyBrief(Base):
     data = Column(JSON(none_as_null=True), nullable=True)
     sent_channels = Column(JSON(none_as_null=True), nullable=True)
     status = Column(String(20), default='generated')
+
+
+class Alert(Base):
+    __tablename__ = "alerts"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    figure_id = Column(String, nullable=True)
+    kind = Column(String(20), nullable=False)
+    severity = Column(String(10), nullable=False)
+    title = Column(String(300), nullable=False)
+    detail = Column(Text, nullable=True)
+    metrics = Column(JSON(none_as_null=True), nullable=True)
+    evidence = Column(JSON(none_as_null=True), nullable=True)
+    suggested_response = Column(Text, nullable=True)
+    status = Column(String(20), default='open')
+    created_at = Column(DateTime, default=func.now())
+    acknowledged_at = Column(DateTime, nullable=True)
+    acknowledged_by = Column(String, nullable=True)
+    dedup_key = Column(String(200), nullable=True)
+
+    __table_args__ = (
+        Index('idx_alerts_status_time', 'status', 'created_at'),
+        Index('idx_alerts_figure_col', 'figure_id'),
+    )

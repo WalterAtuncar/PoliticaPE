@@ -304,8 +304,45 @@ def _persist(db: Session, items: List[Dict[str, Any]], parsed: BatchClassificati
             "cid": src["item_id"],
         })
 
+        _push_to_sniffing(src, res, rows, districts, zone)
+
     db.commit()
     return saved
+
+
+def _push_to_sniffing(src: Dict[str, Any], res: "ItemClassification",
+                      rows: List[dict], districts: List[dict], zone: Optional[str]) -> None:
+    """Empuja el item clasificado al servicio de streaming para el WebSocket y las alertas en vivo."""
+    if (res.relevance or 0) < 0.5:
+        return
+    stances = [r["stance"] for r in rows if r.get("stance") is not None]
+    avg = sum(stances) / len(stances) if stances else 0.0
+    payload = {
+        # live_streams.stream_id es uuid en Postgres: se reutiliza el id del contenido
+        "stream_id": src["item_id"],
+        "platform": src["content_type"],
+        "stream_type": "classified",
+        "content": (src.get("title") or src.get("content") or "")[:500],
+        "author_handle": src.get("source"),
+        "realtime_sentiment": round(avg, 3),
+        "sentiment_confidence": 0.9,
+        "political_relevance_score": float(res.relevance or 0),
+        "urgency_score": 1.0 if avg <= -0.5 else 0.0,
+        "is_crisis_indicator": any((r.get("stance") or 0) <= -0.5 for r in rows),
+        "is_opportunity": any((r.get("stance") or 0) >= 0.5 for r in rows),
+        "is_trending": False,
+        "detected_region": zone,
+        "detected_keywords": [res.topic] + list(res.secondary_topics or []),
+        "political_entities": [f.figure for f in res.figures],
+        "hashtags": [],
+        "message_timestamp": src["published_at"].isoformat() if src.get("published_at") else None,
+    }
+    try:
+        import httpx
+        from app.config import settings
+        httpx.post(f"{settings.SNIFFING_URL}/api/ingest", json=payload, timeout=5)
+    except Exception as e:
+        logger.debug(f"[Classifier] no se pudo empujar al sniffing: {e}")
 
 
 def classify_batch(db: Session, items: List[Dict[str, Any]], dry_run: bool = False):

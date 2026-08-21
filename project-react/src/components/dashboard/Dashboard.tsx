@@ -1,7 +1,7 @@
 import React from 'react';
 import { MetricCard } from './MetricCard';
 import { TrendChart } from './TrendChart';
-import { RealtimeAlerts } from './RealtimeAlerts';
+import { AlertsPanel } from './AlertsPanel';
 import { GeographicMap } from './GeographicMap';
 import { useDashboardData } from '../../hooks/useDashboardData';
 
@@ -32,7 +32,7 @@ export const Dashboard: React.FC = () => {
       {/* Charts and Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <TrendChart />
-        <RealtimeAlerts />
+        <AlertsPanel />
       </div>
 
       {/* Geographic Analysis */}

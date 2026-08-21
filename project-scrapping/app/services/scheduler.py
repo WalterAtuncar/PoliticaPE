@@ -10,10 +10,12 @@ logger = logging.getLogger(__name__)
 SCRAPING_INTERVAL_HOURS = int(os.getenv("SCRAPING_INTERVAL_HOURS", "6"))
 CLASSIFY_INTERVAL_MINUTES = int(os.getenv("CLASSIFY_INTERVAL_MINUTES", "15"))
 BRIEF_HOUR_LIMA = int(os.getenv("BRIEF_HOUR_LIMA", "7"))
+ALERT_INTERVAL_MINUTES = int(os.getenv("ALERT_INTERVAL_MINUTES", "10"))
 
 _scheduler_task: Optional[asyncio.Task] = None
 _classify_task: Optional[asyncio.Task] = None
 _brief_task: Optional[asyncio.Task] = None
+_alert_task: Optional[asyncio.Task] = None
 
 
 def get_active_tokens(db, platform: str) -> List[Dict]:
@@ -929,8 +931,27 @@ async def daily_brief_loop():
             db.close()
 
 
+async def alert_loop():
+    from app.config import settings
+    from app.services.alert_engine import run_alert_cycle
+
+    interval = 2 if os.getenv("DEBATE_MODE", "false").lower() == "true" else ALERT_INTERVAL_MINUTES
+    logger.info(f"[Alerts] Motor de alertas cada {interval} minutos")
+    await asyncio.sleep(120)
+
+    while True:
+        try:
+            result = await asyncio.to_thread(run_alert_cycle, settings.DATABASE_URL)
+            if result.get("created"):
+                logger.info(f"[Alerts] {result}")
+        except Exception as e:
+            logger.error(f"[Alerts] Error en ciclo: {e}")
+        interval = 2 if os.getenv("DEBATE_MODE", "false").lower() == "true" else ALERT_INTERVAL_MINUTES
+        await asyncio.sleep(interval * 60)
+
+
 def start_scheduler():
-    global _scheduler_task, _classify_task, _brief_task
+    global _scheduler_task, _classify_task, _brief_task, _alert_task
     loop = asyncio.get_event_loop()
     if _scheduler_task is None or _scheduler_task.done():
         _scheduler_task = loop.create_task(scheduler_loop())
@@ -941,10 +962,13 @@ def start_scheduler():
     if _brief_task is None or _brief_task.done():
         _brief_task = loop.create_task(daily_brief_loop())
         logger.info("[Brief] Programador de brief diario iniciado")
+    if _alert_task is None or _alert_task.done():
+        _alert_task = loop.create_task(alert_loop())
+        logger.info("[Alerts] Motor de alertas iniciado")
 
 
 def stop_scheduler():
-    global _scheduler_task, _classify_task, _brief_task
+    global _scheduler_task, _classify_task, _brief_task, _alert_task
     if _scheduler_task and not _scheduler_task.done():
         _scheduler_task.cancel()
         logger.info("[Scheduler] Scheduler detenido")
@@ -953,3 +977,5 @@ def stop_scheduler():
         logger.info("[Classifier] Clasificador detenido")
     if _brief_task and not _brief_task.done():
         _brief_task.cancel()
+    if _alert_task and not _alert_task.done():
+        _alert_task.cancel()

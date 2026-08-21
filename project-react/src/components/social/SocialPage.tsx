@@ -6,7 +6,7 @@ import { SocialFeed } from './SocialFeed';
 import { InfluencerRanking } from './InfluencerRanking';
 import { HashtagAnalysis } from './HashtagAnalysis';
 import { SentimentDashboard } from './SentimentDashboard';
-import { CrisisMonitoring } from './CrisisMonitoring';
+import { AlertsPanel } from '../dashboard/AlertsPanel';
 import { useSocialData } from '../../hooks/useSocialData';
 import { SocialFilters } from '../../types/social';
 
@@ -68,7 +68,7 @@ export const SocialPage: React.FC = () => {
       case 'sentiment':
         return <SentimentDashboard metrics={metrics} isLoading={isLoading} filters={filters} />;
       case 'crisis':
-        return <CrisisMonitoring alerts={crisisAlerts} isLoading={isLoading} filters={filters} />;
+        return <AlertsPanel />;
       default:
         return <SocialFeed posts={posts} isLoading={isLoading} filters={filters} />;
     }
