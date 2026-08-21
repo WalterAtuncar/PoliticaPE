@@ -6,6 +6,7 @@ from typing import Optional
 import bcrypt
 
 from app.database import get_db
+from app.api.deps import create_access_token, get_current_user
 
 router = APIRouter()
 
@@ -20,6 +21,7 @@ class RegisterRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     success: bool
+    token: Optional[str] = None
     user: Optional[dict] = None
     message: str
 
@@ -77,9 +79,15 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
             {"id": user_id}
         )
         db.commit()
-        
+
+        access_token = create_access_token(data={
+            "sub": str(user_id),
+            "email": email,
+        })
+
         return LoginResponse(
             success=True,
+            token=access_token,
             user={
                 "id": str(user_id),
                 "email": email,
@@ -167,8 +175,12 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Error al registrar: {str(e)}")
 
 @router.get("/me")
-async def get_current_user(user_id: str, db: Session = Depends(get_db)):
-    """Get current user info"""
+async def get_me(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get current user info (requires JWT token)"""
+    user_id = current_user["user_id"]
     result = db.execute(
         text("""
             SELECT u.id, u.email, u.name, u.tenant_id,
@@ -180,14 +192,14 @@ async def get_current_user(user_id: str, db: Session = Depends(get_db)):
         """),
         {"id": user_id}
     ).fetchone()
-    
+
     if not result:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    
-    user_id, email, name, tenant_id, role_name = result
-    
+
+    uid, email, name, tenant_id, role_name = result
+
     return {
-        "id": str(user_id),
+        "id": str(uid),
         "email": email,
         "name": name or "Usuario",
         "role": role_name or "analyst",

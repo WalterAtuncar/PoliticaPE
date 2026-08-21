@@ -4,6 +4,7 @@ from typing import List, Optional
 import logging
 
 from app.database import get_db
+from app.api.deps import get_current_user
 from app.models import AIRecommendationRecord, PoliticalFigure
 from app.schemas import (
     AIRecommendationResponse,
@@ -25,6 +26,7 @@ def list_recommendations(
     category: Optional[str] = None,
     status: Optional[str] = None,
     limit: int = 50,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     query = db.query(AIRecommendationRecord)
@@ -41,6 +43,7 @@ def list_recommendations(
 @router.post("/generate")
 async def generate_recommendations(
     data: GenerateRecommendationsRequest,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     try:
@@ -58,7 +61,7 @@ async def generate_recommendations(
 
 
 @router.get("/context/{figure_id}")
-def get_figure_context(figure_id: str, db: Session = Depends(get_db)):
+def get_figure_context(figure_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     figure = db.query(PoliticalFigure).filter(PoliticalFigure.id == figure_id).first()
     if not figure:
         raise HTTPException(status_code=404, detail="Figura política no encontrada")
@@ -70,6 +73,7 @@ def get_figure_context(figure_id: str, db: Session = Depends(get_db)):
 def update_recommendation(
     recommendation_id: str,
     data: AIRecommendationUpdate,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     rec = db.query(AIRecommendationRecord).filter(
@@ -88,7 +92,7 @@ def update_recommendation(
 
 
 @router.delete("/{recommendation_id}")
-def delete_recommendation(recommendation_id: str, db: Session = Depends(get_db)):
+def delete_recommendation(recommendation_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     rec = db.query(AIRecommendationRecord).filter(
         AIRecommendationRecord.id == recommendation_id
     ).first()

@@ -6,10 +6,10 @@ class Settings(BaseSettings):
     # Application
     APP_NAME: str = "Political Data Scraper"
     VERSION: str = "1.0.0"
-    DEBUG: bool = True
+    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     
-    # Database - Use Replit's DATABASE_URL
+    # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://localhost:5432/politiscope_db")
     
     # Redis
@@ -35,10 +35,6 @@ class Settings(BaseSettings):
     PROXY_LIST: List[str] = []
     ROTATE_PROXIES: bool = False
     
-    # Celery Configuration
-    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
-    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
-    
     # Scheduling
     NEWS_SCRAPING_INTERVAL: int = 900  # 15 minutes
     SOCIAL_SCRAPING_INTERVAL: int = 300  # 5 minutes
@@ -57,8 +53,9 @@ class Settings(BaseSettings):
     PROMETHEUS_ENABLED: bool = True
     
     class Config:
-        env_file = ".env"
+        env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")
         case_sensitive = True
+        extra = "ignore"
 
 # Global settings instance
 settings = Settings()

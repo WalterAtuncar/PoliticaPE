@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { API_CONFIG } from '../config/api';
+import { API_CONFIG, getAuthHeaders } from '../config/api';
 
 interface TimeSeriesData {
   date: string;
@@ -77,7 +77,7 @@ export function useTimeSeries(days: number = 30) {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/time-series?days=${days}`);
+        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/time-series?days=${days}`, { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed to fetch time series data');
         const result = await response.json();
         setData(result.time_series || []);
@@ -107,7 +107,7 @@ export function usePlatformBreakdown(days: number = 30) {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/platform-breakdown?days=${days}`);
+        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/platform-breakdown?days=${days}`, { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed to fetch platform breakdown');
         const result = await response.json();
         setPlatforms(result.platforms || []);
@@ -138,7 +138,7 @@ export function useShareOfVoice(days: number = 30) {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/share-of-voice?days=${days}`);
+        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/share-of-voice?days=${days}`, { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed to fetch share of voice');
         const result = await response.json();
         setParties(result.parties || []);
@@ -173,7 +173,7 @@ export function useTopPosts(days: number = 30, limit: number = 5, page: number =
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/top-posts?days=${days}&limit=${limit}&page=${page}`);
+        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/top-posts?days=${days}&limit=${limit}&page=${page}`, { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed to fetch top posts');
         const result = await response.json();
         setPosts(result.posts || []);
@@ -203,7 +203,7 @@ export function useTrendingTopics(days: number = 7, limit: number = 20) {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/trending-topics?days=${days}&limit=${limit}`);
+        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/trending-topics?days=${days}&limit=${limit}`, { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed to fetch trending topics');
         const result = await response.json();
         setTopics(result.trending_topics || []);
@@ -230,7 +230,7 @@ export function useRegionalEngagement(days: number = 30) {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/regional-engagement?days=${days}`);
+        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/regional-engagement?days=${days}`, { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed to fetch regional engagement');
         const result = await response.json();
         setRegions(result.regions || []);
@@ -262,7 +262,7 @@ export function useEngagementSummary(days: number = 7) {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/engagement?days=${days}`);
+        const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/engagement?days=${days}`, { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('Failed to fetch engagement summary');
         const result = await response.json();
         setEngagement(result);

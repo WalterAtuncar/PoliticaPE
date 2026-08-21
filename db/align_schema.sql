@@ -1,4 +1,4 @@
--- Align Replit PostgreSQL Schema with Dev Team DDL
+-- Align PostgreSQL Schema with Dev Team DDL
 -- Run this to add missing columns and tables
 
 -- ==========================================

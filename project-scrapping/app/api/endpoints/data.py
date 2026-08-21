@@ -4,9 +4,10 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 
 from app.database import get_db
+from app.api.deps import get_current_user
 from app.models import NewsArticle, RawSocialPost, GovernmentData, ScrapedSurvey
 from app.schemas import (
-    NewsArticleResponse, SocialPostResponse, 
+    NewsArticleResponse, SocialPostResponse,
     GovernmentDataResponse, SurveyResponse, StatsResponse
 )
 
@@ -18,6 +19,7 @@ async def get_news_articles(
     category: Optional[str] = None,
     limit: int = Query(100, le=1000),
     offset: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get news articles with optional filtering"""
@@ -37,6 +39,7 @@ async def get_social_posts(
     location: Optional[str] = None,
     limit: int = Query(100, le=1000),
     offset: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get social media posts with optional filtering"""
@@ -57,6 +60,7 @@ async def get_government_data(
     department: Optional[str] = None,
     limit: int = Query(100, le=1000),
     offset: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get government data with optional filtering"""
@@ -78,6 +82,7 @@ async def get_surveys(
     pollster: Optional[str] = None,
     limit: int = Query(100, le=1000),
     offset: int = Query(0, ge=0),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get survey data with optional filtering"""
@@ -92,7 +97,7 @@ async def get_surveys(
     return surveys
 
 @router.get("/stats", response_model=StatsResponse)
-async def get_statistics(db: Session = Depends(get_db)):
+async def get_statistics(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get overall statistics"""
     news_count = db.query(NewsArticle).count()
     social_count = db.query(RawSocialPost).count()

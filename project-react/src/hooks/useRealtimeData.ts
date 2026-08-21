@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_CONFIG, ENDPOINTS } from '../config/api';
+import { API_CONFIG, ENDPOINTS, getAuthHeaders } from '../config/api';
 import {
   SocialPost,
   Alert,
@@ -57,14 +57,15 @@ export const useRealtimeData = (filters: MonitoringFilters): RealtimeData => {
     const startTime = Date.now();
 
     try {
+      const headers = getAuthHeaders();
       const [, sentimentRes, newsRes, , crisisRes, socialRes, recentRes] = await Promise.allSettled([
-        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.STATS}`),
-        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SENTIMENT}?source_type=news`),
-        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.NEWS}?limit=10`),
-        fetch(`${API_CONFIG.SNIFFING_BASE_URL}${ENDPOINTS.METRICS}`),
-        fetch(`${API_CONFIG.SNIFFING_BASE_URL}/api/crisis-alerts`),
-        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SOCIAL}?limit=10`),
-        fetch(`${API_CONFIG.SNIFFING_BASE_URL}/api/recent?limit=10`),
+        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.STATS}`, { headers }),
+        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SENTIMENT}?source_type=news`, { headers }),
+        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.NEWS}?limit=10`, { headers }),
+        fetch(`${API_CONFIG.SNIFFING_BASE_URL}${ENDPOINTS.METRICS}`, { headers }),
+        fetch(`${API_CONFIG.SNIFFING_BASE_URL}/api/crisis-alerts`, { headers }),
+        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SOCIAL}?limit=10`, { headers }),
+        fetch(`${API_CONFIG.SNIFFING_BASE_URL}/api/recent?limit=10`, { headers }),
       ]);
 
       const latency = Date.now() - startTime;

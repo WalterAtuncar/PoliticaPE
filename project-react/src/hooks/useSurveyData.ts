@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_CONFIG, ENDPOINTS } from '../config/api';
+import { API_CONFIG, ENDPOINTS, getAuthHeaders } from '../config/api';
 
 export interface SurveyItem {
   id: string;
@@ -38,7 +38,8 @@ export const useSurveyData = (limit: number = 50) => {
       setData(prev => ({ ...prev, isLoading: true, error: null }));
       
       const response = await fetch(
-        `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SURVEYS}?limit=${limit}`
+        `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SURVEYS}?limit=${limit}`,
+        { headers: getAuthHeaders() }
       );
       
       if (!response.ok) {

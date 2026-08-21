@@ -47,9 +47,18 @@ async def _build_fastapi_app():
         openapi_url="/openapi.json"
     )
 
+    _allowed_origins = [
+        origin for origin in [
+            "http://localhost:5000",
+            "http://localhost:3000",
+            "http://localhost:8000",
+            os.getenv("FRONTEND_URL", ""),
+        ] if origin
+    ]
+
     _app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=_allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

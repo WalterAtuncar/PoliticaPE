@@ -41,8 +41,17 @@ export const ENDPOINTS = {
   RECOMMENDATIONS_GENERATE: '/api/v1/recommendations/generate',
 };
 
+export function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem('auth_token');
+  return token
+    ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+    : { 'Content-Type': 'application/json' };
+}
+
 export async function fetchFromScrapping(endpoint: string) {
-  const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${endpoint}`);
+  const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${endpoint}`, {
+    headers: getAuthHeaders(),
+  });
   if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
   return response.json();
 }
@@ -50,7 +59,7 @@ export async function fetchFromScrapping(endpoint: string) {
 export async function postToScrapping(endpoint: string, body?: object) {
   const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${endpoint}`, {
     method: 'POST',
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: getAuthHeaders(),
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -58,7 +67,9 @@ export async function postToScrapping(endpoint: string, body?: object) {
 }
 
 export async function fetchFromSniffing(endpoint: string) {
-  const response = await fetch(`${API_CONFIG.SNIFFING_BASE_URL}${endpoint}`);
+  const response = await fetch(`${API_CONFIG.SNIFFING_BASE_URL}${endpoint}`, {
+    headers: getAuthHeaders(),
+  });
   if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
   return response.json();
 }
@@ -66,7 +77,7 @@ export async function fetchFromSniffing(endpoint: string) {
 export async function analyzeText(text: string, platform: string = 'manual') {
   const response = await fetch(`${API_CONFIG.SNIFFING_BASE_URL}${ENDPOINTS.ANALYZE}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ text, platform }),
   });
   if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);

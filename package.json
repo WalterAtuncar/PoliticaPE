@@ -1,19 +1,16 @@
 {
-  "name": "workspace",
+  "name": "politicape",
   "version": "1.0.0",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
+  "private": true,
+  "description": "Plataforma de analitica politica para Peru",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "concurrently --names \"REACT,SCRAPPING,SNIFFING\" --prefix-colors \"cyan,yellow,green\" \"npm run dev:react\" \"npm run dev:scrapping\" \"npm run dev:sniffing\"",
+    "dev:react": "cd project-react && npm run dev",
+    "dev:scrapping": "cd project-scrapping && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload",
+    "dev:sniffing": "cd project-sniffing/microservice && python -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload",
     "build": "cd project-react && npm install && npm run build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "dependencies": {
-    "react-router-dom": "^7.11.0"
+  "devDependencies": {
+    "concurrently": "^9.1.0"
   }
 }

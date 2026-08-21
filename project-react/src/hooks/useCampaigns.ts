@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Campaign, CampaignFilters, ReachEstimate, CompetitorCampaign } from '../types/campaigns';
-import { API_CONFIG } from '../config/api';
+import { API_CONFIG, getAuthHeaders } from '../config/api';
 
 interface BackendCampaign {
   id: string;
@@ -89,8 +89,8 @@ export const useCampaigns = (_filters: CampaignFilters) => {
     setError(null);
     
     try {
-      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/campaigns/`);
-      
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/campaigns/`, { headers: getAuthHeaders() });
+
       if (!response.ok) {
         throw new Error(`Error del servidor: ${response.status}`);
       }
@@ -106,7 +106,7 @@ export const useCampaigns = (_filters: CampaignFilters) => {
         setHasData(false);
       }
 
-      const competitorsRes = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/competitors/`);
+      const competitorsRes = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/competitors/`, { headers: getAuthHeaders() });
       if (competitorsRes.ok) {
         const competitorsData = await competitorsRes.json();
         setCompetitorCampaigns(competitorsData || []);
@@ -144,7 +144,7 @@ export const useCampaigns = (_filters: CampaignFilters) => {
 
       const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/campaigns/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -170,7 +170,7 @@ export const useCampaigns = (_filters: CampaignFilters) => {
     try {
       const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/campaigns/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           name: updates.name,
           description: updates.description,
@@ -206,6 +206,7 @@ export const useCampaigns = (_filters: CampaignFilters) => {
     try {
       const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/campaigns/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {

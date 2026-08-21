@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AIRecommendation, RecommendationsFilters, ROIMetrics } from '../types/recommendations';
-import { API_CONFIG, ENDPOINTS } from '../config/api';
+import { API_CONFIG, ENDPOINTS, getAuthHeaders } from '../config/api';
 
 function mapApiToRecommendation(item: any): AIRecommendation {
   return {
@@ -41,7 +41,8 @@ export const useAIRecommendations = (filters: RecommendationsFilters) => {
       params.set('limit', '100');
 
       const res = await fetch(
-        `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.RECOMMENDATIONS}?${params.toString()}`
+        `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.RECOMMENDATIONS}?${params.toString()}`,
+        { headers: getAuthHeaders() }
       );
       if (!res.ok) return;
       const data = await res.json();
@@ -62,7 +63,7 @@ export const useAIRecommendations = (filters: RecommendationsFilters) => {
         `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.RECOMMENDATIONS_GENERATE}`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             figure_ids: figureIds,
             focus_areas: focusAreas || [
@@ -96,7 +97,7 @@ export const useAIRecommendations = (filters: RecommendationsFilters) => {
         `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.RECOMMENDATIONS}/${id}`,
         {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ status }),
         }
       );
@@ -117,7 +118,7 @@ export const useAIRecommendations = (filters: RecommendationsFilters) => {
         `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.RECOMMENDATIONS}/${id}`,
         {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ user_rating: rating }),
         }
       );

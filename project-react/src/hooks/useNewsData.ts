@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { API_CONFIG, ENDPOINTS } from '../config/api';
+import { API_CONFIG, ENDPOINTS, getAuthHeaders } from '../config/api';
 
 export interface NewsArticle {
   id: string;
@@ -80,7 +80,8 @@ export const useNewsData = (filters: NewsFilters, limit: number = 200) => {
       }
 
       const response = await fetch(
-        `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.NEWS}?${params}`
+        `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.NEWS}?${params}`,
+        { headers: getAuthHeaders() }
       );
 
       if (!response.ok) throw new Error('Error al cargar noticias');
@@ -143,7 +144,7 @@ export const useNewsData = (filters: NewsFilters, limit: number = 200) => {
         `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_NEWS}`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(body),
         }
       );

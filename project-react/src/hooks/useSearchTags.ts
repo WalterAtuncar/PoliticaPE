@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_CONFIG, ENDPOINTS } from '../config/api';
+import { API_CONFIG, ENDPOINTS, getAuthHeaders } from '../config/api';
 
 export interface SearchTag {
   id: string;
@@ -19,7 +19,7 @@ export function useSearchTags() {
   const fetchTags = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SETTINGS_TAGS}`);
+      const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SETTINGS_TAGS}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Error fetching tags');
       const data = await res.json();
       setTags(data);
@@ -37,7 +37,7 @@ export function useSearchTags() {
   const createTag = async (data: { tag: string; platforms: string[]; is_active: boolean }) => {
     const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SETTINGS_TAGS}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
     if (!res.ok) {
@@ -52,7 +52,7 @@ export function useSearchTags() {
   const updateTag = async (tagId: string, data: { tag?: string; platforms?: string[]; is_active?: boolean }) => {
     const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SETTINGS_TAGS}/${tagId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
     if (!res.ok) {
@@ -67,6 +67,7 @@ export function useSearchTags() {
   const deleteTag = async (tagId: string) => {
     const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SETTINGS_TAGS}/${tagId}`, {
       method: 'DELETE',
+      headers: getAuthHeaders(),
     });
     if (!res.ok) throw new Error('Error al eliminar tag');
     setTags(prev => prev.filter(t => t.id !== tagId));

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Alert, SocialPost } from '../types';
-import { API_CONFIG, ENDPOINTS } from '../config/api';
+import { API_CONFIG, ENDPOINTS, getAuthHeaders } from '../config/api';
 
 interface WebSocketData {
   alerts: Alert[];
@@ -33,7 +33,10 @@ export const useWebSocket = () => {
 
   const connect = useCallback(() => {
     try {
-      const wsUrl = `${API_CONFIG.SNIFFING_WS_URL}${ENDPOINTS.WEBSOCKET}`;
+      const token = localStorage.getItem('auth_token');
+      const wsUrl = token
+        ? `${API_CONFIG.SNIFFING_WS_URL}${ENDPOINTS.WEBSOCKET}?token=${encodeURIComponent(token)}`
+        : `${API_CONFIG.SNIFFING_WS_URL}${ENDPOINTS.WEBSOCKET}`;
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {
@@ -104,7 +107,7 @@ export const useWebSocket = () => {
 
   const fetchMetrics = useCallback(async () => {
     try {
-      const response = await fetch(`${API_CONFIG.SNIFFING_BASE_URL}${ENDPOINTS.METRICS}`);
+      const response = await fetch(`${API_CONFIG.SNIFFING_BASE_URL}${ENDPOINTS.METRICS}`, { headers: getAuthHeaders() });
       if (response.ok) {
         const metricsData = await response.json();
         setData(prev => ({

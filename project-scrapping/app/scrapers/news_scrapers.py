@@ -330,12 +330,17 @@ class Peru21Scraper(PeruvianNewsScraper):
         for heading in soup.find_all(['h2', 'h3']):
             link = heading.find('a', href=True)
             if not link:
-                continue
+                # Peru21 often wraps h2 inside <a> tags (parent link pattern)
+                parent_link = heading.find_parent('a', href=True)
+                if parent_link:
+                    link = parent_link
+                else:
+                    continue
             url = urljoin(self.base_url, link['href'])
             if url in seen or not _is_valid_article_url(url, 'peru21.pe'):
                 continue
             seen.add(url)
-            title = _clean_text(link.get_text())
+            title = _clean_text(heading.get_text())
             if not title or len(title) < 15:
                 continue
             articles.append({
@@ -428,20 +433,25 @@ class AndinaScraper(PeruvianNewsScraper):
         super().__init__()
         self.source_key = 'andina'
         self.base_url = "https://andina.pe"
-        self.sections = ["/agencia/seccion-politica-1.aspx", "/agencia/seccion-economia-2.aspx"]
+        self.sections = ["/agencia/seccion-politica-17.aspx", "/agencia/seccion-economia-2.aspx"]
 
     def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(response.content, 'html.parser')
         articles = []
         seen = set()
 
+        # Andina uses both single-quoted and double-quoted href attributes.
+        # Article links follow the pattern: noticia-<slug>-<id>.aspx (relative)
+        # or https://andina.pe/agencia/noticia-<slug>-<id>.aspx (absolute)
         for link in soup.find_all('a', href=True):
             href = link['href']
-            if '/agencia/noticia' not in href and '/agencia/seccion' in href:
+            # Match both relative and absolute noticia links
+            if 'noticia-' not in href:
                 continue
-            if '/agencia/noticia' not in href:
+            # Skip social share links
+            if any(domain in href for domain in ['facebook.com', 'twitter.com', 'linkedin.com']):
                 continue
-            url = urljoin(self.base_url, href)
+            url = urljoin(self.base_url + '/agencia/', href)
             if url in seen:
                 continue
             seen.add(url)
@@ -460,6 +470,8 @@ class AndinaScraper(PeruvianNewsScraper):
 
 
 class CanalNScraper(PeruvianNewsScraper):
+    # NOTE: Canal N uses Next.js; content is server-rendered but structure
+    # uses React CSS module classes (e.g. Card_root__LVo8N).
     def __init__(self):
         super().__init__()
         self.source_key = 'canaln'
@@ -471,7 +483,8 @@ class CanalNScraper(PeruvianNewsScraper):
         articles = []
         seen = set()
 
-        for element in soup.find_all(['article', 'div'], class_=re.compile(r'nota|card|article|item')):
+        # Canal N uses Card_root CSS module classes (case-sensitive)
+        for element in soup.find_all(['article', 'div'], class_=re.compile(r'nota|[Cc]ard|article|item')):
             link = element.find('a', href=True)
             if not link:
                 continue
@@ -496,16 +509,27 @@ class CanalNScraper(PeruvianNewsScraper):
                 'published_at': datetime.now(),
             })
 
+        # Fallback: find h3 titles and look for sibling/parent links
         if len(articles) < 3:
             for heading in soup.find_all(['h2', 'h3']):
+                # Canal N h3 titles don't contain <a> links;
+                # the link is in the parent div (Card_root)
                 link = heading.find('a', href=True)
+                if not link:
+                    parent = heading.find_parent('a', href=True)
+                    if not parent:
+                        # Try finding a sibling or parent-container link
+                        card = heading.find_parent(class_=re.compile(r'[Cc]ard'))
+                        if card:
+                            parent = card.find('a', href=True)
+                    link = parent
                 if not link:
                     continue
                 url = urljoin(self.base_url, link['href'])
                 if url in seen or not _is_valid_article_url(url, 'canaln.pe'):
                     continue
                 seen.add(url)
-                title = _clean_text(link.get_text())
+                title = _clean_text(heading.get_text())
                 if not title or len(title) < 10:
                     continue
                 articles.append({
@@ -623,19 +647,23 @@ class TVPeruScraper(PeruvianNewsScraper):
         super().__init__()
         self.source_key = 'tvperu'
         self.base_url = "https://www.tvperu.gob.pe"
-        self.sections = ["/noticias", "/noticias/politica"]
+        self.sections = ["/noticias", "/noticias/seccion/politica"]
 
     def _parse_content(self, response: requests.Response) -> List[Dict[str, Any]]:
         soup = BeautifulSoup(response.content, 'html.parser')
         articles = []
         seen = set()
 
-        for element in soup.find_all(['article', 'div'], class_=re.compile(r'view|node|card|nota|article')):
+        # TV Perú uses 'news-card' class for article containers (Drupal-based)
+        for element in soup.find_all(['article', 'div'], class_=re.compile(r'view|node|card|nota|article|news-card')):
             link = element.find('a', href=True)
             if not link:
                 continue
             url = urljoin(self.base_url, link['href'])
             if url in seen or not _is_valid_article_url(url, 'tvperu.gob.pe'):
+                continue
+            # Skip non-article links (section pages, tags, etc.)
+            if '/seccion/' in url or '/categorias/' in url or '/tags/' in url:
                 continue
             seen.add(url)
             heading = element.find(['h2', 'h3', 'h4'])
@@ -655,12 +683,19 @@ class TVPeruScraper(PeruvianNewsScraper):
             for heading in soup.find_all(['h2', 'h3']):
                 link = heading.find('a', href=True)
                 if not link:
-                    continue
+                    # Try parent link
+                    parent_link = heading.find_parent('a', href=True)
+                    if parent_link:
+                        link = parent_link
+                    else:
+                        continue
                 url = urljoin(self.base_url, link['href'])
                 if url in seen or not _is_valid_article_url(url, 'tvperu.gob.pe'):
                     continue
+                if '/seccion/' in url or '/categorias/' in url or '/tags/' in url:
+                    continue
                 seen.add(url)
-                title = _clean_text(link.get_text())
+                title = _clean_text(heading.get_text()) or _clean_text(link.get_text())
                 if not title or len(title) < 10:
                     continue
                 articles.append({

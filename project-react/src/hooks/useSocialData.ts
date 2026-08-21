@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { API_CONFIG, ENDPOINTS } from '../config/api';
+import { API_CONFIG, ENDPOINTS, getAuthHeaders } from '../config/api';
 import { 
   SocialPost, 
   SocialMetrics, 
@@ -151,7 +151,7 @@ export const useSocialData = (filters: SocialFilters) => {
   const fetchRealData = async (): Promise<boolean> => {
     try {
       const url = `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SOCIAL}?limit=500`;
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: getAuthHeaders() });
       
       if (response.ok) {
         const data = await response.json();
@@ -173,7 +173,7 @@ export const useSocialData = (filters: SocialFilters) => {
 
   const fetchCrisisAlerts = async () => {
     try {
-      const response = await fetch(`${API_CONFIG.SNIFFING_BASE_URL}/api/crisis-alerts`);
+      const response = await fetch(`${API_CONFIG.SNIFFING_BASE_URL}/api/crisis-alerts`, { headers: getAuthHeaders() });
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data)) {

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { ENDPOINTS, API_CONFIG, fetchFromScrapping } from '../config/api';
+import { ENDPOINTS, API_CONFIG, fetchFromScrapping, getAuthHeaders } from '../config/api';
 
 interface ScrapingLog {
   id: string;
@@ -46,7 +46,7 @@ export function useScrapingControl() {
         url = `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_INSTAGRAM}?max_results=${maxResults}&ig_user_id=${igUserId || ''}`;
       }
       
-      const response = await fetch(url, { method: 'POST' });
+      const response = await fetch(url, { method: 'POST', headers: getAuthHeaders() });
 
       if (!response.ok) {
         throw new Error(`Error al iniciar scraping de ${platform}`);
@@ -67,7 +67,7 @@ export function useScrapingControl() {
     setLoading(prev => ({ ...prev, government: true }));
     setError(null);
     try {
-      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_GOVERNMENT}`, { method: 'POST' });
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_GOVERNMENT}`, { method: 'POST', headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Error al iniciar scraping gubernamental');
       const result = await response.json();
       setTimeout(() => { fetchLogs(); }, 3000);
@@ -84,7 +84,7 @@ export function useScrapingControl() {
     setLoading(prev => ({ ...prev, surveys: true }));
     setError(null);
     try {
-      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_SURVEYS}`, { method: 'POST' });
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_SURVEYS}`, { method: 'POST', headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Error al iniciar scraping de encuestas');
       const result = await response.json();
       setTimeout(() => { fetchLogs(); }, 3000);
@@ -101,7 +101,7 @@ export function useScrapingControl() {
     setLoading(prev => ({ ...prev, all: true }));
     setError(null);
     try {
-      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_ALL}`, { method: 'POST' });
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.TRIGGER_ALL}`, { method: 'POST', headers: getAuthHeaders() });
       if (!response.ok) throw new Error('Error al iniciar scraping completo');
       const result = await response.json();
       setTimeout(() => { fetchLogs(); }, 5000);

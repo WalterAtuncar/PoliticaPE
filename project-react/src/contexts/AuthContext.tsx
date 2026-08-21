@@ -3,6 +3,7 @@ import { User, AuthState } from '../types';
 import { API_CONFIG, ENDPOINTS } from '../config/api';
 
 interface AuthContextType extends AuthState {
+  token: string | null;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
   forgotPassword: (email: string) => Promise<void>;
@@ -46,6 +47,7 @@ const initialState: AuthState = {
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const [token, setToken] = React.useState<string | null>(localStorage.getItem('auth_token'));
 
   const login = async (email: string, password: string, rememberMe = false) => {
     dispatch({ type: 'SET_LOADING', payload: true });
@@ -74,11 +76,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           role: data.user.role as 'admin' | 'analyst' | 'viewer',
           avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?w=100&h=100&fit=crop&crop=face',
         };
-        
+
+        // Store JWT token
+        if (data.token) {
+          localStorage.setItem('auth_token', data.token);
+          setToken(data.token);
+        }
+
         if (rememberMe) {
           localStorage.setItem('user', JSON.stringify(user));
         }
-        
+
         dispatch({ type: 'SET_USER', payload: user });
       } else {
         throw new Error('Error de autenticación');
@@ -91,6 +99,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     localStorage.removeItem('user');
+    localStorage.removeItem('auth_token');
+    setToken(null);
     dispatch({ type: 'LOGOUT' });
   };
 
@@ -125,7 +135,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           role: data.user.role as 'admin' | 'analyst' | 'viewer',
           avatar: 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?w=100&h=100&fit=crop&crop=face',
         };
-        
+
+        // Store JWT token
+        if (data.token) {
+          localStorage.setItem('auth_token', data.token);
+          setToken(data.token);
+        }
+
         localStorage.setItem('user', JSON.stringify(user));
         dispatch({ type: 'SET_USER', payload: user });
       } else {
@@ -148,6 +164,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     <AuthContext.Provider
       value={{
         ...state,
+        token,
         login,
         logout,
         forgotPassword,

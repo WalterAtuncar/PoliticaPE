@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_CONFIG } from '../config/api';
+import { API_CONFIG, getAuthHeaders } from '../config/api';
 
 interface SentimentDistribution {
   positive: number;
@@ -51,8 +51,8 @@ export const useAnalyticsData = (sourceType: string = 'news', periodDays: number
     
     try {
       const [sentimentRes, trendsRes] = await Promise.all([
-        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/sentiment?source_type=${sourceType}&days=${periodDays}`),
-        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/trends?days=${periodDays}`),
+        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/sentiment?source_type=${sourceType}&days=${periodDays}`, { headers: getAuthHeaders() }),
+        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/trends?days=${periodDays}`, { headers: getAuthHeaders() }),
       ]);
 
       if (!sentimentRes.ok) {

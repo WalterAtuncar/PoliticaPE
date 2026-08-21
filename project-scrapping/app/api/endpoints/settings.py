@@ -6,6 +6,7 @@ from datetime import datetime
 import uuid
 
 from app.database import get_db
+from app.api.deps import get_current_user
 from app.models import SocialApiToken, SearchTag
 from app.schemas import (
     SocialApiTokenCreate,
@@ -58,7 +59,7 @@ def token_to_response(token: SocialApiToken) -> dict:
 
 
 @router.get("/platforms", response_model=List[PlatformInfo])
-def get_platforms(db: Session = Depends(get_db)):
+def get_platforms(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     platforms = []
     for platform, fields in PLATFORM_CREDENTIAL_FIELDS.items():
         total = db.query(func.count(SocialApiToken.id)).filter(
@@ -79,7 +80,7 @@ def get_platforms(db: Session = Depends(get_db)):
 
 
 @router.get("/tokens", response_model=List[SocialApiTokenResponse])
-def list_tokens(platform: str = None, db: Session = Depends(get_db)):
+def list_tokens(platform: str = None, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     query = db.query(SocialApiToken).order_by(SocialApiToken.created_at.desc())
     if platform:
         query = query.filter(SocialApiToken.platform == platform)
@@ -88,7 +89,7 @@ def list_tokens(platform: str = None, db: Session = Depends(get_db)):
 
 
 @router.post("/tokens", response_model=SocialApiTokenResponse)
-def create_token(data: SocialApiTokenCreate, db: Session = Depends(get_db)):
+def create_token(data: SocialApiTokenCreate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     if data.platform not in PLATFORM_CREDENTIAL_FIELDS:
         raise HTTPException(status_code=400, detail=f"Plataforma no soportada: {data.platform}")
 
@@ -116,7 +117,7 @@ def create_token(data: SocialApiTokenCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/tokens/{token_id}", response_model=SocialApiTokenResponse)
-def update_token(token_id: str, data: SocialApiTokenUpdate, db: Session = Depends(get_db)):
+def update_token(token_id: str, data: SocialApiTokenUpdate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     token = db.query(SocialApiToken).filter(SocialApiToken.id == token_id).first()
     if not token:
         raise HTTPException(status_code=404, detail="Token no encontrado")
@@ -135,7 +136,7 @@ def update_token(token_id: str, data: SocialApiTokenUpdate, db: Session = Depend
 
 
 @router.delete("/tokens/{token_id}")
-def delete_token(token_id: str, db: Session = Depends(get_db)):
+def delete_token(token_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     token = db.query(SocialApiToken).filter(SocialApiToken.id == token_id).first()
     if not token:
         raise HTTPException(status_code=404, detail="Token no encontrado")
@@ -145,7 +146,7 @@ def delete_token(token_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/tokens/{token_id}/test")
-async def test_token(token_id: str, db: Session = Depends(get_db)):
+async def test_token(token_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     token = db.query(SocialApiToken).filter(SocialApiToken.id == token_id).first()
     if not token:
         raise HTTPException(status_code=404, detail="Token no encontrado")
@@ -205,13 +206,13 @@ async def test_token(token_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/tags", response_model=List[SearchTagResponse])
-def list_tags(db: Session = Depends(get_db)):
+def list_tags(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     tags = db.query(SearchTag).order_by(SearchTag.created_at.desc()).all()
     return tags
 
 
 @router.post("/tags", response_model=SearchTagResponse)
-def create_tag(data: SearchTagCreate, db: Session = Depends(get_db)):
+def create_tag(data: SearchTagCreate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     tag_text = data.tag.strip().lower()
     if not tag_text:
         raise HTTPException(status_code=400, detail="El tag no puede estar vacío")
@@ -238,7 +239,7 @@ def create_tag(data: SearchTagCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/tags/{tag_id}", response_model=SearchTagResponse)
-def update_tag(tag_id: str, data: SearchTagUpdate, db: Session = Depends(get_db)):
+def update_tag(tag_id: str, data: SearchTagUpdate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     tag = db.query(SearchTag).filter(SearchTag.id == tag_id).first()
     if not tag:
         raise HTTPException(status_code=404, detail="Tag no encontrado")
@@ -264,7 +265,7 @@ def update_tag(tag_id: str, data: SearchTagUpdate, db: Session = Depends(get_db)
 
 
 @router.delete("/tags/{tag_id}")
-def delete_tag(tag_id: str, db: Session = Depends(get_db)):
+def delete_tag(tag_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     tag = db.query(SearchTag).filter(SearchTag.id == tag_id).first()
     if not tag:
         raise HTTPException(status_code=404, detail="Tag no encontrado")

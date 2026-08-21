@@ -4,6 +4,7 @@ from typing import List, Optional
 from uuid import UUID
 
 from app.database import get_db
+from app.api.deps import get_current_user
 from app.models import Campaign, CampaignTeamMember, CampaignAsset, ABTest, ABTestVariant
 from app.schemas import (
     CampaignCreate, CampaignUpdate, CampaignResponse,
@@ -21,6 +22,7 @@ async def list_campaigns(
     skip: int = 0,
     limit: int = 100,
     status: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     query = db.query(Campaign)
@@ -29,7 +31,7 @@ async def list_campaigns(
     return query.offset(skip).limit(limit).all()
 
 @router.post("/", response_model=CampaignResponse)
-async def create_campaign(campaign: CampaignCreate, db: Session = Depends(get_db)):
+async def create_campaign(campaign: CampaignCreate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     db_campaign = Campaign(**campaign.dict())
     db.add(db_campaign)
     db.commit()
@@ -37,14 +39,14 @@ async def create_campaign(campaign: CampaignCreate, db: Session = Depends(get_db
     return db_campaign
 
 @router.get("/{campaign_id}", response_model=CampaignResponse)
-async def get_campaign(campaign_id: str, db: Session = Depends(get_db)):
+async def get_campaign(campaign_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
     return campaign
 
 @router.put("/{campaign_id}", response_model=CampaignResponse)
-async def update_campaign(campaign_id: str, campaign_in: CampaignUpdate, db: Session = Depends(get_db)):
+async def update_campaign(campaign_id: str, campaign_in: CampaignUpdate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
@@ -59,7 +61,7 @@ async def update_campaign(campaign_id: str, campaign_in: CampaignUpdate, db: Ses
     return campaign
 
 @router.delete("/{campaign_id}")
-async def delete_campaign(campaign_id: str, db: Session = Depends(get_db)):
+async def delete_campaign(campaign_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
@@ -71,11 +73,11 @@ async def delete_campaign(campaign_id: str, db: Session = Depends(get_db)):
 # --- TEAM MEMBERS ---
 
 @router.get("/{campaign_id}/team", response_model=List[CampaignTeamMemberResponse])
-async def list_team_members(campaign_id: str, db: Session = Depends(get_db)):
+async def list_team_members(campaign_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     return db.query(CampaignTeamMember).filter(CampaignTeamMember.campaign_id == campaign_id).all()
 
 @router.post("/{campaign_id}/team", response_model=CampaignTeamMemberResponse)
-async def add_team_member(campaign_id: str, member: CampaignTeamMemberCreate, db: Session = Depends(get_db)):
+async def add_team_member(campaign_id: str, member: CampaignTeamMemberCreate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     # Verify campaign exists
     if not db.query(Campaign).filter(Campaign.id == campaign_id).first():
         raise HTTPException(status_code=404, detail="Campaign not found")
@@ -102,11 +104,11 @@ async def add_team_member(campaign_id: str, member: CampaignTeamMemberCreate, db
 # --- ASSETS ---
 
 @router.get("/{campaign_id}/assets", response_model=List[CampaignAssetResponse])
-async def list_assets(campaign_id: str, db: Session = Depends(get_db)):
+async def list_assets(campaign_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     return db.query(CampaignAsset).filter(CampaignAsset.campaign_id == campaign_id).all()
 
 @router.post("/{campaign_id}/assets", response_model=CampaignAssetResponse)
-async def add_asset(campaign_id: str, asset: CampaignAssetCreate, db: Session = Depends(get_db)):
+async def add_asset(campaign_id: str, asset: CampaignAssetCreate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
@@ -124,11 +126,11 @@ async def add_asset(campaign_id: str, asset: CampaignAssetCreate, db: Session = 
 # --- A/B TESTS ---
 
 @router.get("/{campaign_id}/ab-tests", response_model=List[ABTestResponse])
-async def list_ab_tests(campaign_id: str, db: Session = Depends(get_db)):
+async def list_ab_tests(campaign_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     return db.query(ABTest).filter(ABTest.campaign_id == campaign_id).all()
 
 @router.post("/{campaign_id}/ab-tests", response_model=ABTestResponse)
-async def create_ab_test(campaign_id: str, test: ABTestCreate, db: Session = Depends(get_db)):
+async def create_ab_test(campaign_id: str, test: ABTestCreate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     campaign = db.query(Campaign).filter(Campaign.id == campaign_id).first()
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")

@@ -4,6 +4,7 @@ from typing import List
 import uuid
 
 from app.database import get_db
+from app.api.deps import get_current_user
 from app.models import PoliticalFigure, SearchTag
 from app.schemas import (
     PoliticalFigureCreate,
@@ -33,6 +34,7 @@ def sync_keywords_to_tags(db: Session, keywords: list, platforms: list = None):
 @router.get("", response_model=List[PoliticalFigureResponse])
 def list_figures(
     active_only: bool = False,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     query = db.query(PoliticalFigure)
@@ -43,7 +45,7 @@ def list_figures(
 
 
 @router.get("/{figure_id}", response_model=PoliticalFigureResponse)
-def get_figure(figure_id: str, db: Session = Depends(get_db)):
+def get_figure(figure_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     figure = db.query(PoliticalFigure).filter(PoliticalFigure.id == figure_id).first()
     if not figure:
         raise HTTPException(status_code=404, detail="Figura política no encontrada")
@@ -51,7 +53,7 @@ def get_figure(figure_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=PoliticalFigureResponse)
-def create_figure(data: PoliticalFigureCreate, db: Session = Depends(get_db)):
+def create_figure(data: PoliticalFigureCreate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     figure = PoliticalFigure(
         id=str(uuid.uuid4()),
         full_name=data.full_name,
@@ -81,6 +83,7 @@ def create_figure(data: PoliticalFigureCreate, db: Session = Depends(get_db)):
 def update_figure(
     figure_id: str,
     data: PoliticalFigureUpdate,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     figure = db.query(PoliticalFigure).filter(PoliticalFigure.id == figure_id).first()
@@ -101,7 +104,7 @@ def update_figure(
 
 
 @router.delete("/{figure_id}")
-def delete_figure(figure_id: str, db: Session = Depends(get_db)):
+def delete_figure(figure_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     figure = db.query(PoliticalFigure).filter(PoliticalFigure.id == figure_id).first()
     if not figure:
         raise HTTPException(status_code=404, detail="Figura política no encontrada")

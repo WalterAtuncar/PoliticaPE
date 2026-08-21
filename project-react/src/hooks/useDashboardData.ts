@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_CONFIG, ENDPOINTS } from '../config/api';
+import { API_CONFIG, ENDPOINTS, getAuthHeaders } from '../config/api';
 import { PoliticalMetric } from '../types';
 
 interface DashboardStats {
@@ -40,8 +40,8 @@ export const useDashboardData = (): DashboardData => {
       setData(prev => ({ ...prev, isLoading: true, error: null }));
 
       const [statsRes, sentimentRes] = await Promise.allSettled([
-        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.STATS}`),
-        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SENTIMENT}?source_type=news`),
+        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.STATS}`, { headers: getAuthHeaders() }),
+        fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SENTIMENT}?source_type=news`, { headers: getAuthHeaders() }),
       ]);
 
       let stats: DashboardStats | null = null;

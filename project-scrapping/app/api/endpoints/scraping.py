@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import Dict, List, Optional
 import uuid
 from datetime import datetime
+from enum import Enum
 import asyncio
 import logging
 
@@ -10,36 +11,76 @@ from app.database import get_db
 from app.models import ScrapingLog, RawSocialPost
 from app.schemas import ScrapingLogResponse, ScrapingTaskRequest, ScrapingTaskResponse
 from app.services.sentiment_analyzer import SentimentAnalyzer
+from app.api.deps import get_current_user
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+class TaskStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+# In-memory task tracking
+_task_registry: Dict[str, dict] = {}
+
+
+def register_task(task_id: str, task_type: str) -> dict:
+    task = {
+        "task_id": task_id,
+        "type": task_type,
+        "status": TaskStatus.PENDING,
+        "started_at": datetime.utcnow().isoformat(),
+        "completed_at": None,
+        "result": None,
+        "error": None,
+    }
+    _task_registry[task_id] = task
+    return task
+
+
+def update_task(task_id: str, status: TaskStatus, result=None, error=None):
+    if task_id in _task_registry:
+        _task_registry[task_id]["status"] = status
+        if status in (TaskStatus.COMPLETED, TaskStatus.FAILED):
+            _task_registry[task_id]["completed_at"] = datetime.utcnow().isoformat()
+        if result:
+            _task_registry[task_id]["result"] = result
+        if error:
+            _task_registry[task_id]["error"] = str(error)
+
 
 @router.get("/logs", response_model=List[ScrapingLogResponse])
 async def get_scraping_logs(
     source: str = None,
     status: str = None,
     limit: int = 100,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     query = db.query(ScrapingLog)
-    
+
     if source:
         query = query.filter(ScrapingLog.source == source)
     if status:
         query = query.filter(ScrapingLog.status == status)
-    
+
     logs = query.order_by(ScrapingLog.started_at.desc()).limit(limit).all()
     return logs
+
 
 async def run_twitter_scraping(db_url: str, query: str = None, max_results: int = 100):
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from app.services.scrapers.twitter_scraper import TwitterScraper
-    
+
     engine = create_engine(db_url)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
-    
+
     log = ScrapingLog(
         id=str(uuid.uuid4()),
         source="twitter",
@@ -48,29 +89,29 @@ async def run_twitter_scraping(db_url: str, query: str = None, max_results: int 
     )
     db.add(log)
     db.commit()
-    
+
     try:
         scraper = TwitterScraper()
-        
+
         if query:
             tweets = await scraper.search_tweets(query=query, max_results=max_results)
         else:
             tweets = await scraper.search_political_content(max_results=max_results)
-        
+
         sentiment_analyzer = SentimentAnalyzer()
         items_added = 0
-        
+
         for tweet in tweets:
             existing = db.query(RawSocialPost).filter(
                 RawSocialPost.platform == "twitter",
                 RawSocialPost.post_id == tweet["post_id"]
             ).first()
-            
+
             if existing:
                 continue
-            
+
             sentiment_score = sentiment_analyzer.analyze(tweet.get("content", ""))
-            
+
             post = RawSocialPost(
                 id=str(uuid.uuid4()),
                 platform=tweet["platform"],
@@ -86,17 +127,17 @@ async def run_twitter_scraping(db_url: str, query: str = None, max_results: int 
             )
             db.add(post)
             items_added += 1
-        
+
         db.commit()
-        
+
         log.status = "completed"
         log.items_scraped = items_added
         log.completed_at = datetime.now()
         log.extra_metadata = {"total_fetched": len(tweets), "duplicates_skipped": len(tweets) - items_added}
         db.commit()
-        
+
         logger.info(f"Twitter scraping completado: {items_added} items agregados")
-        
+
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)
@@ -106,15 +147,16 @@ async def run_twitter_scraping(db_url: str, query: str = None, max_results: int 
     finally:
         db.close()
 
+
 async def run_youtube_scraping(db_url: str, query: str = None, max_results: int = 50):
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from app.services.scrapers.youtube_scraper import YouTubeScraper
-    
+
     engine = create_engine(db_url)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
-    
+
     log = ScrapingLog(
         id=str(uuid.uuid4()),
         source="youtube",
@@ -123,29 +165,29 @@ async def run_youtube_scraping(db_url: str, query: str = None, max_results: int 
     )
     db.add(log)
     db.commit()
-    
+
     try:
         scraper = YouTubeScraper()
-        
+
         if query:
             videos = await scraper.search_videos(query=query, max_results=max_results)
         else:
             videos = await scraper.search_political_content(max_results=max_results)
-        
+
         sentiment_analyzer = SentimentAnalyzer()
         items_added = 0
-        
+
         for video in videos:
             existing = db.query(RawSocialPost).filter(
                 RawSocialPost.platform == "youtube",
                 RawSocialPost.post_id == video["post_id"]
             ).first()
-            
+
             if existing:
                 continue
-            
+
             sentiment_score = sentiment_analyzer.analyze(video.get("content", ""))
-            
+
             post = RawSocialPost(
                 id=str(uuid.uuid4()),
                 platform=video["platform"],
@@ -162,17 +204,17 @@ async def run_youtube_scraping(db_url: str, query: str = None, max_results: int 
             )
             db.add(post)
             items_added += 1
-        
+
         db.commit()
-        
+
         log.status = "completed"
         log.items_scraped = items_added
         log.completed_at = datetime.now()
         log.extra_metadata = {"total_fetched": len(videos), "duplicates_skipped": len(videos) - items_added}
         db.commit()
-        
+
         logger.info(f"YouTube scraping completado: {items_added} items agregados")
-        
+
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)
@@ -182,81 +224,124 @@ async def run_youtube_scraping(db_url: str, query: str = None, max_results: int 
     finally:
         db.close()
 
+
 @router.post("/trigger/twitter")
 async def trigger_twitter_scraping(
     background_tasks: BackgroundTasks,
-    query: Optional[str] = Query(None, description="Búsqueda personalizada"),
-    max_results: int = Query(100, description="Máximo de resultados", le=500)
+    query: Optional[str] = Query(None, description="Busqueda personalizada"),
+    max_results: int = Query(100, description="Maximo de resultados", le=500),
+    current_user: dict = Depends(get_current_user),
 ):
     from app.config import settings
-    
+
     task_id = str(uuid.uuid4())
-    background_tasks.add_task(
-        lambda: asyncio.run(run_twitter_scraping(settings.DATABASE_URL, query, max_results))
-    )
-    
+    register_task(task_id, "twitter")
+
+    async def _run_task():
+        update_task(task_id, TaskStatus.RUNNING)
+        try:
+            await run_twitter_scraping(settings.DATABASE_URL, query, max_results)
+            update_task(task_id, TaskStatus.COMPLETED, result={"source": "twitter"})
+        except Exception as e:
+            update_task(task_id, TaskStatus.FAILED, error=e)
+
+    background_tasks.add_task(lambda: asyncio.run(_run_task()))
+
     return {
         "message": "Scraping de Twitter iniciado",
         "task_id": task_id,
+        "status": "pending",
         "platform": "twitter",
-        "query": query or "Contenido político peruano",
+        "query": query or "Contenido politico peruano",
         "max_results": max_results
     }
+
 
 @router.post("/trigger/youtube")
 async def trigger_youtube_scraping(
     background_tasks: BackgroundTasks,
-    query: Optional[str] = Query(None, description="Búsqueda personalizada"),
-    max_results: int = Query(50, description="Máximo de resultados", le=200)
+    query: Optional[str] = Query(None, description="Busqueda personalizada"),
+    max_results: int = Query(50, description="Maximo de resultados", le=200),
+    current_user: dict = Depends(get_current_user),
 ):
     from app.config import settings
-    
+
     task_id = str(uuid.uuid4())
-    background_tasks.add_task(
-        lambda: asyncio.run(run_youtube_scraping(settings.DATABASE_URL, query, max_results))
-    )
-    
+    register_task(task_id, "youtube")
+
+    async def _run_task():
+        update_task(task_id, TaskStatus.RUNNING)
+        try:
+            await run_youtube_scraping(settings.DATABASE_URL, query, max_results)
+            update_task(task_id, TaskStatus.COMPLETED, result={"source": "youtube"})
+        except Exception as e:
+            update_task(task_id, TaskStatus.FAILED, error=e)
+
+    background_tasks.add_task(lambda: asyncio.run(_run_task()))
+
     return {
         "message": "Scraping de YouTube iniciado",
         "task_id": task_id,
+        "status": "pending",
         "platform": "youtube",
-        "query": query or "Contenido político peruano",
+        "query": query or "Contenido politico peruano",
         "max_results": max_results
     }
+
 
 @router.post("/trigger/social", response_model=ScrapingTaskResponse)
 async def trigger_social_scraping(
     request: ScrapingTaskRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
 ):
     from app.config import settings
-    
+
     platforms = request.sources or ["twitter", "youtube"]
     task_ids = []
-    
+
     for platform in platforms:
         task_id = str(uuid.uuid4())
         task_ids.append(task_id)
-        
+        register_task(task_id, platform)
+
         if platform == "twitter":
-            background_tasks.add_task(
-                lambda: asyncio.run(run_twitter_scraping(settings.DATABASE_URL))
-            )
+            _tid = task_id
+
+            async def _run_twitter(_tid=_tid):
+                update_task(_tid, TaskStatus.RUNNING)
+                try:
+                    await run_twitter_scraping(settings.DATABASE_URL)
+                    update_task(_tid, TaskStatus.COMPLETED, result={"source": "twitter"})
+                except Exception as e:
+                    update_task(_tid, TaskStatus.FAILED, error=e)
+
+            background_tasks.add_task(lambda _f=_run_twitter: asyncio.run(_f()))
         elif platform == "youtube":
-            background_tasks.add_task(
-                lambda: asyncio.run(run_youtube_scraping(settings.DATABASE_URL))
-            )
-    
+            _tid = task_id
+
+            async def _run_youtube(_tid=_tid):
+                update_task(_tid, TaskStatus.RUNNING)
+                try:
+                    await run_youtube_scraping(settings.DATABASE_URL)
+                    update_task(_tid, TaskStatus.COMPLETED, result={"source": "youtube"})
+                except Exception as e:
+                    update_task(_tid, TaskStatus.FAILED, error=e)
+
+            background_tasks.add_task(lambda _f=_run_youtube: asyncio.run(_f()))
+
     return ScrapingTaskResponse(
         message="Scraping de redes sociales iniciado",
         task_ids=task_ids,
         sources=platforms
     )
 
+
 @router.post("/trigger/news", response_model=ScrapingTaskResponse)
 async def trigger_news_scraping(
     request: ScrapingTaskRequest,
     background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     all_sources = [
@@ -267,16 +352,27 @@ async def trigger_news_scraping(
     sources = request.sources or all_sources
     task_ids = [str(uuid.uuid4()) for _ in sources]
 
+    # Register all tasks for the news scraping batch
+    for tid in task_ids:
+        register_task(tid, "news")
+
     def _run_news_sync():
+        for tid in task_ids:
+            update_task(tid, TaskStatus.RUNNING)
         from app.database import SessionLocal
         from app.scrapers.news_scrapers import run_news_scraping
         sync_db = SessionLocal()
         try:
             results = run_news_scraping(sync_db, sources)
             total = sum(results.values())
-            logger.info(f"News scraping completado: {total} artículos nuevos - {results}")
+            logger.info(f"News scraping completado: {total} articulos nuevos - {results}")
+            result_data = {"items_scraped": total, "details": {k: v for k, v in results.items()}}
+            for tid in task_ids:
+                update_task(tid, TaskStatus.COMPLETED, result=result_data)
         except Exception as e:
             logger.error(f"Error en news scraping: {e}")
+            for tid in task_ids:
+                update_task(tid, TaskStatus.FAILED, error=e)
         finally:
             sync_db.close()
 
@@ -288,18 +384,26 @@ async def trigger_news_scraping(
         sources=sources
     )
 
+
 @router.post("/trigger/government")
 async def trigger_government_scraping_legacy(
     background_tasks: BackgroundTasks,
-    request: Optional[ScrapingTaskRequest] = None
+    request: Optional[ScrapingTaskRequest] = None,
+    current_user: dict = Depends(get_current_user),
 ):
     from app.config import settings
 
     task_id = str(uuid.uuid4())
+    register_task(task_id, "government")
 
     def _run_gov_sync():
-        from app.services.scheduler import run_government_scraping_sync
-        run_government_scraping_sync(settings.DATABASE_URL)
+        update_task(task_id, TaskStatus.RUNNING)
+        try:
+            from app.services.scheduler import run_government_scraping_sync
+            run_government_scraping_sync(settings.DATABASE_URL)
+            update_task(task_id, TaskStatus.COMPLETED, result={"source": "government"})
+        except Exception as e:
+            update_task(task_id, TaskStatus.FAILED, error=e)
 
     background_tasks.add_task(_run_gov_sync)
 
@@ -309,36 +413,42 @@ async def trigger_government_scraping_legacy(
         sources=["wikipedia", "congreso", "datos_abiertos"]
     )
 
+
 @router.get("/status/{task_id}")
-async def get_task_status(task_id: str):
-    return {
-        "task_id": task_id,
-        "status": "Background task running",
-        "result": None,
-        "traceback": None
-    }
+async def get_task_status(task_id: str, current_user: dict = Depends(get_current_user)):
+    task = _task_registry.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
+
+
+@router.get("/tasks")
+async def list_tasks(limit: int = 20, current_user: dict = Depends(get_current_user)):
+    tasks = sorted(_task_registry.values(), key=lambda t: t["started_at"], reverse=True)
+    return {"tasks": tasks[:limit]}
+
 
 @router.get("/test/twitter")
-async def test_twitter_api():
+async def test_twitter_api(current_user: dict = Depends(get_current_user)):
     from app.services.scrapers.twitter_scraper import TwitterScraper
     import os
-    
+
     bearer_token = os.environ.get("X_BEARER_TOKEN")
-    
+
     if not bearer_token:
         return {
             "status": "error",
-            "message": "X_BEARER_TOKEN no está configurado",
+            "message": "X_BEARER_TOKEN no esta configurado",
             "api_configured": False
         }
-    
+
     try:
         scraper = TwitterScraper()
-        tweets = await scraper.search_tweets(query="Perú política", max_results=5)
-        
+        tweets = await scraper.search_tweets(query="Peru politica", max_results=5)
+
         return {
             "status": "success",
-            "message": "Conexión a Twitter API exitosa",
+            "message": "Conexion a Twitter API exitosa",
             "api_configured": True,
             "tweets_found": len(tweets),
             "sample_tweets": [
@@ -358,23 +468,25 @@ async def test_twitter_api():
             "api_configured": True
         }
 
+
 @router.get("/test/twitterapi-io")
-async def test_twitterapi_io():
+async def test_twitterapi_io(current_user: dict = Depends(get_current_user)):
     from app.services.scrapers.twitterapi_io_scraper import TwitterAPIioScraper
-    
+
     scraper = TwitterAPIioScraper()
     result = await scraper.test_connection()
     return result
+
 
 async def run_twitterapi_io_scraping(db_url: str, query: str = None, max_results: int = 100):
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from app.services.scrapers.twitterapi_io_scraper import TwitterAPIioScraper
-    
+
     engine = create_engine(db_url)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
-    
+
     log = ScrapingLog(
         id=str(uuid.uuid4()),
         source="twitter",
@@ -383,28 +495,28 @@ async def run_twitterapi_io_scraping(db_url: str, query: str = None, max_results
     )
     db.add(log)
     db.commit()
-    
+
     try:
         scraper = TwitterAPIioScraper()
         search_query = query or "Peru politica OR congreso peru OR presidente peru"
         tweets = await scraper.search_tweets(query=search_query, max_results=max_results)
-        
+
         sentiment_analyzer = SentimentAnalyzer()
         items_added = 0
-        
+
         for tweet in tweets:
             transformed = scraper.transform_tweet(tweet)
-            
+
             existing = db.query(RawSocialPost).filter(
                 RawSocialPost.platform == "twitter",
                 RawSocialPost.post_id == transformed["post_id"]
             ).first()
-            
+
             if existing:
                 continue
-            
+
             sentiment_score = sentiment_analyzer.analyze(transformed.get("content", ""))
-            
+
             post = RawSocialPost(
                 id=str(uuid.uuid4()),
                 platform=transformed["platform"],
@@ -420,17 +532,17 @@ async def run_twitterapi_io_scraping(db_url: str, query: str = None, max_results
             )
             db.add(post)
             items_added += 1
-        
+
         db.commit()
-        
+
         log.status = "completed"
         log.items_scraped = items_added
         log.completed_at = datetime.now()
         log.extra_metadata = {"total_fetched": len(tweets), "duplicates_skipped": len(tweets) - items_added, "source": "twitterapi.io"}
         db.commit()
-        
+
         logger.info(f"TwitterAPI.io scraping completado: {items_added} tweets agregados")
-        
+
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)
@@ -440,49 +552,61 @@ async def run_twitterapi_io_scraping(db_url: str, query: str = None, max_results
     finally:
         db.close()
 
+
 @router.post("/trigger/twitterapi-io")
 async def trigger_twitterapi_io_scraping(
     background_tasks: BackgroundTasks,
-    query: Optional[str] = Query(None, description="Búsqueda personalizada"),
-    max_results: int = Query(50, description="Máximo de resultados", le=200)
+    query: Optional[str] = Query(None, description="Busqueda personalizada"),
+    max_results: int = Query(50, description="Maximo de resultados", le=200),
+    current_user: dict = Depends(get_current_user),
 ):
     from app.config import settings
-    
+
     task_id = str(uuid.uuid4())
-    background_tasks.add_task(
-        lambda: asyncio.run(run_twitterapi_io_scraping(settings.DATABASE_URL, query, max_results))
-    )
-    
+    register_task(task_id, "twitterapi-io")
+
+    async def _run_task():
+        update_task(task_id, TaskStatus.RUNNING)
+        try:
+            await run_twitterapi_io_scraping(settings.DATABASE_URL, query, max_results)
+            update_task(task_id, TaskStatus.COMPLETED, result={"source": "twitterapi.io"})
+        except Exception as e:
+            update_task(task_id, TaskStatus.FAILED, error=e)
+
+    background_tasks.add_task(lambda: asyncio.run(_run_task()))
+
     return {
         "message": "Scraping de Twitter (via TwitterAPI.io) iniciado",
         "task_id": task_id,
+        "status": "pending",
         "platform": "twitter",
         "source": "twitterapi.io",
         "query": query or "Peru politica OR congreso peru OR presidente peru",
         "max_results": max_results
     }
 
+
 @router.get("/test/youtube")
-async def test_youtube_api():
+async def test_youtube_api(current_user: dict = Depends(get_current_user)):
     from app.services.scrapers.youtube_scraper import YouTubeScraper
     import os
-    
+
     api_key = os.environ.get("YOUTUBE_API_KEY")
-    
+
     if not api_key:
         return {
             "status": "error",
-            "message": "YOUTUBE_API_KEY no está configurado",
+            "message": "YOUTUBE_API_KEY no esta configurado",
             "api_configured": False
         }
-    
+
     try:
         scraper = YouTubeScraper()
-        videos = await scraper.search_videos(query="política perú", max_results=5)
-        
+        videos = await scraper.search_videos(query="politica peru", max_results=5)
+
         return {
             "status": "success",
-            "message": "Conexión a YouTube API exitosa",
+            "message": "Conexion a YouTube API exitosa",
             "api_configured": True,
             "videos_found": len(videos),
             "sample_videos": [
@@ -504,23 +628,23 @@ async def test_youtube_api():
 
 
 @router.get("/test/instagram")
-async def test_instagram_api():
+async def test_instagram_api(current_user: dict = Depends(get_current_user)):
     from app.services.scrapers.instagram_scraper import InstagramScraper
     import os
-    
+
     access_token = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
-    
+
     if not access_token:
         return {
             "status": "error",
-            "message": "INSTAGRAM_ACCESS_TOKEN no está configurado",
+            "message": "INSTAGRAM_ACCESS_TOKEN no esta configurado",
             "api_configured": False
         }
-    
+
     try:
         scraper = InstagramScraper()
         result = await scraper.test_connection()
-        
+
         if result.get("success"):
             accounts = await scraper.get_instagram_accounts()
             return {
@@ -549,11 +673,11 @@ async def run_instagram_scraping(db_url: str, ig_user_id: str, max_results: int 
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from app.services.scrapers.instagram_scraper import InstagramScraper
-    
+
     engine = create_engine(db_url)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
-    
+
     log = ScrapingLog(
         id=str(uuid.uuid4()),
         source="instagram",
@@ -562,29 +686,29 @@ async def run_instagram_scraping(db_url: str, ig_user_id: str, max_results: int 
     )
     db.add(log)
     db.commit()
-    
+
     try:
         scraper = InstagramScraper()
-        
+
         if not scraper.is_configured():
-            raise Exception("INSTAGRAM_ACCESS_TOKEN no está configurado")
-        
+            raise Exception("INSTAGRAM_ACCESS_TOKEN no esta configurado")
+
         posts = await scraper.scrape_political_content(ig_user_id, max_per_hashtag=max_results // 6)
-        
+
         sentiment_analyzer = SentimentAnalyzer()
         items_added = 0
-        
+
         for post in posts:
             existing = db.query(RawSocialPost).filter(
                 RawSocialPost.platform == "instagram",
                 RawSocialPost.post_id == post["post_id"]
             ).first()
-            
+
             if existing:
                 continue
-            
+
             sentiment_score = sentiment_analyzer.analyze(post.get("content", ""))
-            
+
             db_post = RawSocialPost(
                 id=str(uuid.uuid4()),
                 platform="instagram",
@@ -608,16 +732,16 @@ async def run_instagram_scraping(db_url: str, ig_user_id: str, max_results: int 
             )
             db.add(db_post)
             items_added += 1
-        
+
         db.commit()
-        
+
         log.status = "completed"
         log.items_scraped = items_added
         log.completed_at = datetime.now()
         db.commit()
-        
-        logger.info(f"Instagram scraping completado: {items_added} posts añadidos")
-        
+
+        logger.info(f"Instagram scraping completado: {items_added} posts agregados")
+
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)
@@ -632,24 +756,34 @@ async def run_instagram_scraping(db_url: str, ig_user_id: str, max_results: int 
 async def trigger_instagram_scraping(
     background_tasks: BackgroundTasks,
     ig_user_id: str = Query(..., description="ID de cuenta Instagram Business"),
-    max_results: int = Query(50, description="Máximo de resultados por hashtag", le=200),
+    max_results: int = Query(50, description="Maximo de resultados por hashtag", le=200),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     from app.config import settings
     from app.services.scrapers.instagram_scraper import InstagramScraper
-    
+
     scraper = InstagramScraper()
     if not scraper.is_configured():
-        raise HTTPException(status_code=400, detail="INSTAGRAM_ACCESS_TOKEN no está configurado")
-    
+        raise HTTPException(status_code=400, detail="INSTAGRAM_ACCESS_TOKEN no esta configurado")
+
     task_id = str(uuid.uuid4())
-    background_tasks.add_task(
-        lambda: asyncio.run(run_instagram_scraping(settings.DATABASE_URL, ig_user_id, max_results))
-    )
-    
+    register_task(task_id, "instagram")
+
+    async def _run_task():
+        update_task(task_id, TaskStatus.RUNNING)
+        try:
+            await run_instagram_scraping(settings.DATABASE_URL, ig_user_id, max_results)
+            update_task(task_id, TaskStatus.COMPLETED, result={"source": "instagram"})
+        except Exception as e:
+            update_task(task_id, TaskStatus.FAILED, error=e)
+
+    background_tasks.add_task(lambda: asyncio.run(_run_task()))
+
     return {
         "message": "Scraping de Instagram iniciado",
         "task_id": task_id,
+        "status": "pending",
         "platform": "instagram",
         "ig_user_id": ig_user_id,
         "max_results": max_results,
@@ -658,16 +792,16 @@ async def trigger_instagram_scraping(
 
 
 @router.get("/test/facebook")
-async def test_facebook_connection():
+async def test_facebook_connection(current_user: dict = Depends(get_current_user)):
     from app.services.scrapers.facebook_scraper import FacebookScraper
-    
+
     scraper = FacebookScraper()
     result = await scraper.test_connection()
-    
+
     if result.get("success"):
         pages = await scraper.get_managed_pages()
         result["pages"] = pages
-    
+
     return result
 
 
@@ -677,11 +811,11 @@ async def run_facebook_scraping(database_url: str, page_ids: list, max_results: 
     from app.models import RawSocialPost, ScrapingLog
     from app.services.scrapers.facebook_scraper import FacebookScraper
     from app.services.sentiment_analyzer import SentimentAnalyzer
-    
+
     engine = create_engine(database_url)
     SessionLocal = sessionmaker(bind=engine)
     db = SessionLocal()
-    
+
     log = ScrapingLog(
         id=str(uuid.uuid4()),
         source="facebook",
@@ -690,35 +824,35 @@ async def run_facebook_scraping(database_url: str, page_ids: list, max_results: 
     )
     db.add(log)
     db.commit()
-    
+
     try:
         scraper = FacebookScraper()
-        
+
         if not scraper.is_configured():
-            raise Exception("FACEBOOK_GRAPH_TOKEN no está configurado")
-        
+            raise Exception("FACEBOOK_GRAPH_TOKEN no esta configurado")
+
         all_posts = []
         for page_id in page_ids:
             posts = await scraper.get_page_posts(page_id, max_results // len(page_ids))
             all_posts.extend(posts)
-        
+
         sentiment_analyzer = SentimentAnalyzer()
         items_added = 0
-        
+
         for post in all_posts:
             if not post.get("content"):
                 continue
-            
+
             existing = db.query(RawSocialPost).filter(
                 RawSocialPost.platform == "facebook",
                 RawSocialPost.post_id == post["post_id"]
             ).first()
-            
+
             if existing:
                 continue
-            
+
             sentiment_score = sentiment_analyzer.analyze(post.get("content", ""))
-            
+
             db_post = RawSocialPost(
                 id=str(uuid.uuid4()),
                 platform="facebook",
@@ -741,16 +875,16 @@ async def run_facebook_scraping(database_url: str, page_ids: list, max_results: 
             )
             db.add(db_post)
             items_added += 1
-        
+
         db.commit()
-        
+
         log.status = "completed"
         log.items_scraped = items_added
         log.completed_at = datetime.now()
         db.commit()
-        
-        logger.info(f"Facebook scraping completado: {items_added} posts añadidos")
-        
+
+        logger.info(f"Facebook scraping completado: {items_added} posts agregados")
+
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)
@@ -764,27 +898,37 @@ async def run_facebook_scraping(database_url: str, page_ids: list, max_results: 
 @router.post("/trigger/facebook")
 async def trigger_facebook_scraping(
     background_tasks: BackgroundTasks,
-    page_ids: str = Query("CongresoPeru,PresidenciaPeru", description="IDs de páginas separados por coma"),
-    max_results: int = Query(50, description="Máximo de resultados total", le=200),
+    page_ids: str = Query("CongresoPeru,PresidenciaPeru", description="IDs de paginas separados por coma"),
+    max_results: int = Query(50, description="Maximo de resultados total", le=200),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     from app.config import settings
     from app.services.scrapers.facebook_scraper import FacebookScraper
-    
+
     scraper = FacebookScraper()
     if not scraper.is_configured():
-        raise HTTPException(status_code=400, detail="FACEBOOK_GRAPH_TOKEN no está configurado")
-    
+        raise HTTPException(status_code=400, detail="FACEBOOK_GRAPH_TOKEN no esta configurado")
+
     page_list = [p.strip() for p in page_ids.split(",") if p.strip()]
-    
+
     task_id = str(uuid.uuid4())
-    background_tasks.add_task(
-        lambda: asyncio.run(run_facebook_scraping(settings.DATABASE_URL, page_list, max_results))
-    )
-    
+    register_task(task_id, "facebook")
+
+    async def _run_task():
+        update_task(task_id, TaskStatus.RUNNING)
+        try:
+            await run_facebook_scraping(settings.DATABASE_URL, page_list, max_results)
+            update_task(task_id, TaskStatus.COMPLETED, result={"source": "facebook"})
+        except Exception as e:
+            update_task(task_id, TaskStatus.FAILED, error=e)
+
+    background_tasks.add_task(lambda: asyncio.run(_run_task()))
+
     return {
         "message": "Scraping de Facebook iniciado",
         "task_id": task_id,
+        "status": "pending",
         "platform": "facebook",
         "page_ids": page_list,
         "max_results": max_results
@@ -794,20 +938,28 @@ async def trigger_facebook_scraping(
 @router.post("/trigger/surveys")
 async def trigger_survey_scraping(
     background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
 ):
     from app.config import settings
 
     task_id = str(uuid.uuid4())
+    register_task(task_id, "surveys")
 
     async def _run_surveys():
-        from app.services.scheduler import run_scheduled_survey_scraping
-        await run_scheduled_survey_scraping(settings.DATABASE_URL)
+        update_task(task_id, TaskStatus.RUNNING)
+        try:
+            from app.services.scheduler import run_scheduled_survey_scraping
+            await run_scheduled_survey_scraping(settings.DATABASE_URL)
+            update_task(task_id, TaskStatus.COMPLETED, result={"source": "surveys"})
+        except Exception as e:
+            update_task(task_id, TaskStatus.FAILED, error=e)
 
     background_tasks.add_task(lambda: asyncio.run(_run_surveys()))
 
     return {
         "message": "Scraping de encuestas iniciado",
         "task_id": task_id,
+        "status": "pending",
         "pollsters": ["IEP", "Ipsos", "Datum", "CPI"]
     }
 
@@ -815,20 +967,28 @@ async def trigger_survey_scraping(
 @router.post("/trigger/all")
 async def trigger_all_scraping(
     background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
 ):
     from app.config import settings
 
     task_id = str(uuid.uuid4())
+    register_task(task_id, "all")
 
     async def _run_all():
-        from app.services.scheduler import run_all_scrapers
-        await run_all_scrapers()
+        update_task(task_id, TaskStatus.RUNNING)
+        try:
+            from app.services.scheduler import run_all_scrapers
+            await run_all_scrapers()
+            update_task(task_id, TaskStatus.COMPLETED, result={"source": "all"})
+        except Exception as e:
+            update_task(task_id, TaskStatus.FAILED, error=e)
 
     background_tasks.add_task(lambda: asyncio.run(_run_all()))
 
     return {
         "message": "Scraping completo iniciado (redes sociales, gobierno, encuestas)",
         "task_id": task_id,
+        "status": "pending",
         "sources": ["Twitter", "YouTube", "Instagram", "ONPE", "INEI", "MEF", "IEP", "Ipsos", "Datum", "CPI"]
     }
 
@@ -836,36 +996,47 @@ async def trigger_all_scraping(
 @router.post("/trigger/historical")
 async def trigger_historical_scraping(
     background_tasks: BackgroundTasks,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     from app.services.scheduler import _historical_running, HISTORICAL_DAYS_BACK
 
     if _historical_running:
-        raise HTTPException(status_code=409, detail="El scraping histórico ya está en ejecución. Espere a que termine.")
+        raise HTTPException(status_code=409, detail="El scraping historico ya esta en ejecucion. Espere a que termine.")
 
     from app.models import SearchTag
     active_tags = db.query(SearchTag).filter(SearchTag.is_active == True).all()
 
     task_id = str(uuid.uuid4())
+    register_task(task_id, "historical")
 
     async def _run_historical():
-        from app.services.scheduler import run_historical_scraping
-        await run_historical_scraping()
+        update_task(task_id, TaskStatus.RUNNING)
+        try:
+            from app.services.scheduler import run_historical_scraping
+            await run_historical_scraping()
+            update_task(task_id, TaskStatus.COMPLETED, result={"source": "historical"})
+        except Exception as e:
+            update_task(task_id, TaskStatus.FAILED, error=e)
 
     background_tasks.add_task(lambda: asyncio.run(_run_historical()))
 
     return {
-        "message": f"Scraping histórico iniciado ({HISTORICAL_DAYS_BACK} días atrás)",
+        "message": f"Scraping historico iniciado ({HISTORICAL_DAYS_BACK} dias atras)",
         "task_id": task_id,
+        "status": "pending",
         "days_back": HISTORICAL_DAYS_BACK,
         "platforms": ["twitter", "youtube", "instagram", "facebook"],
         "active_tags": [t.tag for t in active_tags],
-        "note": "Twitter y YouTube soportan búsqueda retroactiva por fechas. Instagram y Facebook obtienen los posts más recientes disponibles (sin filtro de fecha por limitación de sus APIs)."
+        "note": "Twitter y YouTube soportan busqueda retroactiva por fechas. Instagram y Facebook obtienen los posts mas recientes disponibles (sin filtro de fecha por limitacion de sus APIs)."
     }
 
 
 @router.get("/historical/status")
-async def get_historical_status(db: Session = Depends(get_db)):
+async def get_historical_status(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     from app.models import ScrapingLog
     from app.services.scheduler import _historical_running
 

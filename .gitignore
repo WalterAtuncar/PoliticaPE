@@ -47,3 +47,24 @@ desktop.ini
 
 .vscode/
 .idea/
+
+# Python
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+.mypy_cache/
+.pytest_cache/
+
+# Build
+dist/
+
+# Lima 2026
+.agents/
+.config/
+.local/
+*.dump
+backup_*.sql
+project-scrapping/logs/

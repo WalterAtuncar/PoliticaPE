@@ -1,6 +1,6 @@
 [project]
-name = "repl-nix-workspace"
-version = "0.1.0"
-description = "Add your description here"
+name = "politicape"
+version = "1.0.0"
+description = "Plataforma de analitica politica para Peru"
 requires-python = ">=3.11"
 dependencies = []

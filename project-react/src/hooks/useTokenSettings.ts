@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_CONFIG, ENDPOINTS } from '../config/api';
+import { API_CONFIG, ENDPOINTS, getAuthHeaders } from '../config/api';
 
 export interface PlatformInfo {
   platform: string;
@@ -37,7 +37,7 @@ export const useTokenSettings = () => {
 
   const fetchPlatforms = useCallback(async () => {
     try {
-      const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SETTINGS_PLATFORMS}`);
+      const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SETTINGS_PLATFORMS}`, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setPlatforms(data);
@@ -53,7 +53,7 @@ export const useTokenSettings = () => {
       const url = platform
         ? `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SETTINGS_TOKENS}?platform=${platform}`
         : `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SETTINGS_TOKENS}`;
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: getAuthHeaders() });
       if (res.ok) {
         const data = await res.json();
         setTokens(data);
@@ -69,7 +69,7 @@ export const useTokenSettings = () => {
   const createToken = useCallback(async (data: TokenCreateData) => {
     const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SETTINGS_TOKENS}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
     if (!res.ok) {
@@ -84,7 +84,7 @@ export const useTokenSettings = () => {
   const updateToken = useCallback(async (tokenId: string, data: Partial<TokenCreateData>) => {
     const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SETTINGS_TOKENS}/${tokenId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error('Error al actualizar token');
@@ -95,6 +95,7 @@ export const useTokenSettings = () => {
   const deleteToken = useCallback(async (tokenId: string) => {
     const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SETTINGS_TOKENS}/${tokenId}`, {
       method: 'DELETE',
+      headers: getAuthHeaders(),
     });
     if (!res.ok) throw new Error('Error al eliminar token');
     await fetchTokens();
@@ -104,6 +105,7 @@ export const useTokenSettings = () => {
   const testToken = useCallback(async (tokenId: string) => {
     const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.SETTINGS_TOKENS}/${tokenId}/test`, {
       method: 'POST',
+      headers: getAuthHeaders(),
     });
     const result = await res.json();
     await fetchTokens();

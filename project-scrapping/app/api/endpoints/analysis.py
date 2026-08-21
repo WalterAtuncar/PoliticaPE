@@ -7,6 +7,7 @@ from collections import Counter
 import re
 
 from app.database import get_db
+from app.api.deps import get_current_user
 from app.models import NewsArticle, RawSocialPost
 from app.schemas import SentimentAnalysisResponse, TrendAnalysisResponse
 from app.services.analysis import AnalysisService
@@ -18,6 +19,7 @@ async def get_sentiment_analysis(
     source_type: str = Query(..., description="news, social, or government"),
     source: str = Query(None, description="Specific source to analyze"),
     days: int = Query(7, description="Number of days to analyze"),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get sentiment analysis for specified data source"""
@@ -40,6 +42,7 @@ async def get_trend_analysis(
     keywords: Optional[str] = Query(None, description="Comma-separated keywords to analyze"),
     period_days: int = Query(30, description="Number of days to analyze"),
     days: int = Query(None, description="Alias for period_days"),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get trend analysis for specified keywords"""
@@ -61,6 +64,7 @@ async def get_trend_analysis(
 @router.get("/geographic")
 async def get_geographic_analysis(
     days: int = Query(7, description="Number of days to analyze"),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get geographic distribution of social media posts"""
@@ -76,6 +80,7 @@ async def get_geographic_analysis(
 async def get_engagement_metrics(
     platform: str = Query(None, description="Social media platform"),
     days: int = Query(7, description="Number of days to analyze"),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get engagement metrics for social media posts"""
@@ -91,6 +96,7 @@ async def get_engagement_metrics(
 @router.get("/time-series")
 async def get_time_series_data(
     days: int = Query(30, description="Number of days to analyze"),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get time series data for mentions and sentiment over time"""
@@ -155,6 +161,7 @@ async def get_time_series_data(
 @router.get("/platform-breakdown")
 async def get_platform_breakdown(
     days: int = Query(30, description="Number of days to analyze"),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get engagement breakdown by platform"""
@@ -204,6 +211,7 @@ async def get_platform_breakdown(
 @router.get("/share-of-voice")
 async def get_share_of_voice(
     days: int = Query(30, description="Number of days to analyze"),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get share of voice analysis by political party and figures"""
@@ -300,6 +308,7 @@ async def get_top_posts(
     days: int = Query(30, description="Number of days to analyze"),
     limit: int = Query(10, description="Number of posts to return"),
     page: int = Query(1, description="Page number for pagination"),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get top performing posts by engagement"""
@@ -396,6 +405,7 @@ async def get_top_posts(
 async def get_trending_topics(
     days: int = Query(7, description="Number of days to analyze"),
     limit: int = Query(20, description="Number of topics to return"),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get trending topics from all content"""
@@ -419,6 +429,7 @@ async def get_trending_topics(
 @router.get("/regional-engagement")
 async def get_regional_engagement(
     days: int = Query(30, description="Number of days to analyze"),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get engagement metrics by region (departamentos de Perú)"""

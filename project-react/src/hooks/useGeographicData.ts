@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_CONFIG } from '../config/api';
+import { API_CONFIG, getAuthHeaders } from '../config/api';
 
 interface RegionData {
   id: string;
@@ -70,7 +70,7 @@ export const useGeographicData = (periodDays: number = 7): GeographicData => {
     setError(null);
     
     try {
-      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/geographic?period_days=${periodDays}`);
+      const response = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}/api/v1/analysis/geographic?period_days=${periodDays}`, { headers: getAuthHeaders() });
       
       if (!response.ok) {
         throw new Error(`Error del servidor: ${response.status}`);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_CONFIG, ENDPOINTS } from '../config/api';
+import { API_CONFIG, ENDPOINTS, getAuthHeaders } from '../config/api';
 import { PoliticalFigure } from '../types/recommendations';
 
 export function usePoliticalFigures() {
@@ -9,7 +9,7 @@ export function usePoliticalFigures() {
   const fetchFigures = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.POLITICAL_FIGURES}`);
+      const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.POLITICAL_FIGURES}`, { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('Error fetching figures');
       const data = await res.json();
       setFigures(data);
@@ -27,7 +27,7 @@ export function usePoliticalFigures() {
   const createFigure = async (data: Omit<PoliticalFigure, 'id' | 'created_at' | 'updated_at'>) => {
     const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.POLITICAL_FIGURES}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
     if (!res.ok) {
@@ -42,7 +42,7 @@ export function usePoliticalFigures() {
   const updateFigure = async (figureId: string, data: Partial<PoliticalFigure>) => {
     const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.POLITICAL_FIGURES}/${figureId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(data),
     });
     if (!res.ok) {
@@ -57,6 +57,7 @@ export function usePoliticalFigures() {
   const deleteFigure = async (figureId: string) => {
     const res = await fetch(`${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.POLITICAL_FIGURES}/${figureId}`, {
       method: 'DELETE',
+      headers: getAuthHeaders(),
     });
     if (!res.ok) throw new Error('Error al eliminar figura');
     setFigures(prev => prev.filter(f => f.id !== figureId));

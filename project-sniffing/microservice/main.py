@@ -1,6 +1,6 @@
 """
 Microservicio de Análisis de Datos Políticos en Tiempo Real
-Versión simplificada para Replit sin dependencias pesadas (Kafka, Redis, ML)
+Versión simplificada sin dependencias pesadas (Kafka, Redis, ML)
 """
 
 import asyncio
@@ -19,20 +19,35 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy import create_engine, Column, String, Float, Boolean, Integer, DateTime, Text, JSON, text
+from sqlalchemy.orm import sessionmaker, declarative_base
 import uvicorn
 
 # Configuración
 class Settings(BaseSettings):
     """Configuración de la aplicación usando variables de entorno"""
-    postgres_url: str = os.getenv("DATABASE_URL", "postgresql://localhost:5432/politiscope_db")
+    database_url: str = os.getenv("DATABASE_URL", "postgresql://localhost:5432/politiscope_db")
     log_level: str = "INFO"
-    port: int = 8080
+    port: int = int(os.getenv("PORT", "8080"))
     batch_size: int = 100
     processing_interval: int = 5
-    
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    model_config = SettingsConfigDict(
+        env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env"),
+        extra="ignore"
+    )
 
 settings = Settings()
+
+# Database setup
+DATABASE_URL = settings.database_url
+if DATABASE_URL.startswith("postgresql://"):
+    # SQLAlchemy needs postgresql+psycopg2://
+    pass  # psycopg2 handles postgresql:// fine
+
+engine = create_engine(DATABASE_URL, pool_size=5, max_overflow=10, pool_pre_ping=True)
+SessionLocal = sessionmaker(bind=engine)
+Base = declarative_base()
 
 # Configurar logging
 logging.basicConfig(
@@ -74,6 +89,33 @@ unregister_if_exists('websocket_connections_active')
 active_connections = Gauge('websocket_connections_active', 'Conexiones WebSocket activas')
 
 
+
+# Database Model
+class LiveStreamRecord(Base):
+    __tablename__ = "live_streams"
+    __table_args__ = {"schema": "realtime_data"}
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    stream_id = Column(String, nullable=False, index=True)
+    platform = Column(String, nullable=False)
+    stream_type = Column(String)
+    content = Column(Text)
+    author_handle = Column(String)
+    author_name = Column(String)
+    realtime_sentiment = Column(Float)
+    sentiment_confidence = Column(Float)
+    political_relevance_score = Column(Float)
+    urgency_score = Column(Float)
+    is_trending = Column(Boolean, default=False)
+    is_crisis_indicator = Column(Boolean, default=False)
+    is_opportunity = Column(Boolean, default=False)
+    detected_region = Column(String)
+    detected_keywords = Column(JSON)
+    political_entities = Column(JSON)
+    hashtags = Column(JSON)
+    processing_latency_ms = Column(Integer)
+    message_timestamp = Column(DateTime)
+    created_at = Column(DateTime, server_default=text("NOW()"))
 
 # Modelos
 class LiveStreamData(BaseModel):
@@ -293,15 +335,45 @@ class InMemoryStorage:
     def add_item(self, item: Dict):
         self.processed_count += 1
         self.sentiment_sum += item.get('realtime_sentiment', 0)
-        
+
         if item.get('is_crisis_indicator'):
             self.crisis_alerts += 1
         if item.get('is_trending'):
             self.trending_topics += 1
-            
+
         self.recent_items.append(item)
         if len(self.recent_items) > 1000:
             self.recent_items = self.recent_items[-500:]
+
+        # Persist to PostgreSQL
+        try:
+            session = SessionLocal()
+            record = LiveStreamRecord(
+                stream_id=item.get('stream_id', ''),
+                platform=item.get('platform', ''),
+                stream_type=item.get('stream_type', ''),
+                content=item.get('content', ''),
+                author_handle=item.get('author_handle'),
+                author_name=item.get('author_name'),
+                realtime_sentiment=item.get('realtime_sentiment', 0),
+                sentiment_confidence=item.get('sentiment_confidence', 0),
+                political_relevance_score=item.get('political_relevance_score', 0),
+                urgency_score=item.get('urgency_score', 0),
+                is_trending=item.get('is_trending', False),
+                is_crisis_indicator=item.get('is_crisis_indicator', False),
+                is_opportunity=item.get('is_opportunity', False),
+                detected_region=item.get('detected_region'),
+                detected_keywords=item.get('detected_keywords', []),
+                political_entities=item.get('political_entities', []),
+                hashtags=item.get('hashtags', []),
+                processing_latency_ms=item.get('processing_latency_ms', 0),
+                message_timestamp=item.get('message_timestamp'),
+            )
+            session.add(record)
+            session.commit()
+            session.close()
+        except Exception as e:
+            logger.warning(f"Failed to persist to DB (non-fatal): {e}")
     
     def get_metrics(self) -> StreamMetrics:
         avg_sentiment = self.sentiment_sum / self.processed_count if self.processed_count > 0 else 0.0
@@ -320,6 +392,14 @@ storage = InMemoryStorage()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Iniciando microservicio de streaming...")
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("CREATE SCHEMA IF NOT EXISTS realtime_data"))
+            conn.commit()
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables initialized")
+    except Exception as e:
+        logger.warning(f"Database init warning (non-fatal): {e}")
     yield
     logger.info("Cerrando microservicio...")
 
