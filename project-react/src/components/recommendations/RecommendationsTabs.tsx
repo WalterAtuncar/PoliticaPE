@@ -20,36 +20,60 @@ interface RecommendationsTabsProps {
 
 const tabs = [
   {
-    id: 'immediate',
-    label: 'Oportunidades Inmediatas',
+    id: 'all',
+    label: 'Todas',
     icon: Zap,
-    description: 'Alto impacto, bajo costo',
+    description: 'Todas las recomendaciones',
+    color: 'text-gray-600 dark:text-gray-400',
+    bgColor: 'bg-gray-100 dark:bg-gray-700/40',
+  },
+  {
+    id: 'territorial_priority',
+    label: 'Prioridad territorial',
+    icon: Shield,
+    description: 'Dónde ir esta semana',
+    color: 'text-amber-600 dark:text-amber-400',
+    bgColor: 'bg-amber-100 dark:bg-amber-900/20',
+  },
+  {
+    id: 'message_of_day',
+    label: 'Mensaje del día',
+    icon: Zap,
+    description: 'Tema y encuadre para vocería',
     color: 'text-yellow-600 dark:text-yellow-400',
     bgColor: 'bg-yellow-100 dark:bg-yellow-900/20',
   },
   {
-    id: 'regional',
-    label: 'Fortalecimiento Regional',
-    icon: Shield,
-    description: 'Consolidar zonas favorables',
-    color: 'text-green-600 dark:text-green-400',
-    bgColor: 'bg-green-100 dark:bg-green-900/20',
-  },
-  {
-    id: 'recovery',
-    label: 'Recuperación Territorial',
+    id: 'crisis_response',
+    label: 'Respuesta a crisis',
     icon: RefreshCw,
-    description: 'Sentiment negativo',
+    description: 'Ataques e incidentes',
     color: 'text-red-600 dark:text-red-400',
     bgColor: 'bg-red-100 dark:bg-red-900/20',
   },
   {
-    id: 'expansion',
-    label: 'Expansión Demográfica',
+    id: 'rival_contrast',
+    label: 'Contraste con rivales',
     icon: TrendingUp,
-    description: 'Nuevos segmentos objetivo',
+    description: 'Diferenciación frente a punteros',
     color: 'text-purple-600 dark:text-purple-400',
     bgColor: 'bg-purple-100 dark:bg-purple-900/20',
+  },
+  {
+    id: 'ground_game',
+    label: 'Trabajo de calle',
+    icon: Shield,
+    description: 'Caminatas, dirigentes, gremios',
+    color: 'text-green-600 dark:text-green-400',
+    bgColor: 'bg-green-100 dark:bg-green-900/20',
+  },
+  {
+    id: 'digital_push',
+    label: 'Empuje digital',
+    icon: TrendingUp,
+    description: 'Pauta y contenido por zona',
+    color: 'text-blue-600 dark:text-blue-400',
+    bgColor: 'bg-blue-100 dark:bg-blue-900/20',
   },
 ];
 
@@ -58,18 +82,10 @@ export const RecommendationsTabs: React.FC<RecommendationsTabsProps> = ({
   onTabChange,
   recommendations,
 }) => {
-  const getTabCount = (tabId: string) => {
-    const categoryMap = {
-      immediate: 'immediate_opportunities',
-      regional: 'regional_strengthening',
-      recovery: 'territorial_recovery',
-      expansion: 'demographic_expansion',
-    };
-    
-    return recommendations.filter(rec => 
-      rec.category === categoryMap[tabId as keyof typeof categoryMap]
-    ).length;
-  };
+  const getTabCount = (tabId: string) =>
+    tabId === 'all'
+      ? recommendations.length
+      : recommendations.filter(rec => rec.category === tabId).length;
 
   return (
     <div className="border-b border-gray-200/50 dark:border-gray-700/50">

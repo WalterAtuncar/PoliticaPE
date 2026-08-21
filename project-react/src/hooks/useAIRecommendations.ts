@@ -67,10 +67,12 @@ export const useAIRecommendations = (filters: RecommendationsFilters) => {
           body: JSON.stringify({
             figure_ids: figureIds,
             focus_areas: focusAreas || [
-              'immediate_opportunities',
-              'regional_strengthening',
-              'territorial_recovery',
-              'demographic_expansion',
+              'territorial_priority',
+              'message_of_day',
+              'crisis_response',
+              'rival_contrast',
+              'ground_game',
+              'digital_push',
             ],
           }),
         }

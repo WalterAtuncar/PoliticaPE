@@ -5,9 +5,8 @@ import { Header } from '../components/layout/Header';
 import { Dashboard } from '../components/dashboard/Dashboard';
 import { MonitoringPage } from '../components/monitoring/MonitoringPage';
 import { SocialPage } from '../components/social/SocialPage';
-import { GeoDemographicsPage } from '../components/geo-demographics/GeoDemographicsPage';
-import { GovernmentPage } from '../components/government/GovernmentPage';
-import { SurveysPage } from '../components/surveys/SurveysPage';
+import { TerritoryPage } from '../components/territory/TerritoryPage';
+import { RacePage } from '../components/race/RacePage';
 import { RecommendationsPage } from '../components/recommendations/RecommendationsPage';
 import { SettingsContainer } from '../components/settings/SettingsContainer';
 
@@ -23,12 +22,10 @@ export const MainApp: React.FC = () => {
         return <MonitoringPage />;
       case 'social':
         return <SocialPage />;
-      case 'geo-demographics':
-        return <GeoDemographicsPage />;
-      case 'government':
-        return <GovernmentPage />;
-      case 'surveys':
-        return <SurveysPage />;
+      case 'territory':
+        return <TerritoryPage />;
+      case 'race':
+        return <RacePage />;
       case 'recommendations':
         return <RecommendationsPage />;
       case 'settings':

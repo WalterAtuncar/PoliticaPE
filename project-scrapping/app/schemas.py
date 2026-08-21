@@ -26,6 +26,9 @@ class NewsArticleResponse(BaseResponseModel):
     tags: Optional[List[str]]
     sentiment_score: Optional[float]
     political_entities: Optional[Dict[str, Any]]
+    scope: Optional[str] = None
+    districts: Optional[List[Dict[str, Any]]] = None
+    topics: Optional[Dict[str, Any]] = None
 
 class SocialPostResponse(BaseResponseModel):
     id: str
@@ -38,6 +41,9 @@ class SocialPostResponse(BaseResponseModel):
     engagement_metrics: Optional[Dict[str, Any]]
     sentiment_score: Optional[float]
     geographic_location: Optional[str]
+    scope: Optional[str] = None
+    districts: Optional[List[Dict[str, Any]]] = None
+    topics: Optional[Dict[str, Any]] = None
 
 class GovernmentDataResponse(BaseResponseModel):
     id: str
@@ -265,6 +271,11 @@ class PoliticalFigureCreate(BaseModel):
     is_active: bool = True
     monitoring_priority: str = "medium"
     notes: Optional[str] = None
+    figure_role: str = "candidate"
+    is_own_candidate: bool = False
+    list_name: Optional[str] = None
+    color: Optional[str] = None
+    zone_strength: Optional[Dict[str, Any]] = None
 
 
 class PoliticalFigureUpdate(BaseModel):
@@ -280,6 +291,11 @@ class PoliticalFigureUpdate(BaseModel):
     is_active: Optional[bool] = None
     monitoring_priority: Optional[str] = None
     notes: Optional[str] = None
+    figure_role: Optional[str] = None
+    is_own_candidate: Optional[bool] = None
+    list_name: Optional[str] = None
+    color: Optional[str] = None
+    zone_strength: Optional[Dict[str, Any]] = None
 
 
 class PoliticalFigureResponse(BaseResponseModel):
@@ -296,6 +312,11 @@ class PoliticalFigureResponse(BaseResponseModel):
     is_active: bool
     monitoring_priority: str
     notes: Optional[str]
+    figure_role: Optional[str] = None
+    is_own_candidate: Optional[bool] = None
+    list_name: Optional[str] = None
+    color: Optional[str] = None
+    zone_strength: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: Optional[datetime]
 
@@ -334,7 +355,7 @@ class AIRecommendationUpdate(BaseModel):
 
 class GenerateRecommendationsRequest(BaseModel):
     figure_ids: List[str]
-    focus_areas: List[str] = ["immediate_opportunities", "regional_strengthening", "territorial_recovery", "demographic_expansion"]
+    focus_areas: List[str] = ["territorial_priority", "message_of_day", "crisis_response", "rival_contrast", "ground_game", "digital_push"]
 
 
 PLATFORM_CREDENTIAL_FIELDS = {

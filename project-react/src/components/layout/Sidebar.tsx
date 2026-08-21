@@ -7,8 +7,8 @@ import {
   Home,
   MessageSquare,
   MapPin,
-  Building2,
   BarChart3,
+  Flag,
   Settings
 } from 'lucide-react';
 import logo from '../../assets/logo.png';
@@ -21,12 +21,11 @@ interface SidebarProps {
 }
 
 const menuItems = [
-  { id: 'dashboard', label: 'Panel Principal', icon: Home },
-  { id: 'monitoring', label: 'Monitoreo de Noticias', icon: Activity },
-  { id: 'social', label: 'Redes Sociales', icon: MessageSquare },
-  { id: 'geo-demographics', label: 'Geográfico y Demográfico', icon: MapPin },
-  { id: 'government', label: 'Data Gubernamental', icon: Building2 },
-  { id: 'surveys', label: 'Encuestas', icon: BarChart3 },
+  { id: 'dashboard', label: 'Panel', icon: Home },
+  { id: 'monitoring', label: 'Prensa', icon: Activity },
+  { id: 'social', label: 'Redes', icon: MessageSquare },
+  { id: 'race', label: 'Carrera', icon: Flag },
+  { id: 'territory', label: 'Territorio', icon: MapPin },
   { id: 'recommendations', label: 'Recomendaciones IA', icon: Brain },
   { id: 'settings', label: 'Configuración', icon: Settings },
 ];
@@ -53,7 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <div>
                 <h1 className="font-bold text-gray-900 dark:text-white">PolíticaPE</h1>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Plataforma de Análisis</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Lima 2026 · Cuarto de guerra</p>
               </div>
             )}
           </motion.div>

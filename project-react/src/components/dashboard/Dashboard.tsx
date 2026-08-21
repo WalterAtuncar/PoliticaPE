@@ -1,21 +1,21 @@
 import React from 'react';
 import { MetricCard } from './MetricCard';
 import { TrendChart } from './TrendChart';
-import { RealtimeAlerts } from './RealtimeAlerts';
+import { AlertsPanel } from './AlertsPanel';
 import { GeographicMap } from './GeographicMap';
 import { useDashboardData } from '../../hooks/useDashboardData';
 
 export const Dashboard: React.FC = () => {
-  const { metrics, isLoading, isUsingMockData } = useDashboardData();
+  const { metrics, isLoading, hasData } = useDashboardData();
 
   return (
     <div className="space-y-8">
-      {isUsingMockData && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 text-sm text-yellow-700 dark:text-yellow-300">
-          Mostrando datos de demostración. Los datos reales se cargarán cuando estén disponibles.
+      {!isLoading && !hasData && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm text-amber-700 dark:text-amber-300">
+          Aún no hay datos recolectados. Ejecuta el scraping desde Configuración para poblar el panel.
         </div>
       )}
-      
+
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {isLoading ? (
@@ -32,7 +32,7 @@ export const Dashboard: React.FC = () => {
       {/* Charts and Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <TrendChart />
-        <RealtimeAlerts />
+        <AlertsPanel />
       </div>
 
       {/* Geographic Analysis */}

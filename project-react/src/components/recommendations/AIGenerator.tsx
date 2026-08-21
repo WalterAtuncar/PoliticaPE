@@ -24,10 +24,12 @@ export const AIGenerator: React.FC<AIGeneratorProps> = ({
   const [selectedFocus, setSelectedFocus] = useState<string[]>([]);
 
   const focusAreas = [
-    { id: 'immediate_opportunities', label: 'Oportunidades Inmediatas', icon: Zap, color: 'text-yellow-600' },
-    { id: 'regional_strengthening', label: 'Fortalecimiento Regional', icon: Target, color: 'text-green-600' },
-    { id: 'territorial_recovery', label: 'Recuperación Territorial', icon: Brain, color: 'text-red-600' },
-    { id: 'demographic_expansion', label: 'Expansión Demográfica', icon: Users, color: 'text-purple-600' },
+    { id: 'territorial_priority', label: 'Prioridad territorial', icon: Target, color: 'text-amber-600' },
+    { id: 'message_of_day', label: 'Mensaje del día', icon: Zap, color: 'text-yellow-600' },
+    { id: 'crisis_response', label: 'Respuesta a crisis', icon: Brain, color: 'text-red-600' },
+    { id: 'rival_contrast', label: 'Contraste con rivales', icon: Users, color: 'text-purple-600' },
+    { id: 'ground_game', label: 'Trabajo de calle', icon: Target, color: 'text-green-600' },
+    { id: 'digital_push', label: 'Empuje digital', icon: Zap, color: 'text-blue-600' },
   ];
 
   const toggleFigure = (id: string) => {

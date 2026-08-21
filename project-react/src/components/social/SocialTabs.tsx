@@ -24,17 +24,10 @@ interface SocialTabsProps {
 
 const tabs = [
   { id: 'feed', label: 'Feed Unificado', icon: MessageSquare, description: 'Posts de todas las plataformas' },
-  { id: 'engagement', label: 'Engagement', icon: BarChart2, description: 'Análisis de interacciones' },
   { id: 'influencers', label: 'Influencers', icon: Users, description: 'Ranking de influencia' },
   { id: 'hashtags', label: 'Hashtags', icon: Hash, description: 'Análisis de tendencias' },
-  { id: 'viral', label: 'Contenido Viral', icon: TrendingUp, description: 'Posts de alto impacto' },
-  { id: 'competitors', label: 'Competencia', icon: Eye, description: 'Análisis comparativo' },
   { id: 'sentiment', label: 'Sentiment', icon: Heart, description: 'Análisis de sentimiento' },
-  { id: 'calendar', label: 'Calendario', icon: Calendar, description: 'Planificación editorial' },
-  { id: 'audience', label: 'Audiencia', icon: PieChart, description: 'Insights demográficos' },
-  { id: 'fakenews', label: 'Fake News', icon: AlertTriangle, description: 'Detección de desinformación' },
   { id: 'crisis', label: 'Crisis', icon: Activity, description: 'Monitoreo de crisis' },
-  { id: 'listening', label: 'Listening', icon: Ear, description: 'Social listening' },
 ];
 
 export const SocialTabs: React.FC<SocialTabsProps> = ({

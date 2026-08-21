@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, Boolean, Float, Index, Date, ForeignKey, Numeric
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.sql import func
 from app.database import Base
 import uuid
@@ -6,7 +7,7 @@ import uuid
 class RawSocialPost(Base):
     __tablename__ = "raw_social_posts"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(PGUUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     platform = Column(String(50), nullable=False)
     post_id = Column(String(255), nullable=False)
     author = Column(String(255), nullable=True)
@@ -19,6 +20,10 @@ class RawSocialPost(Base):
     sentiment_score = Column(Float, nullable=True)
     geographic_location = Column(String(100), nullable=True)
     region = Column(String(100), nullable=True)
+    scope = Column(String(30), nullable=True)
+    districts = Column(JSON(none_as_null=True), nullable=True)
+    topics = Column(JSON(none_as_null=True), nullable=True)
+    classified = Column(Boolean, default=False)
     
     __table_args__ = (
         Index('idx_platform_post_id', 'platform', 'post_id'),
@@ -30,7 +35,7 @@ class RawSocialPost(Base):
 class NewsArticle(Base):
     __tablename__ = "news_articles"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(PGUUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     source = Column(String(100), nullable=False)
     title = Column(String(500), nullable=False)
     content = Column(Text, nullable=True)
@@ -43,6 +48,10 @@ class NewsArticle(Base):
     sentiment_score = Column(Float, nullable=True)
     political_entities = Column(JSON, nullable=True)
     processed = Column(Boolean, default=False)
+    scope = Column(String(30), nullable=True)
+    districts = Column(JSON(none_as_null=True), nullable=True)
+    topics = Column(JSON(none_as_null=True), nullable=True)
+    classified = Column(Boolean, default=False)
     
     __table_args__ = (
         Index('idx_source_published', 'source', 'published_at'),
@@ -54,7 +63,7 @@ class NewsArticle(Base):
 class GovernmentData(Base):
     __tablename__ = "government_data"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(PGUUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     source = Column(String(100), nullable=False)
     data_type = Column(String(100), nullable=False)
     title = Column(String(500), nullable=False)
@@ -76,7 +85,7 @@ class GovernmentData(Base):
 class ScrapedSurvey(Base):
     __tablename__ = "scraped_surveys"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(PGUUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     source = Column(String(100), nullable=False)
     title = Column(String(500), nullable=False)
     methodology = Column(Text, nullable=True)
@@ -130,6 +139,11 @@ class PoliticalFigure(Base):
     is_active = Column(Boolean, default=True)
     monitoring_priority = Column(String(20), default='medium')
     notes = Column(Text, nullable=True)
+    figure_role = Column(String(30), default='candidate')
+    is_own_candidate = Column(Boolean, default=False)
+    list_name = Column(String(200), nullable=True)
+    color = Column(String(20), nullable=True)
+    zone_strength = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -195,7 +209,7 @@ class SocialApiToken(Base):
 class ScrapingLog(Base):
     __tablename__ = "scraping_logs"
     
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(PGUUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4()))
     source = Column(String(100), nullable=False)
     scraping_type = Column(String(50), nullable=False)
     status = Column(String(20), nullable=False)
@@ -312,3 +326,161 @@ class CompetitorCampaign(Base):
     sentiment_score = Column(Numeric(4,3), nullable=True)
     key_messages = Column(JSON, nullable=True)
     platforms = Column(JSON, nullable=True)
+
+
+class ContentClassification(Base):
+    __tablename__ = "content_classifications"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    content_type = Column(String(10), nullable=False)
+    content_id = Column(String, nullable=False)
+    figure_id = Column(String, nullable=True)
+    stance = Column(Float, nullable=True)
+    stance_label = Column(String(10), nullable=True)
+    topic = Column(String(40), nullable=False)
+    secondary_topics = Column(JSON(none_as_null=True), nullable=True)
+    is_attack = Column(Boolean, default=False)
+    attacker_figure_id = Column(String, nullable=True)
+    attacked_figure_id = Column(String, nullable=True)
+    districts = Column(JSON(none_as_null=True), nullable=True)
+    zone = Column(String(20), nullable=True)
+    summary = Column(String(300), nullable=True)
+    relevance = Column(Float, nullable=True)
+    model = Column(String(60), nullable=True)
+    classified_at = Column(DateTime, default=func.now())
+    content_published_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index('idx_cc_figure_time', 'figure_id', 'content_published_at'),
+        Index('idx_cc_topic_time', 'topic', 'content_published_at'),
+        Index('idx_cc_zone', 'zone'),
+    )
+
+
+class DailyBrief(Base):
+    __tablename__ = "daily_briefs"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    brief_date = Column(Date, nullable=False, unique=True)
+    generated_at = Column(DateTime, default=func.now())
+    model = Column(String(60), nullable=True)
+    headline = Column(String(300), nullable=True)
+    body_markdown = Column(Text, nullable=False)
+    data = Column(JSON(none_as_null=True), nullable=True)
+    sent_channels = Column(JSON(none_as_null=True), nullable=True)
+    status = Column(String(20), default='generated')
+
+
+class Alert(Base):
+    __tablename__ = "alerts"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    figure_id = Column(String, nullable=True)
+    kind = Column(String(20), nullable=False)
+    severity = Column(String(10), nullable=False)
+    title = Column(String(300), nullable=False)
+    detail = Column(Text, nullable=True)
+    metrics = Column(JSON(none_as_null=True), nullable=True)
+    evidence = Column(JSON(none_as_null=True), nullable=True)
+    suggested_response = Column(Text, nullable=True)
+    status = Column(String(20), default='open')
+    created_at = Column(DateTime, default=func.now())
+    acknowledged_at = Column(DateTime, nullable=True)
+    acknowledged_by = Column(String, nullable=True)
+    dedup_key = Column(String(200), nullable=True)
+
+    __table_args__ = (
+        Index('idx_alerts_status_time', 'status', 'created_at'),
+        Index('idx_alerts_figure_col', 'figure_id'),
+    )
+
+
+# --- Modulo territorial y de campana (S2-12) ---
+
+class Venue(Base):
+    __tablename__ = "venues"
+    __table_args__ = {'schema': 'organization'}
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False)
+    name = Column(String(200), nullable=False)
+    address = Column(String(500), nullable=True)
+    region_code = Column(String(10), nullable=True)
+    capacity = Column(Integer, nullable=True)
+    latitude = Column(Numeric(10, 8), nullable=True)
+    longitude = Column(Numeric(11, 8), nullable=True)
+    contact_name = Column(String(200), nullable=True)
+    contact_phone = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+
+class Event(Base):
+    __tablename__ = "events"
+    __table_args__ = {'schema': 'organization'}
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False)
+    campaign_id = Column(String, nullable=False)
+    venue_id = Column(String, nullable=True)
+    event_type = Column(String(30), nullable=False)
+    title = Column(String(300), nullable=False)
+    description = Column(Text, nullable=True)
+    start_at = Column(DateTime(timezone=True), nullable=False)
+    end_at = Column(DateTime(timezone=True), nullable=True)
+    region_code = Column(String(10), nullable=True)
+    expected_attendance = Column(Integer, nullable=True)
+    actual_attendance = Column(Integer, nullable=True)
+    status = Column(String(20), default='scheduled')
+    created_at = Column(DateTime(timezone=True), default=func.now())
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+    __table_args__ = {'schema': 'organization'}
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False)
+    campaign_id = Column(String, nullable=True)
+    event_id = Column(String, nullable=True)
+    title = Column(String(300), nullable=False)
+    status = Column(String(20), default='todo')
+    priority = Column(String(20), default='medium')
+    assigned_user_id = Column(String, nullable=True)
+    created_by_user_id = Column(String, nullable=True)
+    due_date = Column(DateTime(timezone=True), nullable=True)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+
+class Volunteer(Base):
+    __tablename__ = "volunteers"
+    __table_args__ = {'schema': 'organization'}
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False)
+    name = Column(String(200), nullable=False)
+    phone = Column(String(50), nullable=True)
+    email = Column(String(255), nullable=True)
+    region_code = Column(String(10), nullable=True)
+    status = Column(String(20), default='active')
+    assigned_event_id = Column(String, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+
+
+class ElectionResult(Base):
+    __tablename__ = "election_results"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    ubigeo = Column(String(6), nullable=False)
+    district_name = Column(String(100), nullable=True)
+    figure_id = Column(String, nullable=True)
+    list_name = Column(String(200), nullable=False)
+    votes = Column(Integer, nullable=True)
+    pct_valid = Column(Numeric(5, 2), nullable=True)
+    actas_pct = Column(Numeric(5, 2), nullable=True)
+    source = Column(String(50), nullable=False)
+    loaded_at = Column(DateTime, default=func.now())
+
+    __table_args__ = (
+        Index('idx_results_ubigeo_col', 'ubigeo'),
+    )

@@ -29,12 +29,11 @@ interface Alert {
 }
 
 const sectionTitles: Record<string, string> = {
-  dashboard: 'Panel Principal',
-  monitoring: 'Monitoreo en Tiempo Real',
-  social: 'Redes Sociales',
-  'geo-demographics': 'Análisis Geográfico y Demográfico',
-  government: 'Data Gubernamental',
-  surveys: 'Encuestas',
+  dashboard: 'Panel',
+  monitoring: 'Prensa — Lima Metropolitana',
+  social: 'Redes sociales',
+  race: 'Carrera — Alcaldía de Lima 2026',
+  territory: 'Territorio — Lima Metropolitana',
   recommendations: 'Recomendaciones IA',
   settings: 'Configuración',
 };

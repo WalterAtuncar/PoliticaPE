@@ -43,41 +43,10 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
       description: 'Gestión de usuarios, roles y permisos'
     },
     {
-      id: 'integrations',
-      name: 'Integraciones',
-      icon: Link,
-      description: 'APIs, bases de datos y servicios externos'
-    },
-    {
-      id: 'notifications',
-      name: 'Notificaciones',
-      icon: Bell,
-      description: 'Configuración de alertas y notificaciones'
-    },
-    {
-      id: 'security',
-      name: 'Seguridad',
-      icon: Shield,
-      description: 'Políticas de seguridad y autenticación'
-    },
-    {
-      id: 'backup',
-      name: 'Backup',
-      icon: HardDrive,
-      description: 'Respaldos y recuperación de datos'
-    },
-    {
       id: 'general',
       name: 'General',
       icon: Settings,
       description: 'Configuración general del sistema'
-    },
-    {
-      id: 'audit',
-      name: 'Auditoría',
-      icon: Activity,
-      description: 'Logs de auditoría y actividad',
-      badge: alertsCount > 0 ? alertsCount : undefined
     }
   ];
 

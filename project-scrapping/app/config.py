@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     FACEBOOK_ACCESS_TOKEN: Optional[str] = None
     INSTAGRAM_ACCESS_TOKEN: Optional[str] = None
     YOUTUBE_API_KEY: Optional[str] = None
+    TWITTERAPI_IO_KEY: Optional[str] = None
+    FACEBOOK_GRAPH_TOKEN: Optional[str] = None
+    ANTHROPIC_API_KEY: Optional[str] = None
+
+    # Servicio de streaming
+    SNIFFING_URL: str = os.getenv("SNIFFING_URL", "http://localhost:8080")
     
     # Scraping Configuration
     SCRAPING_DELAY: float = 1.0

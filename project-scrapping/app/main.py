@@ -1,6 +1,14 @@
 import os
 import asyncio
 import json
+import logging
+
+# El scheduler, el clasificador y el motor de alertas usan logging estandar.
+# Sin esta configuracion sus lineas INFO no llegan a stdout (ni a los logs de Railway).
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s | %(levelname)-8s | %(name)s - %(message)s",
+)
 
 FRONTEND_DIST_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "project-react", "dist")
 SNIFFING_URL = os.getenv("SNIFFING_URL", "http://localhost:8080")

@@ -17,6 +17,7 @@ router = APIRouter()
 async def get_news_articles(
     source: Optional[str] = None,
     category: Optional[str] = None,
+    scope: Optional[str] = None,
     limit: int = Query(100, le=1000),
     offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
@@ -29,6 +30,8 @@ async def get_news_articles(
         query = query.filter(NewsArticle.source == source)
     if category:
         query = query.filter(NewsArticle.category == category)
+    if scope:
+        query = query.filter(NewsArticle.scope == scope)
     
     articles = query.order_by(NewsArticle.published_at.desc()).offset(offset).limit(limit).all()
     return articles
@@ -37,6 +40,7 @@ async def get_news_articles(
 async def get_social_posts(
     platform: Optional[str] = None,
     location: Optional[str] = None,
+    scope: Optional[str] = None,
     limit: int = Query(100, le=1000),
     offset: int = Query(0, ge=0),
     current_user: dict = Depends(get_current_user),
@@ -49,6 +53,8 @@ async def get_social_posts(
         query = query.filter(RawSocialPost.platform == platform)
     if location:
         query = query.filter(RawSocialPost.geographic_location == location)
+    if scope:
+        query = query.filter(RawSocialPost.scope == scope)
     
     posts = query.order_by(RawSocialPost.created_at.desc()).offset(offset).limit(limit).all()
     return posts

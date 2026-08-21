@@ -986,10 +986,10 @@ async def trigger_all_scraping(
     background_tasks.add_task(lambda: asyncio.run(_run_all()))
 
     return {
-        "message": "Scraping completo iniciado (redes sociales, gobierno, encuestas)",
+        "message": "Scraping completo iniciado (prensa, redes sociales, gobierno, encuestas)",
         "task_id": task_id,
         "status": "pending",
-        "sources": ["Twitter", "YouTube", "Instagram", "ONPE", "INEI", "MEF", "IEP", "Ipsos", "Datum", "CPI"]
+        "sources": ["Prensa (12 medios)", "X (twitterapi.io)", "YouTube", "Instagram", "Facebook", "Wikipedia", "IEP", "Ipsos", "Datum", "CPI", "Congreso", "Datos Abiertos"]
     }
 
 

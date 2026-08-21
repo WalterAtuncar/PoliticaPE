@@ -8,8 +8,15 @@ from typing import Optional, List, Dict
 logger = logging.getLogger(__name__)
 
 SCRAPING_INTERVAL_HOURS = int(os.getenv("SCRAPING_INTERVAL_HOURS", "6"))
+CLASSIFY_INTERVAL_MINUTES = int(os.getenv("CLASSIFY_INTERVAL_MINUTES", "15"))
+BRIEF_HOUR_LIMA = int(os.getenv("BRIEF_HOUR_LIMA", "7"))
+ALERT_INTERVAL_MINUTES = int(os.getenv("ALERT_INTERVAL_MINUTES", "10"))
 
 _scheduler_task: Optional[asyncio.Task] = None
+_classify_task: Optional[asyncio.Task] = None
+_brief_task: Optional[asyncio.Task] = None
+_alert_task: Optional[asyncio.Task] = None
+_results_task: Optional[asyncio.Task] = None
 
 
 def get_active_tokens(db, platform: str) -> List[Dict]:
@@ -89,6 +96,8 @@ async def run_twitter_with_token(db, token_info: Dict, sentiment_analyzer, days_
 
     try:
         from datetime import timedelta
+        from app.services.lima_geo import detect_scope, figure_keywords
+        fig_keywords = figure_keywords(db)
         tags = get_active_tags(db, "twitter")
         queries = ["Peru politica OR congreso peru OR presidente peru"]
         for tag in tags:
@@ -120,6 +129,7 @@ async def run_twitter_with_token(db, token_info: Dict, sentiment_analyzer, days_
                         continue
 
                     sentiment_score = sentiment_analyzer.analyze(transformed.get("content", ""))
+                    scope, districts = detect_scope("", transformed.get("content", ""), fig_keywords)
                     post = RawSocialPost(
                         id=str(uuid.uuid4()),
                         platform=transformed["platform"],
@@ -128,10 +138,13 @@ async def run_twitter_with_token(db, token_info: Dict, sentiment_analyzer, days_
                         content=transformed["content"],
                         created_at=transformed["created_at"],
                         engagement_metrics=transformed["engagement_metrics"],
-                        geographic_location=transformed.get("geographic_location"),
-                        region=transformed.get("region", "Nacional"),
+                        geographic_location=districts[0]["name"] if districts else transformed.get("geographic_location"),
+                        region="Lima Metropolitana" if districts else transformed.get("region", "Nacional"),
                         sentiment_score=sentiment_score,
-                        processed=True
+                        processed=True,
+                        scope=scope,
+                        districts=districts or None,
+                        classified=False
                     )
                     db.add(post)
                     tag_count += 1
@@ -175,6 +188,8 @@ async def run_youtube_with_token(db, token_info: Dict, sentiment_analyzer, days_
         return 0
 
     try:
+        from app.services.lima_geo import detect_scope, figure_keywords
+        fig_keywords = figure_keywords(db)
         tags = get_active_tags(db, "youtube")
         queries = ["política Perú congreso gobierno"]
         for tag in tags:
@@ -211,6 +226,7 @@ async def run_youtube_with_token(db, token_info: Dict, sentiment_analyzer, days_
                         if not content:
                             content = f"{video.get('title', '')} {video.get('description', '')}"
                         sentiment_score = sentiment_analyzer.analyze(content)
+                        scope, districts = detect_scope("", content, fig_keywords)
                         post = RawSocialPost(
                             id=str(uuid.uuid4()),
                             platform="youtube",
@@ -221,9 +237,13 @@ async def run_youtube_with_token(db, token_info: Dict, sentiment_analyzer, days_
                             engagement_metrics=video.get("engagement_metrics", {
                                 "likes": 0, "shares": 0, "comments": 0, "views": 0
                             }),
-                            region=video.get("region", "Nacional"),
+                            geographic_location=districts[0]["name"] if districts else None,
+                            region="Lima Metropolitana" if districts else video.get("region", "Nacional"),
                             sentiment_score=sentiment_score,
-                            processed=True
+                            processed=True,
+                            scope=scope,
+                            districts=districts or None,
+                            classified=False
                         )
                         db.add(post)
                         tag_count += 1
@@ -422,7 +442,7 @@ async def run_scheduled_social_scraping(db_url: str, platform: str, days_back: i
     tokens = get_active_tokens(db, platform)
 
     if platform == "twitter" and not tokens:
-        api_key = os.getenv("TWITTERAPI_IO_KEY")
+        api_key = os.getenv("TWITTERAPI_IO_KEY") or os.getenv("TWITTER_BEARER_TOKEN")
         if api_key:
             tokens = [{"id": "__env__", "label": "Variable de entorno", "credentials": {"api_key": api_key}}]
     elif platform == "youtube" and not tokens:
@@ -434,7 +454,7 @@ async def run_scheduled_social_scraping(db_url: str, platform: str, days_back: i
         if access_token:
             tokens = [{"id": "__env__", "label": "Variable de entorno", "credentials": {"access_token": access_token}}]
     elif platform == "facebook" and not tokens:
-        access_token = os.getenv("FACEBOOK_GRAPH_TOKEN")
+        access_token = os.getenv("FACEBOOK_GRAPH_TOKEN") or os.getenv("FACEBOOK_ACCESS_TOKEN")
         if access_token:
             tokens = [{"id": "__env__", "label": "Variable de entorno", "credentials": {"access_token": access_token}}]
 
@@ -478,7 +498,7 @@ async def run_scheduled_social_scraping(db_url: str, platform: str, days_back: i
 
         log.status = "completed"
         log.items_scraped = total_added
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         log.extra_metadata = {
             "triggered_by": "scheduler",
             "tokens_used": len(tokens),
@@ -492,7 +512,7 @@ async def run_scheduled_social_scraping(db_url: str, platform: str, days_back: i
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         db.commit()
         logger.error(f"[Scheduler] Error {platform}: {e}")
         return 0
@@ -546,7 +566,7 @@ async def run_scheduled_government_scraping(db_url: str):
 
         log.status = "completed"
         log.items_scraped = total_items
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         log.extra_metadata = {
             "triggered_by": "scheduler",
             "sources": details
@@ -559,7 +579,7 @@ async def run_scheduled_government_scraping(db_url: str):
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         db.commit()
         logger.error(f"[Scheduler] Error datos gubernamentales: {e}")
         return 0
@@ -612,7 +632,7 @@ def run_government_scraping_sync(db_url: str):
 
         log.status = "completed"
         log.items_scraped = total_items
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         log.extra_metadata = {
             "triggered_by": "trigger_endpoint",
             "sources": details
@@ -625,7 +645,7 @@ def run_government_scraping_sync(db_url: str):
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         db.commit()
         logger.error(f"[Scheduler] Error datos gubernamentales: {e}")
         import traceback
@@ -680,7 +700,7 @@ async def run_scheduled_survey_scraping(db_url: str):
 
         log.status = "completed"
         log.items_scraped = total_items
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         log.extra_metadata = {
             "triggered_by": "scheduler",
             "pollsters": details
@@ -693,7 +713,7 @@ async def run_scheduled_survey_scraping(db_url: str):
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         db.commit()
         logger.error(f"[Scheduler] Error encuestas: {e}")
         return 0
@@ -747,7 +767,7 @@ async def run_historical_scraping() -> Dict:
 
         log.status = "completed"
         log.items_scraped = total
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         log.extra_metadata = {
             "triggered_by": "historical_endpoint",
             "days_back": HISTORICAL_DAYS_BACK,
@@ -761,12 +781,52 @@ async def run_historical_scraping() -> Dict:
     except Exception as e:
         log.status = "failed"
         log.error_message = str(e)[:500]
-        log.completed_at = datetime.now()
+        log.completed_at = datetime.utcnow()
         db.commit()
         logger.error(f"[Historical] Error general: {e}")
         return {"status": "failed", "error": str(e)[:200]}
     finally:
         _historical_running = False
+        db.close()
+
+
+async def run_scheduled_news_scraping(db_url: str) -> int:
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.models import ScrapingLog
+    from app.scrapers.news_scrapers import run_news_scraping
+
+    engine = create_engine(db_url)
+    SessionLocal = sessionmaker(bind=engine)
+    db = SessionLocal()
+
+    log = ScrapingLog(
+        id=str(uuid.uuid4()),
+        source="news",
+        scraping_type="news",
+        status="running"
+    )
+    db.add(log)
+    db.commit()
+
+    try:
+        results = await asyncio.to_thread(run_news_scraping, db, None)
+        total = sum(results.values())
+        log.status = "completed"
+        log.items_scraped = total
+        log.completed_at = datetime.utcnow()
+        log.extra_metadata = {"triggered_by": "scheduler", "sources": results}
+        db.commit()
+        logger.info(f"[Scheduler] Noticias: {total} articulos nuevos")
+        return total
+    except Exception as e:
+        log.status = "failed"
+        log.error_message = str(e)[:500]
+        log.completed_at = datetime.utcnow()
+        db.commit()
+        logger.error(f"[Scheduler] Error noticias: {e}")
+        return 0
+    finally:
         db.close()
 
 
@@ -777,6 +837,12 @@ async def run_all_scrapers():
     logger.info("[Scheduler] Iniciando ciclo de scraping automático...")
 
     total = 0
+
+    try:
+        total += await run_scheduled_news_scraping(db_url)
+    except Exception as e:
+        logger.error(f"[Scheduler] Error en news scraping: {e}")
+
     for platform in ["twitter", "youtube", "instagram", "facebook"]:
         try:
             count = await run_scheduled_social_scraping(db_url, platform)
@@ -802,7 +868,7 @@ async def scheduler_loop():
     interval_seconds = SCRAPING_INTERVAL_HOURS * 3600
     logger.info(f"[Scheduler] Scraping automático cada {SCRAPING_INTERVAL_HOURS} horas")
 
-    await asyncio.sleep(120)
+    await asyncio.sleep(30)
 
     while True:
         try:
@@ -814,16 +880,138 @@ async def scheduler_loop():
         await asyncio.sleep(interval_seconds)
 
 
+async def classification_loop():
+    from app.config import settings
+    from app.services.classifier import run_classification_cycle
+    from app.services.claude_client import has_key
+
+    logger.info(f"[Classifier] Clasificacion automatica cada {CLASSIFY_INTERVAL_MINUTES} minutos")
+    await asyncio.sleep(90)
+
+    while True:
+        try:
+            if has_key():
+                result = await asyncio.to_thread(run_classification_cycle, settings.DATABASE_URL)
+                logger.info(f"[Classifier] {result}")
+            else:
+                logger.info("[Classifier] ANTHROPIC_API_KEY ausente; ciclo omitido")
+        except Exception as e:
+            logger.error(f"[Classifier] Error en ciclo: {e}")
+        await asyncio.sleep(CLASSIFY_INTERVAL_MINUTES * 60)
+
+
+async def daily_brief_loop():
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+
+    from app.database import SessionLocal
+    from app.services import daily_brief
+    from app.services.claude_client import has_key
+
+    lima = ZoneInfo("America/Lima")
+
+    while True:
+        now = datetime.now(lima)
+        target = now.replace(hour=BRIEF_HOUR_LIMA, minute=0, second=0, microsecond=0)
+        if target <= now:
+            target += timedelta(days=1)
+        wait = (target - now).total_seconds()
+        logger.info(f"[Brief] proximo envio {target.strftime('%Y-%m-%d %H:%M')} America/Lima ({int(wait/60)} min)")
+        await asyncio.sleep(wait)
+
+        if not has_key():
+            logger.info("[Brief] ANTHROPIC_API_KEY ausente; brief omitido")
+            continue
+        db = SessionLocal()
+        try:
+            result = await asyncio.to_thread(daily_brief.generate, db, None, True, True)
+            logger.info(f"[Brief] generado {result.get('brief_date')} | canales {result.get('sent_channels')}")
+        except Exception as e:
+            logger.error(f"[Brief] Error: {e}")
+        finally:
+            db.close()
+
+
+async def alert_loop():
+    from app.config import settings
+    from app.services.alert_engine import run_alert_cycle
+
+    interval = 2 if os.getenv("DEBATE_MODE", "false").lower() == "true" else ALERT_INTERVAL_MINUTES
+    logger.info(f"[Alerts] Motor de alertas cada {interval} minutos")
+    await asyncio.sleep(120)
+
+    while True:
+        try:
+            result = await asyncio.to_thread(run_alert_cycle, settings.DATABASE_URL)
+            if result.get("created"):
+                logger.info(f"[Alerts] {result}")
+        except Exception as e:
+            logger.error(f"[Alerts] Error en ciclo: {e}")
+        interval = 2 if os.getenv("DEBATE_MODE", "false").lower() == "true" else ALERT_INTERVAL_MINUTES
+        await asyncio.sleep(interval * 60)
+
+
+async def results_loop():
+    """Solo corre el dia de la eleccion y las 72 h siguientes."""
+    from datetime import timedelta
+
+    from app import electoral_config as ec
+    from app.config import settings
+    from app.database import SessionLocal
+    from app.scrapers.onpe_results import OnpeResultsScraper
+    from app.services import results as results_service
+
+    while True:
+        phase = ec.campaign_phase()
+        deadline = datetime.combine(ec.ELECTION_DATE, datetime.min.time()) + timedelta(days=3)
+        if phase in ("election_day", "post") and datetime.utcnow() < deadline:
+            scraper = OnpeResultsScraper()
+            if scraper.is_configured():
+                db = SessionLocal()
+                try:
+                    rows = await asyncio.to_thread(scraper.fetch_lima_districts)
+                    saved = await asyncio.to_thread(results_service.upsert_results, db, rows, "onpe")
+                    logger.info(f"[Results] {saved} filas de ONPE cargadas")
+                except Exception as e:
+                    logger.error(f"[Results] Error: {e}")
+                finally:
+                    db.close()
+                    scraper.close()
+            else:
+                logger.info("[Results] ONPE_RESULTS_URL sin configurar; se espera carga por CSV")
+        await asyncio.sleep(15 * 60)
+
+
 def start_scheduler():
-    global _scheduler_task
+    global _scheduler_task, _classify_task, _brief_task, _alert_task, _results_task
+    loop = asyncio.get_event_loop()
     if _scheduler_task is None or _scheduler_task.done():
-        loop = asyncio.get_event_loop()
         _scheduler_task = loop.create_task(scheduler_loop())
         logger.info("[Scheduler] Scheduler iniciado")
+    if _classify_task is None or _classify_task.done():
+        _classify_task = loop.create_task(classification_loop())
+        logger.info("[Classifier] Clasificador iniciado")
+    if _brief_task is None or _brief_task.done():
+        _brief_task = loop.create_task(daily_brief_loop())
+        logger.info("[Brief] Programador de brief diario iniciado")
+    if _alert_task is None or _alert_task.done():
+        _alert_task = loop.create_task(alert_loop())
+        logger.info("[Alerts] Motor de alertas iniciado")
+    if _results_task is None or _results_task.done():
+        _results_task = loop.create_task(results_loop())
 
 
 def stop_scheduler():
-    global _scheduler_task
+    global _scheduler_task, _classify_task, _brief_task, _alert_task, _results_task
     if _scheduler_task and not _scheduler_task.done():
         _scheduler_task.cancel()
         logger.info("[Scheduler] Scheduler detenido")
+    if _classify_task and not _classify_task.done():
+        _classify_task.cancel()
+        logger.info("[Classifier] Clasificador detenido")
+    if _brief_task and not _brief_task.done():
+        _brief_task.cancel()
+    if _alert_task and not _alert_task.done():
+        _alert_task.cancel()
+    if _results_task and not _results_task.done():
+        _results_task.cancel()

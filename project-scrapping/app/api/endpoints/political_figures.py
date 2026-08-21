@@ -68,6 +68,11 @@ def create_figure(data: PoliticalFigureCreate, current_user: dict = Depends(get_
         is_active=data.is_active,
         monitoring_priority=data.monitoring_priority,
         notes=data.notes,
+        figure_role=data.figure_role,
+        is_own_candidate=data.is_own_candidate,
+        list_name=data.list_name,
+        color=data.color,
+        zone_strength=data.zone_strength,
     )
     db.add(figure)
     db.commit()

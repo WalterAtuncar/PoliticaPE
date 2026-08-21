@@ -225,10 +225,15 @@ const SurveyDetailModal: React.FC<{ item: SurveyItem; onClose: () => void }> = (
 export const SurveysPage: React.FC = () => {
   const { items, isLoading, error, hasData, refetch } = useSurveyData(100);
   const [sourceFilter, setSourceFilter] = useState<string>('all');
+  const [scopeFilter, setScopeFilter] = useState<string>('lima_metropolitana');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedItem, setSelectedItem] = useState<SurveyItem | null>(null);
 
-  const filteredItems = items.filter(item => {
+  const scopeOf = (item: SurveyItem) => (item.results?.ambito as string | undefined) || 'otro';
+
+  const scopedItems = items.filter(item => scopeFilter === 'all' || scopeOf(item) === scopeFilter);
+
+  const filteredItems = scopedItems.filter(item => {
     const matchesSource = sourceFilter === 'all' || item.source === sourceFilter;
     const matchesSearch = searchTerm === '' ||
       item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -236,10 +241,10 @@ export const SurveysPage: React.FC = () => {
     return matchesSource && matchesSearch;
   });
 
-  const sources = [...new Set(items.map(i => i.source))];
+  const sources = [...new Set(scopedItems.map(i => i.source))];
 
-  const pollItems = items.filter(i => ((i.results?.candidatos as CandidateData[] | undefined) || []).length > 0);
-  const analysisItems = items.filter(i => !((i.results?.candidatos as CandidateData[] | undefined) || []).length && i.results?.datos_encontrados);
+  const pollItems = scopedItems.filter(i => ((i.results?.candidatos as CandidateData[] | undefined) || []).length > 0);
+  const analysisItems = scopedItems.filter(i => !((i.results?.candidatos as CandidateData[] | undefined) || []).length && i.results?.datos_encontrados);
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return 'Sin fecha';
@@ -291,6 +296,14 @@ export const SurveysPage: React.FC = () => {
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-gray-400" />
+          <select value={scopeFilter} onChange={(e) => { setScopeFilter(e.target.value); setSourceFilter('all'); }}
+            className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="lima_metropolitana">Lima 2026 (municipal)</option>
+            <option value="presidencial_2026">Presidencial 2026</option>
+            <option value="all">Todos los ambitos</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
           <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}
             className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             <option value="all">Todas las fuentes</option>

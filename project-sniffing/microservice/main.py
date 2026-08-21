@@ -19,7 +19,10 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy import create_engine, Column, String, Float, Boolean, Integer, DateTime, Text, JSON, text
+from sqlalchemy import (create_engine, Column, String, Float, Boolean, Integer, BigInteger,
+                        DateTime, Text, JSON, Numeric, text)
+from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import sessionmaker, declarative_base
 import uvicorn
 
@@ -92,30 +95,33 @@ active_connections = Gauge('websocket_connections_active', 'Conexiones WebSocket
 
 # Database Model
 class LiveStreamRecord(Base):
+    """Refleja la tabla real realtime_data.live_streams: stream_id es uuid,
+    las listas son arrays de texto de Postgres y la marca de tiempo es received_at."""
     __tablename__ = "live_streams"
     __table_args__ = {"schema": "realtime_data"}
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    stream_id = Column(String, nullable=False, index=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    stream_id = Column(PGUUID(as_uuid=False), nullable=False, index=True)
     platform = Column(String, nullable=False)
-    stream_type = Column(String)
-    content = Column(Text)
+    stream_type = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
     author_handle = Column(String)
     author_name = Column(String)
-    realtime_sentiment = Column(Float)
-    sentiment_confidence = Column(Float)
-    political_relevance_score = Column(Float)
-    urgency_score = Column(Float)
+    realtime_sentiment = Column(Numeric)
+    sentiment_confidence = Column(Numeric)
+    political_relevance_score = Column(Numeric)
+    urgency_score = Column(Numeric)
     is_trending = Column(Boolean, default=False)
     is_crisis_indicator = Column(Boolean, default=False)
     is_opportunity = Column(Boolean, default=False)
     detected_region = Column(String)
-    detected_keywords = Column(JSON)
-    political_entities = Column(JSON)
-    hashtags = Column(JSON)
+    location_confidence = Column(Numeric)
+    detected_keywords = Column(ARRAY(Text))
+    political_entities = Column(ARRAY(Text))
+    hashtags = Column(ARRAY(Text))
     processing_latency_ms = Column(Integer)
-    message_timestamp = Column(DateTime)
-    created_at = Column(DateTime, server_default=text("NOW()"))
+    message_timestamp = Column(DateTime(timezone=True), nullable=False)
+    received_at = Column(DateTime(timezone=True), server_default=text("NOW()"))
 
 # Modelos
 class LiveStreamData(BaseModel):
@@ -323,6 +329,18 @@ class SentimentAnalyzer:
 
 analyzer = SentimentAnalyzer()
 
+def _parse_ts(value):
+    """message_timestamp llega como ISO string o datetime; la columna es timestamptz NOT NULL."""
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str) and value:
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+    return datetime.now(timezone.utc)
+
+
 # Storage en memoria para métricas (sin Redis)
 class InMemoryStorage:
     def __init__(self):
@@ -367,7 +385,7 @@ class InMemoryStorage:
                 political_entities=item.get('political_entities', []),
                 hashtags=item.get('hashtags', []),
                 processing_latency_ms=item.get('processing_latency_ms', 0),
-                message_timestamp=item.get('message_timestamp'),
+                message_timestamp=_parse_ts(item.get('message_timestamp')),
             )
             session.add(record)
             session.commit()
@@ -504,6 +522,42 @@ async def analyze_text(request: AnalyzeRequest):
     await manager.broadcast(stream_data)
     
     return stream_data
+
+class IngestItem(BaseModel):
+    """Item ya clasificado que el backend de scrapping empuja al stream en vivo."""
+    stream_id: str
+    platform: str
+    stream_type: str = "classified"
+    content: str
+    author_handle: Optional[str] = None
+    author_name: Optional[str] = None
+    realtime_sentiment: float = 0.0
+    sentiment_confidence: float = 0.9
+    political_relevance_score: float = 1.0
+    urgency_score: float = 0.0
+    is_trending: bool = False
+    is_crisis_indicator: bool = False
+    is_opportunity: bool = False
+    detected_region: Optional[str] = None
+    location_confidence: Optional[float] = None
+    detected_keywords: List[str] = []
+    political_entities: List[str] = []
+    hashtags: List[str] = []
+    message_timestamp: Optional[str] = None
+
+
+@app.post("/api/ingest")
+async def ingest(item: IngestItem):
+    """Recibe contenido ya clasificado, lo persiste y lo difunde por WebSocket."""
+    data = item.model_dump()
+    data["message_timestamp"] = data.get("message_timestamp") or datetime.now(timezone.utc).isoformat()
+    data["processing_latency_ms"] = 0
+
+    storage.add_item(data)
+    stream_counter.inc()
+    await manager.broadcast(data)
+    return {"ok": True, "stream_id": data["stream_id"]}
+
 
 @app.get("/api/recent")
 async def get_recent_items(limit: int = 50):
