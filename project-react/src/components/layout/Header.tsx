@@ -29,12 +29,11 @@ interface Alert {
 }
 
 const sectionTitles: Record<string, string> = {
-  dashboard: 'Panel Principal',
-  monitoring: 'Monitoreo en Tiempo Real',
-  social: 'Redes Sociales',
-  'geo-demographics': 'Análisis Geográfico y Demográfico',
-  government: 'Data Gubernamental',
+  dashboard: 'Panel',
+  monitoring: 'Prensa — Lima Metropolitana',
+  social: 'Redes sociales',
   surveys: 'Encuestas',
+  'geo-demographics': 'Territorio',
   recommendations: 'Recomendaciones IA',
   settings: 'Configuración',
 };

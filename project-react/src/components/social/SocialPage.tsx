@@ -3,17 +3,10 @@ import { motion } from 'framer-motion';
 import { SocialHeader } from './SocialHeader';
 import { SocialTabs } from './SocialTabs';
 import { SocialFeed } from './SocialFeed';
-import { EngagementAnalysis } from './EngagementAnalysis';
 import { InfluencerRanking } from './InfluencerRanking';
 import { HashtagAnalysis } from './HashtagAnalysis';
-import { ViralContent } from './ViralContent';
-import { CompetitorAnalysis } from './CompetitorAnalysis';
 import { SentimentDashboard } from './SentimentDashboard';
-import { ContentCalendar } from './ContentCalendar';
-import { AudienceInsights } from './AudienceInsights';
-import { FakeNewsDetection } from './FakeNewsDetection';
 import { CrisisMonitoring } from './CrisisMonitoring';
-import { SocialListening } from './SocialListening';
 import { useSocialData } from '../../hooks/useSocialData';
 import { SocialFilters } from '../../types/social';
 
@@ -68,28 +61,14 @@ export const SocialPage: React.FC = () => {
     switch (activeTab) {
       case 'feed':
         return <SocialFeed posts={posts} isLoading={isLoading} filters={filters} />;
-      case 'engagement':
-        return <EngagementAnalysis metrics={metrics} isLoading={isLoading} filters={filters} />;
       case 'influencers':
         return <InfluencerRanking influencers={influencers} isLoading={isLoading} filters={filters} />;
       case 'hashtags':
         return <HashtagAnalysis hashtags={hashtags} isLoading={isLoading} filters={filters} />;
-      case 'viral':
-        return <ViralContent content={viralContent} isLoading={isLoading} filters={filters} />;
-      case 'competitors':
-        return <CompetitorAnalysis competitors={competitors} isLoading={isLoading} filters={filters} />;
       case 'sentiment':
         return <SentimentDashboard metrics={metrics} isLoading={isLoading} filters={filters} />;
-      case 'calendar':
-        return <ContentCalendar calendar={contentCalendar} isLoading={isLoading} filters={filters} />;
-      case 'audience':
-        return <AudienceInsights audience={audienceData} isLoading={isLoading} filters={filters} />;
-      case 'fakenews':
-        return <FakeNewsDetection posts={posts} isLoading={isLoading} filters={filters} />;
       case 'crisis':
         return <CrisisMonitoring alerts={crisisAlerts} isLoading={isLoading} filters={filters} />;
-      case 'listening':
-        return <SocialListening data={listeningData} isLoading={isLoading} filters={filters} />;
       default:
         return <SocialFeed posts={posts} isLoading={isLoading} filters={filters} />;
     }

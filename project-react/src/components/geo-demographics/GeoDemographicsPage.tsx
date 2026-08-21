@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Users, Map } from 'lucide-react';
+import { MapPin, Map } from 'lucide-react';
 import { GeographicPage } from '../geographic/GeographicPage';
-import { DemographicsPage } from '../demographics/DemographicsPage';
 
-type TabId = 'geographic' | 'demographics';
+type TabId = 'geographic';
 
 const tabs = [
   { id: 'geographic' as TabId, label: 'Análisis Geográfico', icon: Map, description: 'Mapa de sentimiento por regiones' },
-  { id: 'demographics' as TabId, label: 'Análisis Demográfico', icon: Users, description: 'Segmentación y pirámides poblacionales' },
 ];
 
 export const GeoDemographicsPage: React.FC = () => {
@@ -64,7 +62,6 @@ export const GeoDemographicsPage: React.FC = () => {
 
       <div>
         {activeTab === 'geographic' && <GeographicPage />}
-        {activeTab === 'demographics' && <DemographicsPage />}
       </div>
     </motion.div>
   );
