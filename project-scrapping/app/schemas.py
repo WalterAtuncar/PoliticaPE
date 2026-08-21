@@ -355,7 +355,7 @@ class AIRecommendationUpdate(BaseModel):
 
 class GenerateRecommendationsRequest(BaseModel):
     figure_ids: List[str]
-    focus_areas: List[str] = ["immediate_opportunities", "regional_strengthening", "territorial_recovery", "demographic_expansion"]
+    focus_areas: List[str] = ["territorial_priority", "message_of_day", "crisis_response", "rival_contrast", "ground_game", "digital_push"]
 
 
 PLATFORM_CREDENTIAL_FIELDS = {

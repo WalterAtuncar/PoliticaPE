@@ -4,9 +4,10 @@ import logging
 import re
 import uuid
 from datetime import datetime, date, timedelta
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Literal, Optional
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, text
 from collections import defaultdict
 
 from app.models import (
@@ -478,76 +479,293 @@ def _compute_weekly_trends(posts: list, articles: list, since: datetime) -> List
     return result[-16:]
 
 
+Category = Literal[
+    "territorial_priority", "message_of_day", "crisis_response",
+    "rival_contrast", "ground_game", "digital_push",
+]
+Priority = Literal["critical", "high", "medium", "low"]
+
+FOCUS_DESCRIPTIONS = {
+    "territorial_priority": "Prioridad territorial: donde ir esta semana y por que",
+    "message_of_day": "Mensaje del dia: tema y encuadre para voceria y redes",
+    "crisis_response": "Respuesta a crisis: que responder y como ante ataques o incidentes",
+    "rival_contrast": "Contraste con rivales: diferenciacion frente a los punteros",
+    "ground_game": "Trabajo de calle: caminatas, dirigentes, gremios, eventos",
+    "digital_push": "Empuje digital: pauta y contenido segmentado por zona",
+}
+
+# Focos que implican propaganda o actos publicos: se filtran cuando la ley ya no los permite.
+PROPAGANDA_FOCUS = ("ground_game", "digital_push")
+
+
+class Recommendation(BaseModel):
+    figure_display_name: str
+    title: str = Field(max_length=80)
+    description: str
+    category: Category
+    priority: Priority
+    target_zone: Optional[str] = None
+    target_districts: List[str] = Field(default_factory=list, max_length=5)
+    target_demographic: Optional[str] = None
+    identified_weakness: str = Field(description="Cita textual del dato que fundamenta la recomendacion")
+    recommended_action: str = Field(description="Paso 1: ... Paso 2: ... Paso 3: ...")
+    estimated_budget_min_pen: int
+    estimated_budget_max_pen: int
+    expected_timeline: str
+    projected_roi_pct: int
+    ai_confidence_pct: int
+    resources_needed: List[str] = Field(default_factory=list)
+    success_kpis: List[str] = Field(default_factory=list)
+    risk_factors: List[str] = Field(default_factory=list)
+    legal_check: str = Field(description="'OK' o la restriccion legal aplicable")
+
+
+class RecommendationBatch(BaseModel):
+    recommendations: List[Recommendation]
+
+
+def _rivals_block(db: Session, own_display_name: Optional[str]) -> str:
+    from app.services import race
+
+    poll_rows = race.polls(db, base="validos", days=120)
+    avg = race.poll_average(poll_rows)
+    sent = {s["name"]: s for s in race.sentiment(db, 30)}
+
+    lines = []
+    for a in avg[:4]:
+        if own_display_name and a["name"] == own_display_name:
+            continue
+        zones = (sent.get(a["name"]) or {}).get("by_zone", {})
+        strong = sorted(
+            [(z, v.get("net")) for z, v in zones.items() if v.get("net") is not None],
+            key=lambda kv: -(kv[1] or 0),
+        )[:2]
+        zone_txt = ", ".join(f"{z} ({net:+.2f})" for z, net in strong) if strong else "sin datos por zona"
+        lines.append(f"- {a['name']}: {a['pct']} % en encuestas [{a['low']}-{a['high']}] · zonas fuertes: {zone_txt}")
+        if len(lines) >= 3:
+            break
+    return "\n".join(lines) or "- Sin datos de encuestas todavia"
+
+
+def _own_block(db: Session, figure: PoliticalFigure) -> str:
+    return (
+        f"{figure.display_name} ({figure.party_name or 'sin partido'}) — "
+        f"{figure.current_position or 'candidatura'} · lista: {figure.list_name or 'n/d'}"
+    )
+
+
+def build_claude_prompt(contexts: List[Dict], focus_areas: Dict[str, str],
+                        db: Optional[Session] = None,
+                        own_display_name: Optional[str] = None,
+                        extra: Optional[Dict[str, Any]] = None) -> tuple:
+    """Devuelve (system, user) para el generador de recomendaciones municipales."""
+    today = date.today()
+    extra = extra or {}
+
+    system = f"""Eres el estratega jefe de una campana a la alcaldia de Lima Metropolitana. Eleccion: {ec.fmt_es(ec.ELECTION_DATE)} (una sola vuelta; gana la lista con mas votos validos; 21 listas; ~7,9 millones de electores; un tercio sin decidir). Hoy es {ec.fmt_es(today)}. Quedan {max(0, ec.days_to(ec.ELECTION_DATE, today) or 0)} dias para la eleccion y {max(0, ec.days_to(ec.PROPAGANDA_DEADLINE, today) or 0)} para el ultimo dia de propaganda ({ec.fmt_es(ec.PROPAGANDA_DEADLINE)}). Ultimo dia de mitines: {ec.fmt_es(ec.RALLY_DEADLINE)}. Veda de publicacion de encuestas desde {ec.fmt_es(ec.POLL_BLACKOUT_FROM)}. Fase actual: {ec.campaign_phase(today)}.
+
+Candidatura propia: {extra.get('own_block') or '(sin definir: analiza cada figura seleccionada como si fuera la propia)'}
+Rivales prioritarios:
+{extra.get('rivals_block') or '- Sin datos'}
+
+Zonas y peso electoral: Lima Norte ~2,17 M, Lima Este ~1,97 M, Lima Sur ~1,64 M, Lima Moderna ~1,35 M, Lima Centro ~0,77 M. Temas que deciden el voto: inseguridad (71 % lo pide como prioridad), extorsion a transportistas, transporte, basura, corrupcion municipal, legalidad de candidaturas.
+
+Reglas:
+- Cada recomendacion nace de UN dato concreto del contexto (citalo en identified_weakness). Sin dato, sin recomendacion.
+- Piensa en terminos de votos: donde hay mas electores indecisos y menor presencia nuestra; que tema domina en esa zona; que rival capitaliza ese tema.
+- Acciones ejecutables por un equipo de campana municipal real: caminatas, voceria, respuesta de prensa, pauta digital segmentada por distrito, reuniones con dirigentes vecinales o gremios de transportistas, contraste de propuestas. Presupuestos en soles (S/), realistas para campana municipal.
+- Respeta la ley: despues del {ec.fmt_es(ec.PROPAGANDA_DEADLINE)} no hay propaganda; despues del {ec.fmt_es(ec.RALLY_DEADLINE)} no hay mitines; nunca recomiendes publicar encuestas en veda. Indica la restriccion en legal_check.
+- KPIs medibles por este sistema en 72 h: menciones, sentimiento neto, share of voice por zona/distrito, alertas cerradas.
+- Entre 4 y 8 recomendaciones por figura. Todo en espanol."""
+
+    if not ec.propaganda_allowed(today):
+        system += ("\n\nRESTRICCION VIGENTE: esta prohibida toda propaganda electoral. Solo recomienda respuesta "
+                   "de prensa, gestion de crisis, defensa legal, logistica del dia de la eleccion y personeros.")
+    if not ec.rallies_allowed(today):
+        system += "\nRESTRICCION: prohibidas reuniones y manifestaciones publicas."
+
+    figures_text = ""
+    for ctx in contexts:
+        fig = ctx["figure"]
+        social = ctx.get("social_media", {})
+        news = ctx.get("news_media", {})
+        figures_text += f"""
+================================================================================
+FIGURA: {fig["display_name"]} | {fig["party_name"]} | {fig["current_position"]}
+--- REDES ({CONTEXT_DAYS} dias) ---
+Menciones: {social.get("total_mentions", 0)} | sentimiento {social.get("sentiment_average", 0)} ({social.get("sentiment_trend", "sin datos")})
+Distribucion: {json.dumps(social.get("sentiment_distribution", {}), ensure_ascii=False)}
+Posts negativos con mas alcance: {json.dumps(social.get("top_negative_posts", [])[:5], ensure_ascii=False)}
+Posts positivos con mas alcance: {json.dumps(social.get("top_positive_posts", [])[:5], ensure_ascii=False)}
+--- PRENSA ({CONTEXT_DAYS} dias) ---
+Articulos: {news.get("total_articles", 0)} | sentimiento {news.get("sentiment_average", 0)}
+Noticias negativas: {json.dumps(news.get("top_negative_news", [])[:4], ensure_ascii=False)}
+Noticias positivas: {json.dumps(news.get("top_positive_news", [])[:4], ensure_ascii=False)}
+--- ENCUESTAS ---
+{json.dumps(ctx.get("surveys", {}), ensure_ascii=False)[:2000]}
+--- INCIDENTES DETECTADOS ---
+{json.dumps(ctx.get("incidents", [])[:10], ensure_ascii=False)}
+--- TENDENCIA SEMANAL ---
+{json.dumps(ctx.get("weekly_trends", [])[-8:], ensure_ascii=False)}
+--- TERRITORIO (top distritos) ---
+{json.dumps(ctx.get("territory", [])[:10], ensure_ascii=False, default=str)}
+--- OPORTUNIDAD TERRITORIAL (top 10) ---
+{json.dumps(ctx.get("opportunity", [])[:10], ensure_ascii=False, default=str)}
+--- ATAQUES 7 DIAS ---
+{json.dumps(ctx.get("attacks_7d", []), ensure_ascii=False, default=str)}
+--- ALERTAS ABIERTAS ---
+{json.dumps(ctx.get("open_alerts", []), ensure_ascii=False, default=str)}
+"""
+
+    focus_text = "\n".join(f"- {k}: {v}" for k, v in focus_areas.items())
+    user = f"""CONTEXTO DE DATOS (ultimos {CONTEXT_DAYS} dias):
+{figures_text}
+
+TEMAS 7 DIAS: {json.dumps(extra.get('topics_7d', []), ensure_ascii=False, default=str)}
+
+AREAS DE ENFOQUE SOLICITADAS:
+{focus_text}"""
+
+    return system, user
+
+
+def _enrich_context(db: Session, figure: PoliticalFigure, ctx: Dict[str, Any]) -> Dict[str, Any]:
+    from app.services import territory
+
+    try:
+        ctx["territory"] = [
+            {k: d[k] for k in ("name", "zone", "electors", "mentions", "net_sentiment", "top_topic")}
+            for d in territory.district_stats(db, 30, figure.id)[:10]
+        ]
+    except Exception as e:
+        logger.warning(f"territorio no disponible: {e}")
+        ctx["territory"] = []
+
+    try:
+        if (figure.figure_role or "candidate") == "candidate":
+            ctx["opportunity"] = [
+                {k: d[k] for k in ("name", "zone", "score", "rank", "why")}
+                for d in territory.opportunity(db, figure.id)[:10]
+            ]
+        else:
+            ctx["opportunity"] = []
+    except Exception as e:
+        logger.warning(f"oportunidad no disponible: {e}")
+        ctx["opportunity"] = []
+
+    try:
+        ctx["attacks_7d"] = [dict(r._mapping) for r in db.execute(text("""
+            SELECT COALESCE(fa.display_name, 'origen no identificado') AS attacker,
+                   fd.display_name AS attacked, count(*) AS count
+            FROM content_classifications c
+            JOIN political_figures fd ON fd.id = c.attacked_figure_id
+            LEFT JOIN political_figures fa ON fa.id = c.attacker_figure_id
+            WHERE c.is_attack AND c.content_published_at >= NOW() - INTERVAL '7 days'
+              AND (c.attacked_figure_id = :fid OR c.attacker_figure_id = :fid)
+            GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 8
+        """), {"fid": figure.id}).fetchall()]
+    except Exception:
+        ctx["attacks_7d"] = []
+
+    try:
+        ctx["open_alerts"] = [dict(r._mapping) for r in db.execute(text("""
+            SELECT kind, severity, title FROM alerts
+            WHERE status = 'open' AND figure_id = :fid ORDER BY created_at DESC LIMIT 5
+        """), {"fid": figure.id}).fetchall()]
+    except Exception:
+        ctx["open_alerts"] = []
+
+    return ctx
+
+
 async def generate_recommendations_for_figures(
     db: Session,
     figure_ids: List[str],
     focus_areas: List[str],
 ) -> List[Dict[str, Any]]:
+    import asyncio as _asyncio
 
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY no está configurada. Agrega tu API key en la configuración de secretos.")
+    from app.services import race
+    from app.services.claude_client import get_client, has_key, model as claude_model
+
+    if not has_key():
+        raise ValueError("ANTHROPIC_API_KEY no esta configurada. Agregala en la configuracion de secretos.")
 
     figures = db.query(PoliticalFigure).filter(PoliticalFigure.id.in_(figure_ids)).all()
     if not figures:
-        raise ValueError("No se encontraron las figuras políticas especificadas")
+        raise ValueError("No se encontraron las figuras politicas especificadas")
 
+    today = date.today()
     all_contexts = []
     for fig in figures:
         ctx = gather_figure_context(db, fig)
-        all_contexts.append(ctx)
+        all_contexts.append(_enrich_context(db, fig, ctx))
 
-    focus_descriptions = {
-        "immediate_opportunities": "Oportunidades inmediatas de acción política y comunicacional",
-        "regional_strengthening": "Fortalecimiento regional en territorios estratégicos",
-        "territorial_recovery": "Recuperación de territorios con sentimiento negativo",
-        "demographic_expansion": "Expansión demográfica hacia nuevos segmentos electorales",
+    own = next((f for f in figures if f.is_own_candidate), None)
+    own_name = own.display_name if own else (ec.OWN_CANDIDATE or None)
+
+    selected_focus = {k: v for k, v in FOCUS_DESCRIPTIONS.items() if k in focus_areas} or FOCUS_DESCRIPTIONS
+    if not ec.propaganda_allowed(today):
+        selected_focus = {k: v for k, v in selected_focus.items() if k not in PROPAGANDA_FOCUS} or {
+            "crisis_response": FOCUS_DESCRIPTIONS["crisis_response"]
+        }
+
+    extra = {
+        "own_block": _own_block(db, own) if own else None,
+        "rivals_block": _rivals_block(db, own_name),
+        "topics_7d": race.topics(db, 7),
     }
-
-    selected_focus = {k: v for k, v in focus_descriptions.items() if k in focus_areas}
-    prompt = build_claude_prompt(all_contexts, selected_focus)
-
-    logger.info(f"Sending prompt to Claude ({len(prompt)} chars) for {len(figures)} figure(s)")
-
-    import asyncio as _asyncio
-    from app.services.claude_client import get_client, model as claude_model
+    system, user = build_claude_prompt(all_contexts, selected_focus, db, own_name, extra)
+    logger.info(f"Prompt municipal: system {len(system)} chars, user {len(user)} chars, {len(figures)} figura(s)")
 
     response = await _asyncio.to_thread(
-        get_client().messages.create,
+        get_client().messages.parse,
         model=claude_model(),
         max_tokens=16000,
         thinking={"type": "adaptive"},
         output_config={"effort": "high"},
-        messages=[{"role": "user", "content": prompt}],
+        system=system,
+        messages=[{"role": "user", "content": user}],
+        output_format=RecommendationBatch,
     )
 
-    text_content = next((b.text for b in response.content if b.type == "text"), "")
-    if not text_content:
-        raise ValueError("Claude no devolvio texto en la respuesta")
-
-    recommendations = parse_claude_response(text_content, figures)
+    batch: RecommendationBatch = response.parsed_output
+    figure_map = {}
+    for f in figures:
+        figure_map[f.display_name.lower()] = f.id
+        if f.full_name:
+            figure_map[f.full_name.lower()] = f.id
+    default_figure_id = figures[0].id
 
     saved = []
-    for rec in recommendations:
+    for rec in batch.recommendations:
+        if not ec.propaganda_allowed(today) and rec.category in PROPAGANDA_FOCUS:
+            continue
+        fid = figure_map.get((rec.figure_display_name or "").lower().strip(), default_figure_id)
+        region = ", ".join(x for x in ([rec.target_zone] + list(rec.target_districts)) if x) or None
+        risks = list(rec.risk_factors)
+        if rec.legal_check and rec.legal_check.strip().upper() != "OK":
+            risks.append(f"Restriccion legal: {rec.legal_check}")
+
         record = AIRecommendationRecord(
             id=str(uuid.uuid4()),
-            figure_id=rec["figure_id"],
-            title=rec["title"],
-            description=rec["description"],
-            category=rec["category"],
-            priority=rec["priority"],
+            figure_id=fid,
+            title=rec.title[:500],
+            description=rec.description,
+            category=rec.category,
+            priority=rec.priority,
             status="generated",
-            target_region=rec.get("target_region"),
-            target_demographic=rec.get("target_demographic"),
-            identified_weakness=rec.get("identified_weakness"),
-            recommended_action=rec.get("recommended_action"),
-            estimated_budget=rec.get("estimated_budget"),
-            expected_timeline=rec.get("expected_timeline"),
-            projected_roi=rec.get("projected_roi"),
-            ai_confidence=rec.get("ai_confidence"),
-            resources_needed=rec.get("resources_needed"),
-            success_kpis=rec.get("success_kpis"),
-            risk_factors=rec.get("risk_factors"),
+            target_region=(region or "")[:100] or None,
+            target_demographic=rec.target_demographic,
+            identified_weakness=rec.identified_weakness,
+            recommended_action=rec.recommended_action,
+            estimated_budget={"min": rec.estimated_budget_min_pen, "max": rec.estimated_budget_max_pen},
+            expected_timeline=rec.expected_timeline,
+            projected_roi=float(rec.projected_roi_pct),
+            ai_confidence=float(rec.ai_confidence_pct),
+            resources_needed=rec.resources_needed,
+            success_kpis=rec.success_kpis,
+            risk_factors=risks,
         )
         db.add(record)
         saved.append(record)
@@ -557,234 +775,6 @@ async def generate_recommendations_for_figures(
         db.refresh(s)
 
     return [record_to_dict(s) for s in saved]
-
-
-def build_claude_prompt(contexts: List[Dict], focus_areas: Dict[str, str]) -> str:
-    figures_text = ""
-    for ctx in contexts:
-        fig = ctx["figure"]
-        social = ctx.get("social_media", {})
-        news = ctx.get("news_media", {})
-        surveys = ctx.get("surveys", {})
-        gov = ctx.get("government", {})
-        incidents = ctx.get("incidents", [])
-        trends = ctx.get("weekly_trends", [])
-
-        figures_text += f"""
-================================================================================
-FIGURA POLÍTICA: {fig["display_name"]}
-================================================================================
-Nombre completo: {fig["full_name"]}
-Apodo: {fig.get("nickname", "N/A")}
-Partido: {fig["party_name"]}
-Posición actual: {fig["current_position"]}
-Región principal: {fig["region"]}
-Cuentas sociales: {json.dumps(fig["social_accounts"], ensure_ascii=False)}
-
---- REDES SOCIALES (últimos {CONTEXT_DAYS} días) ---
-Total de menciones: {social.get("total_mentions", 0)}
-Sentimiento promedio: {social.get("sentiment_average", 0)} (escala -1 a 1)
-Tendencia de sentimiento: {social.get("sentiment_trend", "sin datos")}
-Distribución: {json.dumps(social.get("sentiment_distribution", {}), ensure_ascii=False)}
-Engagement total: {social.get("total_engagement", 0)}
-Plataformas: {json.dumps(social.get("platforms", []), ensure_ascii=False)}
-Regiones principales: {json.dumps(social.get("top_regions", []), ensure_ascii=False)}
-
-POSTS POSITIVOS MÁS RELEVANTES (para POTENCIAR):
-{json.dumps(social.get("top_positive_posts", []), ensure_ascii=False, indent=1)}
-
-POSTS NEGATIVOS MÁS RELEVANTES (para REMEDIAR):
-{json.dumps(social.get("top_negative_posts", []), ensure_ascii=False, indent=1)}
-
---- NOTICIAS EN MEDIOS (últimos {CONTEXT_DAYS} días) ---
-Total de artículos: {news.get("total_articles", 0)}
-Sentimiento promedio en noticias: {news.get("sentiment_average", 0)}
-Distribución: {json.dumps(news.get("sentiment_distribution", {}), ensure_ascii=False)}
-Fuentes de medios: {json.dumps(news.get("sources", []), ensure_ascii=False)}
-Categorías: {json.dumps(news.get("categories", {}), ensure_ascii=False)}
-
-NOTICIAS POSITIVAS (para POTENCIAR):
-{json.dumps(news.get("top_positive_news", []), ensure_ascii=False, indent=1)}
-
-NOTICIAS NEGATIVAS (para REMEDIAR):
-{json.dumps(news.get("top_negative_news", []), ensure_ascii=False, indent=1)}
-
---- ENCUESTAS ---
-{json.dumps(surveys, ensure_ascii=False, indent=1) if surveys else "Sin datos de encuestas disponibles"}
-
---- DATOS DE GOBIERNO ---
-{json.dumps(gov, ensure_ascii=False, indent=1) if gov else "Sin datos de gobierno disponibles"}
-
---- INCIDENTES Y EVENTOS ESPECÍFICOS DETECTADOS ---
-{json.dumps(incidents, ensure_ascii=False, indent=1) if incidents else "Sin incidentes específicos detectados"}
-
---- TENDENCIA SEMANAL ---
-{json.dumps(trends, ensure_ascii=False, indent=1) if trends else "Sin datos de tendencia"}
-"""
-
-    focus_text = "\n".join(f"- {k}: {v}" for k, v in focus_areas.items())
-
-    today = date.today()
-    days_remaining = max(0, ec.days_to(ec.PROPAGANDA_DEADLINE, today) or 0)
-    today_str = ec.fmt_es(today)
-    deadline_str = ec.fmt_es(ec.PROPAGANDA_DEADLINE)
-    election_str = ec.fmt_es(ec.ELECTION_DATE)
-    deadline_short = ec.PROPAGANDA_DEADLINE.strftime("%d/%m/%Y")
-    rounds_txt = f"{ec.ELECTION_ROUNDS} vuelta" + ("s" if ec.ELECTION_ROUNDS > 1 else "")
-
-    if days_remaining == 0:
-        urgency_block = f"""- La ventana de propaganda ya ha finalizado (posterior al {deadline_str})
-- Genera recomendaciones de respuesta de prensa, defensa legal y análisis post-electoral"""
-    else:
-        urgency_block = f"""- Días restantes para acciones de campaña: {days_remaining} días
-- TODAS las recomendaciones deben ser ejecutables desde HOY hasta el {deadline_str}
-- Priorizar impacto inmediato dado el plazo electoral"""
-
-    return f"""Eres un consultor político estratégico experto en campañas electorales en Perú. Tu trabajo es analizar TODOS los datos reales recopilados sobre figuras políticas y generar recomendaciones estratégicas ultra-específicas y accionables.
-
-CONTEXTO ELECTORAL CRÍTICO:
-- Fecha actual: {today_str}
-- {ec.ELECTION_NAME}: {election_str} ({rounds_txt}, circunscripción {ec.ELECTORAL_DISTRICT})
-- Último día permitido para propaganda y campañas: {deadline_str}
-{urgency_block}
-
-================================================================================
-DATOS COMPLETOS DE LAS FIGURAS POLÍTICAS
-================================================================================
-{figures_text}
-
-ÁREAS DE ENFOQUE SOLICITADAS:
-{focus_text}
-
-================================================================================
-INSTRUCCIONES DETALLADAS
-================================================================================
-
-REGLA PRINCIPAL: Por cada evento/incidente/noticia/post encontrado en los datos, debes generar una recomendación específica que indique:
-
-1. **Si el sentimiento es NEGATIVO (posts negativos, noticias negativas, incidentes desfavorables):**
-   - Identifica exactamente qué evento/incidente causó el sentimiento negativo
-   - Genera una recomendación paso a paso para REMEDIAR el daño
-   - Incluye: respuesta pública sugerida, estrategia de comunicación de crisis, acciones concretas para revertir la percepción
-
-2. **Si el sentimiento es POSITIVO (posts positivos, noticias favorables):**
-   - Identifica exactamente qué evento generó el sentimiento positivo
-   - Genera una recomendación paso a paso para POTENCIAR y capitalizar ese momentum positivo
-   - Incluye: cómo amplificar el mensaje, en qué plataformas reforzar, qué acciones tomar para mantener la tendencia
-
-3. **Si el sentimiento es NEUTRO:**
-   - Identifica la oportunidad de convertir la neutralidad en sentimiento positivo
-   - Genera una recomendación para ACTIVAR engagement y generar opinión favorable
-
-4. **Para ENCUESTAS:**
-   - Si la figura aparece en encuestas, analiza su posición relativa
-   - Recomienda acciones específicas para mejorar sus números
-
-5. **Para DATOS DE GOBIERNO:**
-   - Si hay datos gubernamentales relevantes, úsalos como contexto para oportunidades políticas
-
-FORMATO DE RESPUESTA:
-Genera entre 3 y 6 recomendaciones por cada figura política.
-Cada recomendación debe estar DIRECTAMENTE vinculada a un dato real encontrado.
-Responde EXCLUSIVAMENTE con un JSON array válido, sin texto adicional.
-
-[
-  {{
-    "figure_display_name": "nombre de la figura",
-    "title": "Título conciso de la recomendación (máx 80 caracteres)",
-    "description": "Descripción detallada incluyendo: 1) El evento/incidente específico detectado en los datos, 2) Por qué es importante abordarlo, 3) Qué se espera lograr. (3-5 oraciones)",
-    "category": "una de: immediate_opportunities, regional_strengthening, territorial_recovery, demographic_expansion",
-    "priority": "una de: critical, high, medium, low",
-    "target_region": "región objetivo específica basada en los datos",
-    "target_demographic": "segmento demográfico objetivo",
-    "identified_weakness": "El evento/incidente/dato específico que fundamenta esta recomendación. Citar el contenido real del post/noticia.",
-    "recommended_action": "Plan de acción paso a paso: Paso 1: [acción]. Paso 2: [acción]. Paso 3: [acción]. Cada paso debe ser concreto y ejecutable antes del {deadline_str}.",
-    "estimated_budget": {{"min": 5000, "max": 50000}},
-    "expected_timeline": "plazo concreto (ej: 1-2 semanas, fecha específica) que NO exceda el {deadline_str}",
-    "projected_roi": 200,
-    "ai_confidence": 85,
-    "resources_needed": ["recurso1", "recurso2", "recurso3"],
-    "success_kpis": ["KPI medible 1", "KPI medible 2"],
-    "risk_factors": ["riesgo 1", "riesgo 2"]
-  }}
-]
-
-REGLAS FINALES:
-- Todos los textos en español
-- estimated_budget en soles peruanos (S/.)
-- projected_roi es porcentaje (200 = 200% retorno)
-- ai_confidence es porcentaje de 0 a 100
-- identified_weakness DEBE citar contenido real de los datos proporcionados
-- recommended_action DEBE ser un plan paso a paso concreto
-- CADA recomendación debe ser ejecutable entre hoy ({today.strftime("%d/%m/%Y")}) y el {deadline_short}
-- NO inventes datos. Solo usa la información proporcionada arriba
-
-Responde SOLO con el JSON array."""
-
-
-def parse_claude_response(text: str, figures: List[PoliticalFigure]) -> List[Dict]:
-    text = text.strip()
-    if text.startswith("```json"):
-        text = text[7:]
-    if text.startswith("```"):
-        text = text[3:]
-    if text.endswith("```"):
-        text = text[:-3]
-    text = text.strip()
-
-    try:
-        items = json.loads(text)
-    except json.JSONDecodeError as e:
-        logger.error(f"Error parsing Claude response: {e}\nText: {text[:500]}")
-        raise ValueError("La respuesta de Claude no es JSON válido")
-
-    if not isinstance(items, list):
-        items = [items]
-
-    figure_map = {}
-    for f in figures:
-        figure_map[f.display_name.lower()] = f.id
-        if f.full_name:
-            figure_map[f.full_name.lower()] = f.id
-        if f.nickname:
-            figure_map[f.nickname.lower()] = f.id
-
-    default_figure_id = figures[0].id
-
-    results = []
-    for item in items:
-        fig_name = item.get("figure_display_name", "").lower().strip()
-        figure_id = figure_map.get(fig_name, None)
-
-        if not figure_id:
-            for f_name, f_id in figure_map.items():
-                if f_name in fig_name or fig_name in f_name:
-                    figure_id = f_id
-                    break
-
-        if not figure_id:
-            figure_id = default_figure_id
-
-        results.append({
-            "figure_id": figure_id,
-            "title": item.get("title", "Recomendación sin título")[:500],
-            "description": item.get("description", ""),
-            "category": item.get("category", "immediate_opportunities"),
-            "priority": item.get("priority", "medium"),
-            "target_region": item.get("target_region"),
-            "target_demographic": item.get("target_demographic"),
-            "identified_weakness": item.get("identified_weakness"),
-            "recommended_action": item.get("recommended_action"),
-            "estimated_budget": item.get("estimated_budget"),
-            "expected_timeline": item.get("expected_timeline"),
-            "projected_roi": item.get("projected_roi"),
-            "ai_confidence": item.get("ai_confidence"),
-            "resources_needed": item.get("resources_needed"),
-            "success_kpis": item.get("success_kpis"),
-            "risk_factors": item.get("risk_factors"),
-        })
-
-    return results
 
 
 def record_to_dict(rec: AIRecommendationRecord) -> Dict[str, Any]:

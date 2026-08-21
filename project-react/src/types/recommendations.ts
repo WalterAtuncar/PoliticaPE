@@ -42,7 +42,7 @@ export interface AIRecommendation {
   figure_id?: string;
   title: string;
   description: string;
-  category: 'immediate_opportunities' | 'regional_strengthening' | 'territorial_recovery' | 'demographic_expansion';
+  category: 'territorial_priority' | 'message_of_day' | 'crisis_response' | 'rival_contrast' | 'ground_game' | 'digital_push';
   priority: 'critical' | 'high' | 'medium' | 'low';
   status: 'generated' | 'under_review' | 'approved' | 'in_progress' | 'completed' | 'rejected';
   targetRegion: string;

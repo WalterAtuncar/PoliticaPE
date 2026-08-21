@@ -28,14 +28,16 @@ const initialFilters: RecommendationsFilters = {
 };
 
 const focusAreaOptions = [
-  { id: 'immediate_opportunities', label: 'Oportunidades Inmediatas', icon: Zap, color: 'text-yellow-600' },
-  { id: 'regional_strengthening', label: 'Fortalecimiento Regional', icon: Target, color: 'text-green-600' },
-  { id: 'territorial_recovery', label: 'Recuperación Territorial', icon: Brain, color: 'text-red-600' },
-  { id: 'demographic_expansion', label: 'Expansión Demográfica', icon: UsersIcon, color: 'text-purple-600' },
+  { id: 'territorial_priority', label: 'Prioridad territorial', icon: Target, color: 'text-amber-600' },
+  { id: 'message_of_day', label: 'Mensaje del día', icon: Zap, color: 'text-yellow-600' },
+  { id: 'crisis_response', label: 'Respuesta a crisis', icon: Brain, color: 'text-red-600' },
+  { id: 'rival_contrast', label: 'Contraste con rivales', icon: UsersIcon, color: 'text-purple-600' },
+  { id: 'ground_game', label: 'Trabajo de calle', icon: Target, color: 'text-green-600' },
+  { id: 'digital_push', label: 'Empuje digital', icon: Zap, color: 'text-blue-600' },
 ];
 
 export const RecommendationsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('immediate');
+  const [activeTab, setActiveTab] = useState('all');
   const [filters, setFilters] = useState<RecommendationsFilters>(initialFilters);
   const [selectedRecommendations, setSelectedRecommendations] = useState<string[]>([]);
   const [showComparator, setShowComparator] = useState(false);
@@ -56,15 +58,7 @@ export const RecommendationsPage: React.FC = () => {
   } = useAIRecommendations(filters);
 
   const filteredRecommendations = recommendations.filter(rec => {
-    const matchesTab = () => {
-      switch (activeTab) {
-        case 'immediate': return rec.category === 'immediate_opportunities';
-        case 'regional': return rec.category === 'regional_strengthening';
-        case 'recovery': return rec.category === 'territorial_recovery';
-        case 'expansion': return rec.category === 'demographic_expansion';
-        default: return true;
-      }
-    };
+    const matchesTab = () => activeTab === 'all' || rec.category === activeTab;
     return matchesTab() &&
       (filters.region === 'all' || rec.targetRegion === filters.region) &&
       (filters.priority === 'all' || rec.priority === filters.priority) &&
