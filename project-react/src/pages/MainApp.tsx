@@ -6,7 +6,7 @@ import { Dashboard } from '../components/dashboard/Dashboard';
 import { MonitoringPage } from '../components/monitoring/MonitoringPage';
 import { SocialPage } from '../components/social/SocialPage';
 import { TerritoryPage } from '../components/territory/TerritoryPage';
-import { SurveysPage } from '../components/surveys/SurveysPage';
+import { RacePage } from '../components/race/RacePage';
 import { RecommendationsPage } from '../components/recommendations/RecommendationsPage';
 import { SettingsContainer } from '../components/settings/SettingsContainer';
 
@@ -24,8 +24,8 @@ export const MainApp: React.FC = () => {
         return <SocialPage />;
       case 'territory':
         return <TerritoryPage />;
-      case 'surveys':
-        return <SurveysPage />;
+      case 'race':
+        return <RacePage />;
       case 'recommendations':
         return <RecommendationsPage />;
       case 'settings':

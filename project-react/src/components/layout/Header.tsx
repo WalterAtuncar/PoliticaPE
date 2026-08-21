@@ -32,7 +32,7 @@ const sectionTitles: Record<string, string> = {
   dashboard: 'Panel',
   monitoring: 'Prensa — Lima Metropolitana',
   social: 'Redes sociales',
-  surveys: 'Encuestas',
+  race: 'Carrera — Alcaldía de Lima 2026',
   territory: 'Territorio — Lima Metropolitana',
   recommendations: 'Recomendaciones IA',
   settings: 'Configuración',

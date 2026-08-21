@@ -9,9 +9,11 @@ logger = logging.getLogger(__name__)
 
 SCRAPING_INTERVAL_HOURS = int(os.getenv("SCRAPING_INTERVAL_HOURS", "6"))
 CLASSIFY_INTERVAL_MINUTES = int(os.getenv("CLASSIFY_INTERVAL_MINUTES", "15"))
+BRIEF_HOUR_LIMA = int(os.getenv("BRIEF_HOUR_LIMA", "7"))
 
 _scheduler_task: Optional[asyncio.Task] = None
 _classify_task: Optional[asyncio.Task] = None
+_brief_task: Optional[asyncio.Task] = None
 
 
 def get_active_tokens(db, platform: str) -> List[Dict]:
@@ -895,8 +897,40 @@ async def classification_loop():
         await asyncio.sleep(CLASSIFY_INTERVAL_MINUTES * 60)
 
 
+async def daily_brief_loop():
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+
+    from app.database import SessionLocal
+    from app.services import daily_brief
+    from app.services.claude_client import has_key
+
+    lima = ZoneInfo("America/Lima")
+
+    while True:
+        now = datetime.now(lima)
+        target = now.replace(hour=BRIEF_HOUR_LIMA, minute=0, second=0, microsecond=0)
+        if target <= now:
+            target += timedelta(days=1)
+        wait = (target - now).total_seconds()
+        logger.info(f"[Brief] proximo envio {target.strftime('%Y-%m-%d %H:%M')} America/Lima ({int(wait/60)} min)")
+        await asyncio.sleep(wait)
+
+        if not has_key():
+            logger.info("[Brief] ANTHROPIC_API_KEY ausente; brief omitido")
+            continue
+        db = SessionLocal()
+        try:
+            result = await asyncio.to_thread(daily_brief.generate, db, None, True, True)
+            logger.info(f"[Brief] generado {result.get('brief_date')} | canales {result.get('sent_channels')}")
+        except Exception as e:
+            logger.error(f"[Brief] Error: {e}")
+        finally:
+            db.close()
+
+
 def start_scheduler():
-    global _scheduler_task, _classify_task
+    global _scheduler_task, _classify_task, _brief_task
     loop = asyncio.get_event_loop()
     if _scheduler_task is None or _scheduler_task.done():
         _scheduler_task = loop.create_task(scheduler_loop())
@@ -904,13 +938,18 @@ def start_scheduler():
     if _classify_task is None or _classify_task.done():
         _classify_task = loop.create_task(classification_loop())
         logger.info("[Classifier] Clasificador iniciado")
+    if _brief_task is None or _brief_task.done():
+        _brief_task = loop.create_task(daily_brief_loop())
+        logger.info("[Brief] Programador de brief diario iniciado")
 
 
 def stop_scheduler():
-    global _scheduler_task, _classify_task
+    global _scheduler_task, _classify_task, _brief_task
     if _scheduler_task and not _scheduler_task.done():
         _scheduler_task.cancel()
         logger.info("[Scheduler] Scheduler detenido")
     if _classify_task and not _classify_task.done():
         _classify_task.cancel()
         logger.info("[Classifier] Clasificador detenido")
+    if _brief_task and not _brief_task.done():
+        _brief_task.cancel()

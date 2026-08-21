@@ -355,3 +355,17 @@ class ContentClassification(Base):
         Index('idx_cc_topic_time', 'topic', 'content_published_at'),
         Index('idx_cc_zone', 'zone'),
     )
+
+
+class DailyBrief(Base):
+    __tablename__ = "daily_briefs"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    brief_date = Column(Date, nullable=False, unique=True)
+    generated_at = Column(DateTime, default=func.now())
+    model = Column(String(60), nullable=True)
+    headline = Column(String(300), nullable=True)
+    body_markdown = Column(Text, nullable=False)
+    data = Column(JSON(none_as_null=True), nullable=True)
+    sent_channels = Column(JSON(none_as_null=True), nullable=True)
+    status = Column(String(20), default='generated')

@@ -8,6 +8,7 @@ import {
   MessageSquare,
   MapPin,
   BarChart3,
+  Flag,
   Settings
 } from 'lucide-react';
 import logo from '../../assets/logo.png';
@@ -23,7 +24,7 @@ const menuItems = [
   { id: 'dashboard', label: 'Panel', icon: Home },
   { id: 'monitoring', label: 'Prensa', icon: Activity },
   { id: 'social', label: 'Redes', icon: MessageSquare },
-  { id: 'surveys', label: 'Encuestas', icon: BarChart3 },
+  { id: 'race', label: 'Carrera', icon: Flag },
   { id: 'territory', label: 'Territorio', icon: MapPin },
   { id: 'recommendations', label: 'Recomendaciones IA', icon: Brain },
   { id: 'settings', label: 'Configuración', icon: Settings },
