@@ -422,7 +422,7 @@ async def run_scheduled_social_scraping(db_url: str, platform: str, days_back: i
     tokens = get_active_tokens(db, platform)
 
     if platform == "twitter" and not tokens:
-        api_key = os.getenv("TWITTERAPI_IO_KEY")
+        api_key = os.getenv("TWITTERAPI_IO_KEY") or os.getenv("TWITTER_BEARER_TOKEN")
         if api_key:
             tokens = [{"id": "__env__", "label": "Variable de entorno", "credentials": {"api_key": api_key}}]
     elif platform == "youtube" and not tokens:
@@ -434,7 +434,7 @@ async def run_scheduled_social_scraping(db_url: str, platform: str, days_back: i
         if access_token:
             tokens = [{"id": "__env__", "label": "Variable de entorno", "credentials": {"access_token": access_token}}]
     elif platform == "facebook" and not tokens:
-        access_token = os.getenv("FACEBOOK_GRAPH_TOKEN")
+        access_token = os.getenv("FACEBOOK_GRAPH_TOKEN") or os.getenv("FACEBOOK_ACCESS_TOKEN")
         if access_token:
             tokens = [{"id": "__env__", "label": "Variable de entorno", "credentials": {"access_token": access_token}}]
 
