@@ -1,73 +1,96 @@
-# PoliticaPE - Political Analysis Platform
+# PoliticaPE — Arquitectura
 
-## Overview
-PoliticaPE is a multi-project platform designed for political analytics in Peru. It provides comprehensive insights by integrating data from various sources, including news, social media, and government data. The platform consists of a frontend dashboard for data visualization and user interaction, a batch processing backend for data scraping and API services, and a real-time streaming microservice for live analytics.
+Plataforma de inteligencia electoral orientada a la **elección municipal de Lima Metropolitana del
+4 de octubre de 2026**. Convierte prensa, redes sociales y encuestas públicas en decisiones para un
+equipo de campaña: dónde ir, qué decir, a qué responder.
 
-## System Architecture
+Para empezar a trabajar lee primero `CLAUDE.md` (resumen operativo) y
+`docs/plan-lima-2026/ESTADO-EJECUCION.md` (estado y bloqueos).
 
-### Core Architecture
-The platform is composed of three integrated sub-projects:
-- **project-react**: Frontend dashboard built with React, Vite, TypeScript, and TailwindCSS. It provides a user interface for login, data visualization, and analytics.
-- **project-scrapping**: Backend for batch data scraping and REST API services, implemented with FastAPI and SQLAlchemy. It handles data ingestion, processing, and exposure through various endpoints.
-- **project-sniffing**: Real-time streaming microservice developed with FastAPI, utilizing WebSockets for live data analysis and updates.
+## Los tres servicios
 
-### Technical Implementations
-- **Frontend**: Utilizes React 18, Vite, TypeScript, TailwindCSS for styling, Framer Motion for animations, Recharts for charting, and Leaflet for mapping. Key hooks like `useDashboardData`, `useRealtimeData`, `useWebSocket`, and `useSocialData` manage data fetching and state.
-- **Backend (Scrapping)**: Built with FastAPI, SQLAlchemy for ORM, Pydantic for data validation, and uvicorn as the ASGI server. Authentication uses bcrypt.
-- **Backend (Sniffing)**: FastAPI microservice focused on real-time data processing and WebSocket communication.
-- **Database**: PostgreSQL (Neon) with a multi-schema design to organize core, real-time, identity, and organization-specific data.
-- **Data Scraping**: Custom scrapers for social media (TwitterAPI.io, YouTube Data API v3) and 12 Peruvian news sources using BeautifulSoup. News sources include: El Comercio, RPP, La Republica, Peru21, Gestion, Infobae Peru (prensa), Canal N, America TV, Panamericana TV, TV Peru (TV), Exitosa (radio), Andina (agencia oficial). Flexible multi-token configuration for social media APIs.
-- **Sentiment Analysis**: A lightweight rule-based Spanish lexicon is used for sentiment analysis, avoiding heavy ML dependencies.
-- **Deployment**: The `project-scrapping` backend can serve the `project-react` frontend directly in production via a reverse proxy and static file serving capabilities. WebSocket traffic is also proxied.
-
-### Feature Specifications
-- **Authentication**: Secure user authentication with bcrypt.
-- **Data Analytics**: Comprehensive analytics dashboards displaying news, social media trends, government data, and sentiment analysis.
-- **News Monitoring**: Dedicated news monitoring page showing real-time articles scraped from 12 Peruvian media sources (newspapers, TV, radio, agency). Includes filtering by source/category/search, sentiment analysis, auto-refresh, and manual scraping trigger.
-- **Scraping Management**: Tools to trigger and monitor data scraping jobs, along with managing API tokens for various platforms.
-- **Configuration System**: A robust system for managing API tokens for social media platforms, including CRUD operations and connectivity testing.
-- **Regional Engagement Analysis**: Functionality to analyze political engagement based on geographical regions within Peru.
-- **Political Figures Management**: CRUD system for managing political figures with search keywords, social accounts, and monitoring priority. Keywords automatically sync with the scraping engine's search tags.
-- **AI Recommendations (Claude)**: Integration with Anthropic Claude API to generate strategic political recommendations based on real scraped data. The system gathers data from ALL sources (social posts, news articles, surveys, government data) within a 120-day window, classifies each mention by sentiment, extracts specific incidents/events, computes weekly trends, and sanitizes all data before sending to Claude. The AI generates per-incident recommendations. Recommendations are persisted in the `ai_recommendations` table with status tracking, rating, and ROI metrics.
-
-### Design Choices
-- **Simplified Infrastructure**: Avoids heavy tools like Redis, Celery, or Kafka by leveraging FastAPI's background tasks and direct WebSocket broadcasting.
-- **No Heavy ML Models**: Opts for lightweight, rule-based sentiment analysis to reduce complexity and dependency.
-- **UUID Handling**: Pydantic schemas are configured to correctly serialize UUIDs to strings in API responses.
-- **Data Flow**: Frontend hooks prioritize fetching real data from the backend. If no data or an error occurs, the UI gracefully handles empty states.
-
-## External Dependencies
-- **Database**: PostgreSQL (Neon).
-- **Social Media APIs**:
-    - TwitterAPI.io (for Twitter data scraping)
-    - YouTube Data API v3 (for YouTube data scraping)
-- **AI**: Anthropic Claude API (for AI-powered political recommendations via ANTHROPIC_API_KEY).
-- **Monitoring**: Prometheus (for metrics exposure).
-
-## Key Database Tables
-- `raw_social_posts`: Scraped social media posts (810+ records across YouTube, Twitter, Instagram)
-- `political_figures`: Political figures with search keywords, social accounts, monitoring config
-- `ai_recommendations`: AI-generated strategy recommendations linked to political figures
-- `search_tags`: Keywords for scraping (auto-synced with political figure keywords)
-- `social_api_tokens`: API credentials for social media platforms
-- `news_articles`: Scraped news articles from 12 Peruvian media sources (430+ records)
-- `scraped_surveys`, `government_data`: Other scraped data sources
-
-## Local Development
-
-### Services
-| Service | Port | Command |
+| Servicio | Rol | Puerto local |
 |---|---|---|
-| Frontend (React/Vite) | 5000 | `cd project-react && npm run dev` |
-| Backend API (Scrapping) | 8000 | `cd project-scrapping && PORT=8000 python serve.py` |
-| Microservicio Sniffing | 8080 | `cd project-sniffing/microservice && PORT=8080 python main.py` |
+| `project-scrapping` | FastAPI: scrapers, API REST, scheduler, servicios de análisis. En producción también sirve el frontend compilado | 8000 |
+| `project-sniffing` | FastAPI: difusión en vivo por WebSocket de los ítems ya clasificados | 8080 |
+| `project-react` | React 18 + Vite + TypeScript + Tailwind | 5000 |
 
-### Environment Variables
-Configure in `.env` at the project root:
-- `DATABASE_URL` - PostgreSQL connection string (Neon)
-- `SNIFFING_URL` - Sniffing service URL (default: http://localhost:8080)
-- `SNIFFING_WS_URL` - Sniffing WebSocket URL (default: ws://localhost:8080)
-- `SERVE_FRONTEND` - Set to "true" in production to serve React build
-- `TWITTER_BEARER_TOKEN` - Twitter API token
-- `YOUTUBE_API_KEY` - YouTube Data API key
-- `ANTHROPIC_API_KEY` - Claude API key for AI recommendations
+En producción (Railway) son dos servicios: `politicape-web` (scrapping + frontend) y
+`politicape-sniffing`, que se comunican por la red privada de Railway.
+
+## Flujo de datos
+
+```
+12 medios de prensa ─┐
+X / YouTube ─────────┼─► scrapers ─► lima_geo.detect_scope ─► scope + districts
+Wikipedia municipal ─┘                    (¿es de Lima? ¿qué distrito?)
+                                                   │
+                                    classifier (Claude, lotes de 20)
+                                                   │
+                            content_classifications: figura, sentimiento HACIA ella,
+                            tema municipal, ataque→atacado, distritos, relevancia
+                                                   │
+        ┌──────────────────┬───────────────────────┼──────────────────┬─────────────────┐
+        ▼                  ▼                       ▼                  ▼                 ▼
+  race (encuestas,   territory (distritos,   alert_engine        daily_brief      ai_recommendations
+  SoV, sentimiento,   zonas, oportunidad)    (crisis/ataque/     (07:00 Lima,     (estratega municipal)
+  temas)                                      oportunidad)        Telegram+correo)
+                                                   │
+                                        sniffing /api/ingest ─► WebSocket ─► frontend
+```
+
+## Decisiones de diseño
+
+- **El calendario electoral es configuración, no código.** `app/electoral_config.py` lee las fechas de
+  variables de entorno y expone `campaign_phase()`: `pre | campaign | poll_blackout | closing |
+  election_day | post`. Recomendaciones, brief, alertas y UI cambian de comportamiento según la fase
+  (en veda no se publican encuestas; cerrada la propaganda se filtran los focos de calle y pauta).
+- **El sentimiento es hacia una figura, no del texto.** Una noticia donde A denuncia a B es negativa
+  para B y neutra para A. Eso lo resuelve el clasificador con Claude, no un léxico de palabras.
+- **La unidad territorial es el distrito.** 43 distritos con ubigeo real, agrupados en las 5 zonas que
+  usan las encuestadoras (Norte, Este, Centro, Moderna, Sur). El padrón es el de Reniec 2026
+  (7 901 379 electores).
+- **Infraestructura simple a propósito**: sin Redis, sin Celery, sin Alembic. El scheduler son tareas
+  asyncio dentro del proceso de FastAPI; las migraciones son SQL idempotente con un runner de 50 líneas.
+- **Degradación limpia**: sin `ANTHROPIC_API_KEY` el sistema recolecta y muestra igual; los loops de IA
+  lo registran en el log y siguen. Nada revienta.
+
+## API (`/api/v1`)
+
+| Prefijo | Qué expone |
+|---|---|
+| `/auth` | login, registro, perfil (JWT HS256) |
+| `/data` | noticias, posts, gobierno, encuestas, estadísticas — con filtro `scope` |
+| `/scraping` | disparadores manuales y logs de scraping |
+| `/analysis` | sentimiento, tendencias, geografía, engagement (etapa anterior) |
+| `/electoral` | `config`: fechas, fase y días restantes |
+| `/race` | encuestas, promedio ponderado, share of voice, sentimiento por zona, temas, brief |
+| `/territory` | distritos, zonas, catálogo, score de oportunidad |
+| `/alerts` | listar y cambiar estado de alertas |
+| `/events` | eventos de campaña, tareas, voluntarios, impacto de evento |
+| `/results` | carga CSV/ONPE, resumen y comparación oportunidad vs. resultado |
+| `/political-figures`, `/recommendations`, `/settings`, `/campaigns`, `/competitors` | CRUD y configuración |
+
+Todos exigen `Authorization: Bearer <jwt>` salvo login y registro.
+
+## Base de datos (Neon PostgreSQL)
+
+Cuatro esquemas: `public` (datos scrapeados y análisis), `realtime_data` (streaming),
+`identity` (usuarios, roles, tenants), `organization` (campañas, eventos, tareas, partidos, regiones).
+
+Tablas propias de esta etapa: `content_classifications`, `daily_briefs`, `alerts`, `election_results`,
+más las columnas `scope`, `districts`, `topics`, `classified` en `news_articles` y `raw_social_posts`,
+y `figure_role`, `is_own_candidate`, `list_name`, `color`, `zone_strength` en `political_figures`.
+
+Las trampas de tipos (columnas `uuid`, `text[]`, JSON null) están documentadas en `CLAUDE.md`.
+
+## Dependencias externas
+
+- **Neon PostgreSQL** — base de datos.
+- **Anthropic Claude** (`claude-opus-5` por defecto, SDK `anthropic` 1.0.0) — clasificación, brief,
+  recomendaciones y respuestas sugeridas.
+- **TwitterAPI.io** y **YouTube Data API v3** — redes sociales.
+- **Telegram Bot API** y SMTP — entrega de alertas y brief.
+- **Railway** — despliegue.
+- Prensa y encuestas: 12 medios peruanos, Wikipedia (tablas de encuestas municipales), IEP, Ipsos,
+  Datum, CPI.
