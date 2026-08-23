@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 BATCH_SIZE = int(os.getenv("CLASSIFY_BATCH_SIZE", "20"))
 DAILY_LIMIT = int(os.getenv("CLASSIFY_DAILY_LIMIT", "3000"))
 MAX_CONTENT_CHARS = 1200
+# Solo se clasifica contenido del ciclo municipal. Antes de esta fecha la base guarda
+# material de la etapa presidencial (segunda vuelta del 7-jun) que no aporta a Lima 2026
+# y solo gastaria tokens. Vacia la variable para clasificar todo el historico.
+MIN_DATE = os.getenv("CLASSIFY_MIN_DATE", "2026-07-01").strip()
 
 TOPICS = [
     "inseguridad", "extorsion", "transporte", "limpieza_residuos", "obras_infraestructura",
@@ -132,9 +136,20 @@ def _figure_keyword_conditions(model_class, fields: List[str], keywords: List[st
     return conditions
 
 
+def _date_window(model, primary: str, fallback: str):
+    """Filtro de antiguedad tolerante a fechas nulas: usa la fecha de publicacion y,
+    si falta, la de scraping."""
+    if not MIN_DATE:
+        return None
+    from sqlalchemy import and_
+    p, f = getattr(model, primary), getattr(model, fallback)
+    return or_(p >= MIN_DATE, and_(p.is_(None), f >= MIN_DATE))
+
+
 def select_pending(db: Session, limit: int) -> List[Dict[str, Any]]:
     """Contenido sin clasificar que es de Lima o menciona a una figura monitoreada.
-    Mezcla 70 % noticias / 30 % posts."""
+    Apunta a 70 % noticias / 30 % posts, pero si no hay social suficiente rellena con
+    noticias para no desaprovechar el lote. Solo considera contenido desde MIN_DATE."""
     keywords = [
         kw for (kws,) in db.query(PoliticalFigure.search_keywords).filter(PoliticalFigure.is_active == True).all()
         for kw in (kws or []) if kw and len(kw) >= 4
@@ -148,14 +163,16 @@ def select_pending(db: Session, limit: int) -> List[Dict[str, Any]]:
     news_conditions = [NewsArticle.scope == "lima_metropolitana"]
     if keywords:
         news_conditions += _figure_keyword_conditions(NewsArticle, ["title", "content"], keywords)
-    news = (
+    news_q = (
         db.query(NewsArticle)
         .filter(NewsArticle.classified == False)
         .filter(or_(*news_conditions))
-        .order_by(NewsArticle.published_at.desc().nullslast())
-        .limit(n_news)
-        .all()
     )
+    news_window = _date_window(NewsArticle, "published_at", "scraped_at")
+    if news_window is not None:
+        news_q = news_q.filter(news_window)
+    news_q = news_q.order_by(NewsArticle.published_at.desc().nullslast())
+    news = news_q.limit(n_news).all()
     for a in news:
         items.append({
             "item_id": str(a.id),
@@ -169,14 +186,15 @@ def select_pending(db: Session, limit: int) -> List[Dict[str, Any]]:
     social_conditions = [RawSocialPost.scope == "lima_metropolitana"]
     if keywords:
         social_conditions += _figure_keyword_conditions(RawSocialPost, ["content"], keywords)
-    posts = (
+    social_q = (
         db.query(RawSocialPost)
         .filter(RawSocialPost.classified == False)
         .filter(or_(*social_conditions))
-        .order_by(RawSocialPost.created_at.desc().nullslast())
-        .limit(n_social)
-        .all()
     )
+    social_window = _date_window(RawSocialPost, "created_at", "scraped_at")
+    if social_window is not None:
+        social_q = social_q.filter(social_window)
+    posts = social_q.order_by(RawSocialPost.created_at.desc().nullslast()).limit(n_social).all()
     for p in posts:
         items.append({
             "item_id": str(p.id),
@@ -186,6 +204,31 @@ def select_pending(db: Session, limit: int) -> List[Dict[str, Any]]:
             "content": (p.content or "")[:MAX_CONTENT_CHARS],
             "published_at": p.created_at or p.scraped_at,
         })
+
+    # El social solo se llena cuando hay scraping de redes activo. Si falta, se completa
+    # el lote con mas noticias en vez de mandar lotes cortos (mismo coste fijo de prompt).
+    faltan = limit - len(items)
+    if faltan > 0 and news:
+        ya = {it["item_id"] for it in items}
+        extra_q = (
+            db.query(NewsArticle)
+            .filter(NewsArticle.classified == False)
+            .filter(or_(*news_conditions))
+            .filter(~NewsArticle.id.in_([a.id for a in news]))
+        )
+        if news_window is not None:
+            extra_q = extra_q.filter(news_window)
+        for a in extra_q.order_by(NewsArticle.published_at.desc().nullslast()).limit(faltan).all():
+            if str(a.id) in ya:
+                continue
+            items.append({
+                "item_id": str(a.id),
+                "content_type": "news",
+                "source": a.source,
+                "title": a.title or "",
+                "content": (a.content or "")[:MAX_CONTENT_CHARS],
+                "published_at": a.published_at or a.scraped_at,
+            })
 
     return items
 
@@ -310,6 +353,14 @@ def _persist(db: Session, items: List[Dict[str, Any]], parsed: BatchClassificati
     return saved
 
 
+# El push al sniffing es best-effort: nunca debe frenar la persistencia. Si el servicio
+# no responde, tras unos intentos se deja de llamar en este proceso (evita sumar un
+# timeout por item, que multiplicaba por tres la duracion de cada lote).
+SNIFFING_TIMEOUT = float(os.getenv("SNIFFING_PUSH_TIMEOUT", "2"))
+SNIFFING_MAX_FAILURES = 3
+_sniffing_failures = 0
+
+
 def _push_to_sniffing(src: Dict[str, Any], res: "ItemClassification",
                       rows: List[dict], districts: List[dict], zone: Optional[str]) -> None:
     """Empuja el item clasificado al servicio de streaming para el WebSocket y las alertas en vivo."""
@@ -337,12 +388,21 @@ def _push_to_sniffing(src: Dict[str, Any], res: "ItemClassification",
         "hashtags": [],
         "message_timestamp": src["published_at"].isoformat() if src.get("published_at") else None,
     }
+    global _sniffing_failures
+    if _sniffing_failures >= SNIFFING_MAX_FAILURES:
+        return
     try:
         import httpx
         from app.config import settings
-        httpx.post(f"{settings.SNIFFING_URL}/api/ingest", json=payload, timeout=5)
+        httpx.post(f"{settings.SNIFFING_URL}/api/ingest", json=payload, timeout=SNIFFING_TIMEOUT)
+        _sniffing_failures = 0
     except Exception as e:
+        _sniffing_failures += 1
         logger.debug(f"[Classifier] no se pudo empujar al sniffing: {e}")
+        if _sniffing_failures == SNIFFING_MAX_FAILURES:
+            logger.warning(
+                f"[Classifier] sniffing no responde tras {SNIFFING_MAX_FAILURES} intentos; "
+                "se deja de empujar en este proceso (la clasificacion sigue normal)")
 
 
 def classify_batch(db: Session, items: List[Dict[str, Any]], dry_run: bool = False):
