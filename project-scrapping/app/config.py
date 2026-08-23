@@ -2,6 +2,22 @@ from pydantic_settings import BaseSettings
 from typing import List, Optional
 import os
 
+# pydantic_settings solo rellena los campos declarados en Settings; no toca os.environ.
+# Como 45 variables se leen con os.getenv() directo desde otros modulos (electoral_config,
+# classifier, scheduler, notify...), en local se quedaban con su valor por defecto y .env
+# se ignoraba en la practica. En Railway no se notaba porque inyecta todo en el entorno.
+# Cargar el .env aqui, en el primer modulo que importa todo el mundo, deja ambos caminos
+# viendo lo mismo. override=False: una variable real del entorno siempre manda.
+_ENV_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env"
+)
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(_ENV_FILE, override=False)
+except ImportError:  # pragma: no cover - python-dotenv esta en requirements.txt
+    pass
+
 class Settings(BaseSettings):
     # Application
     APP_NAME: str = "Political Data Scraper"
@@ -59,7 +75,7 @@ class Settings(BaseSettings):
     PROMETHEUS_ENABLED: bool = True
     
     class Config:
-        env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")
+        env_file = _ENV_FILE
         case_sensitive = True
         extra = "ignore"
 
