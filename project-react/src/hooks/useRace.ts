@@ -74,6 +74,20 @@ export interface Brief {
   model: string | null;
   sent_channels: Record<string, boolean> | null;
   status: string;
+  data?: BriefData | null;
+}
+
+export interface BriefAttack {
+  attacked: string;
+  attacker: string | null;
+  count: number;
+  example_url?: string | null;
+}
+
+export interface BriefData {
+  kind?: string;
+  phase?: string;
+  attacks_1d?: BriefAttack[];
 }
 
 export function useRace(days: number = 7, base: 'validos' | 'total' = 'validos') {
