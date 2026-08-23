@@ -18,6 +18,11 @@ logger = logging.getLogger(__name__)
 SPIKE_FACTOR = float(os.getenv("ALERT_SPIKE_FACTOR", "3.0"))
 MIN_MENTIONS = int(os.getenv("ALERT_MIN_MENTIONS", "15"))
 NEG_SHARE = float(os.getenv("ALERT_NEG_SHARE", "0.6"))
+# Ventana de observacion. 60 min esta calibrado para redes sociales (miles de menciones/hora).
+# Con prensa sola el candidato recibe 2-7 notas al dia: usar 1440 (un dia) y bajar ALERT_MIN_MENTIONS.
+WINDOW_MINUTES = int(os.getenv("ALERT_WINDOW_MINUTES", "60"))
+# Minimo de ataques del mismo origen en la ventana para abrir una alerta "attack".
+ATTACK_MIN = int(os.getenv("ALERT_ATTACK_MIN", "5"))
 ALERT_ROLES = ("candidate", "incumbent")
 
 
@@ -29,14 +34,16 @@ def _params():
     """En modo debate la ventana se acorta y el umbral baja."""
     if _debate_mode():
         return {"window_minutes": 5, "baseline_hours": 2, "min_mentions": max(5, MIN_MENTIONS // 3)}
-    return {"window_minutes": 60, "baseline_hours": 24 * 7, "min_mentions": MIN_MENTIONS}
+    return {"window_minutes": WINDOW_MINUTES, "baseline_hours": 24 * 7, "min_mentions": MIN_MENTIONS}
 
 
 def _severity(kind: str, velocity: float, count: int) -> str:
     if kind == "crisis":
         return "critical" if velocity >= 2 * SPIKE_FACTOR else "high"
     if kind == "attack":
-        return "high" if count >= 10 else "medium"
+        # El umbral era 10 fijo, calibrado para redes. Se escala con ATTACK_MIN para que en modo
+        # prensa (ATTACK_MIN=2) cuatro ataques en un dia ya sean graves; con ATTACK_MIN=5 da 10.
+        return "high" if count >= ATTACK_MIN * 2 else "medium"
     if kind == "opportunity":
         return "medium"
     return "low"
@@ -223,9 +230,12 @@ def run_alert_cycle(db_url: str) -> Dict[str, Any]:
                 kind = "crisis"
                 title = f"Pico negativo sobre {f.display_name}: {n} menciones ({velocity}x lo normal)"
                 detail = f"{int(neg_share * 100)} % negativas. Tema dominante: {top_topic or 'sin determinar'}."
-            elif attacks and int(attacks[1]) >= 5:
+            elif attacks and int(attacks[1]) >= ATTACK_MIN:
                 kind = "attack"
-                title = f"{attacks[0]} ataca a {f.display_name}: {int(attacks[1])} menciones"
+                n_at = int(attacks[1])
+                title = (f"Ataques a {f.display_name}: {n_at} menciones sin origen identificado"
+                         if attacks[0] == "origen no identificado"
+                         else f"{attacks[0]} ataca a {f.display_name}: {n_at} menciones")
                 detail = f"Tema: {top_topic or 'sin determinar'}. Velocidad {velocity}x."
             elif velocity >= SPIKE_FACTOR and pos_share >= 0.6:
                 kind = "opportunity"
@@ -249,7 +259,7 @@ def run_alert_cycle(db_url: str) -> Dict[str, Any]:
                 "figure_id": f.id, "kind": kind, "severity": severity, "title": title,
                 "detail": detail, "metrics": metrics, "evidence": evidence,
                 "suggested_response": suggested,
-                "dedup_key": f"{f.id}|{kind}|{now.strftime('%Y-%m-%dT%H')}",
+                "dedup_key": f"{f.id}|{kind}|{now.strftime('%Y-%m-%d' if p['window_minutes'] >= 1440 else '%Y-%m-%dT%H')}",
             }
             if _insert_alert(db, alert):
                 created += 1

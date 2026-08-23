@@ -79,6 +79,10 @@ Nada de esto exige tocar código: el sistema los toma en el siguiente ciclo.
 
 ## Deuda conocida (no bloquea)
 
+- El motor de alertas corre en **modo prensa** (`ALERT_WINDOW_MINUTES=1440`, `ALERT_MIN_MENTIONS=3`,
+  `ALERT_ATTACK_MIN=2`). Con la ventana de 60 min original nunca disparaba: el candidato recibe 2-7 notas
+  al día, no por hora. Cuando se activen `TWITTERAPI_IO_KEY`/`YOUTUBE_API_KEY`, volver a 60 / 15 / 5.
+
 - Bundle del frontend en ~1,3 MB: falta *code splitting*.
 - `analysis.py` sigue leyendo ventanas con `datetime.now()` (hora local) mientras el resto escribe en UTC.
   Con ventanas de 7–30 días el desfase de 5 h es ruido, pero conviene unificar.
