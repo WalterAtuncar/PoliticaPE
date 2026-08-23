@@ -53,6 +53,7 @@ export const Dashboard: React.FC = () => {
               metric="opportunity"
               scores={d.opportunityScores}
               height={340}
+              zoom={10}
               compact
             />
           </div>

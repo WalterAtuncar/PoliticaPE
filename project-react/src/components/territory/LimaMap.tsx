@@ -16,6 +16,8 @@ interface Props {
   scores?: Record<string, number>;
   height?: number;
   compact?: boolean;
+  /** Nivel de zoom inicial. Por defecto 9 en modo compacto y 10 en el normal. */
+  zoom?: number;
 }
 
 const NEUTRAL = '#e5e7eb';
@@ -39,7 +41,7 @@ function stepColor(value: number, max: number, scale: string[]): string {
 }
 
 export const LimaMap: React.FC<Props> = ({
-  districts, metric, selected, onSelect, scores, height = 520, compact = false,
+  districts, metric, selected, onSelect, scores, height = 520, compact = false, zoom,
 }) => {
   const byUbigeo = useMemo(() => {
     const m: Record<string, DistrictStat> = {};
@@ -92,7 +94,7 @@ export const LimaMap: React.FC<Props> = ({
     <div className="rounded-xl overflow-hidden border border-gray-200/60 dark:border-gray-700/60" style={{ height }}>
       <MapContainer
         center={[-12.02, -76.94]}
-        zoom={compact ? 9 : 10}
+        zoom={zoom ?? (compact ? 9 : 10)}
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom={!compact}
         zoomControl={!compact}
