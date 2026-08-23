@@ -77,6 +77,29 @@ Nada de esto exige tocar código: el sistema los toma en el siguiente ciclo.
 - Resultados: 43 distritos × 3 listas ficticias, Spearman 0,501, datos de prueba borrados después.
 - Persistencia del clasificador probada sin API: mapeo de figuras/distritos desconocidos y upsert idempotente.
 
+## Panel de campaña (23-ago-2026)
+
+El Panel (pantalla de inicio) se reescribió para la demo a Renovación Popular. Plan y trabajos en
+`docs/plan-demo-panel/`; commits `547bbe5` (P-01) a `bc3850c` (P-07).
+
+Qué hay ahora: cabecera con candidato, fase legal y hitos; 4 KPI (intención de voto, share of voice,
+presión mediática, tema dominante); evolución de encuestas; alertas abiertas con respuesta sugerida;
+mapa de oportunidad y top 5 distritos; temas de la semana; brief diario; últimas noticias de Lima
+clasificadas; top 3 recomendaciones. Todo con datos reales vía `useDashboard`, que compone los
+endpoints existentes (no hay agregador nuevo en el backend).
+
+Qué se borró, por ser de la etapa presidencial: `useDashboardData`, `TrendChart`, `GeographicMap`,
+`MetricCard`, `RealtimeAlerts`.
+
+**Rutina de la mañana antes de una demo** (detalle en `docs/plan-demo-panel/jobs/P-06...`):
+
+```bash
+TOK=$(curl -s -X POST $B/auth/login -H "Content-Type: application/json"   -d '{"email":"admin@politica.pe","password":"password123"}' | python -c "import sys,json;print(json.load(sys.stdin)['token'])")
+curl -s -X POST -H "Authorization: Bearer $TOK" -H "Content-Type: application/json" -d '{}' $B/scraping/trigger/news
+cd project-scrapping && python scripts/classify_backlog.py --max 300
+curl -s -X POST -H "Authorization: Bearer $TOK" "$B/race/brief/generate?send=false&force=true"
+```
+
 ## Deuda conocida (no bloquea)
 
 - El motor de alertas corre en **modo prensa** (`ALERT_WINDOW_MINUTES=1440`, `ALERT_MIN_MENTIONS=3`,
