@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AlertTriangle, Check, ChevronDown, ChevronUp, ExternalLink, Shield, TrendingUp, Swords, X } from 'lucide-react';
 import { CampaignAlert, useAlerts } from '../../hooks/useAlerts';
+import { timeAgo } from '../../utils/time';
 
 const SEVERITY_STYLE: Record<string, { bar: string; chip: string; label: string }> = {
   critical: { bar: 'bg-red-600', chip: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200', label: 'Crítica' },
@@ -19,13 +20,6 @@ const KIND_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
 const KIND_LABEL: Record<string, string> = {
   crisis: 'Crisis', attack: 'Ataque', opportunity: 'Oportunidad', spike: 'Pico',
 };
-
-function timeAgo(iso: string): string {
-  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (mins < 60) return `hace ${mins} min`;
-  const h = Math.round(mins / 60);
-  return h < 24 ? `hace ${h} h` : `hace ${Math.round(h / 24)} d`;
-}
 
 const AlertCard: React.FC<{
   alert: CampaignAlert;
