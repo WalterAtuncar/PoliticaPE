@@ -66,37 +66,49 @@ export function useDashboard() {
   const opportunity = useOpportunity(ownFigure?.id);
 
   const [news, setNews] = useState<LimaNewsItem[]>([]);
+  const [newsLoading, setNewsLoading] = useState(true);
+  const [newsError, setNewsError] = useState<string | null>(null);
   const [recs, setRecs] = useState<DashboardRecommendation[]>([]);
-  const [extraLoading, setExtraLoading] = useState(true);
-  const [extraError, setExtraError] = useState<string | null>(null);
+  const [recsLoading, setRecsLoading] = useState(true);
+  const [recsError, setRecsError] = useState<string | null>(null);
 
   const ownId = ownFigure?.id;
 
-  const fetchExtras = useCallback(async () => {
-    setExtraLoading(true);
-    setExtraError(null);
-    const b = API_CONFIG.SCRAPPING_BASE_URL;
-    const headers = getAuthHeaders();
-
-    const [newsRes, recsRes] = await Promise.allSettled([
-      fetch(`${b}${ENDPOINTS.NEWS}?scope=lima_metropolitana&limit=${NEWS_LIMIT}`, { headers }),
-      ownId
-        ? fetch(`${b}${ENDPOINTS.RECOMMENDATIONS}?figure_id=${ownId}`, { headers })
-        : Promise.reject(new Error('sin candidatura propia')),
-    ]);
-
-    let newsOk = false;
-    if (newsRes.status === 'fulfilled' && newsRes.value.ok) {
-      const j = await newsRes.value.json();
+  // Las noticias no dependen de la candidatura: van en su propio efecto para no volver a
+  // pedirlas cuando llega ownId (antes se pedian dos veces, una sin figura y otra con ella).
+  const fetchNews = useCallback(async () => {
+    setNewsLoading(true);
+    try {
+      const res = await fetch(
+        `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.NEWS}?scope=lima_metropolitana&limit=${NEWS_LIMIT}`,
+        { headers: getAuthHeaders() }
+      );
+      if (!res.ok) throw new Error('No se pudieron cargar las noticias');
+      const j = await res.json();
       setNews(Array.isArray(j) ? j : j.items || []);
-      newsOk = true;
-    } else {
+      setNewsError(null);
+    } catch (e) {
       setNews([]);
+      setNewsError(e instanceof Error ? e.message : 'Error desconocido');
+    } finally {
+      setNewsLoading(false);
     }
+  }, []);
 
-    let recsOk = false;
-    if (recsRes.status === 'fulfilled' && recsRes.value.ok) {
-      const j = await recsRes.value.json();
+  const fetchRecs = useCallback(async () => {
+    if (!ownId) {
+      setRecs([]);
+      setRecsLoading(false);
+      return;
+    }
+    setRecsLoading(true);
+    try {
+      const res = await fetch(
+        `${API_CONFIG.SCRAPPING_BASE_URL}${ENDPOINTS.RECOMMENDATIONS}?figure_id=${ownId}`,
+        { headers: getAuthHeaders() }
+      );
+      if (!res.ok) throw new Error('No se pudieron cargar las recomendaciones');
+      const j = await res.json();
       const all: DashboardRecommendation[] = Array.isArray(j) ? j : j.items || [];
       setRecs(
         [...all]
@@ -107,18 +119,22 @@ export function useDashboard() {
           )
           .slice(0, RECS_LIMIT)
       );
-      recsOk = true;
-    } else {
+      setRecsError(null);
+    } catch (e) {
       setRecs([]);
+      setRecsError(e instanceof Error ? e.message : 'Error desconocido');
+    } finally {
+      setRecsLoading(false);
     }
-
-    if (!newsOk && !recsOk) setExtraError('No se pudo cargar');
-    setExtraLoading(false);
   }, [ownId]);
 
   useEffect(() => {
-    fetchExtras();
-  }, [fetchExtras]);
+    fetchNews();
+  }, [fetchNews]);
+
+  useEffect(() => {
+    fetchRecs();
+  }, [fetchRecs]);
 
   // El grafico de encuestas colorea por nombre de candidato, no por id.
   const figureColors = useMemo(() => {
@@ -189,10 +205,13 @@ export function useDashboard() {
     opportunity,
     opportunityScores,
     news,
+    newsLoading,
+    newsError,
+    refetchNews: fetchNews,
     recs,
-    extraLoading,
-    extraError,
-    refetchExtras: fetchExtras,
+    recsLoading,
+    recsError,
+    refetchRecs: fetchRecs,
     isLoading: cfgLoading || race.isLoading,
   };
 }

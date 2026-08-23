@@ -2,6 +2,7 @@ import React from 'react';
 import { FileText, Loader2, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Brief } from '../../hooks/useRace';
+import { formatDayMonth } from '../../utils/time';
 
 interface Props {
   brief: Brief | null;
@@ -74,7 +75,7 @@ export const BriefPanel: React.FC<Props> = ({ brief, isGenerating, onGenerate })
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Brief diario</h3>
           {brief && (
             <span className="text-xs text-gray-500 dark:text-gray-400">
-              {new Date(brief.brief_date).toLocaleDateString('es-PE', { day: '2-digit', month: 'long' })}
+              {formatDayMonth(brief.brief_date)}
             </span>
           )}
         </div>

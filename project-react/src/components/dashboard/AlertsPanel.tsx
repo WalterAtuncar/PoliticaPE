@@ -101,7 +101,7 @@ const AlertCard: React.FC<{
 };
 
 export const AlertsPanel: React.FC = () => {
-  const { alerts, isLoading, acknowledge, dismiss } = useAlerts('open', 20);
+  const { alerts, isLoading, acknowledge, dismiss } = useAlerts('open', 5);
 
   return (
     <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/60 bg-white/60 dark:bg-gray-800/60 p-4">
@@ -118,7 +118,7 @@ export const AlertsPanel: React.FC = () => {
         <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg h-20" />
       ) : alerts.length === 0 ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Sin alertas abiertas. El motor revisa cada 10 minutos.
+          Sin alertas abiertas en las últimas 24 h.
         </p>
       ) : (
         <div className="space-y-2">

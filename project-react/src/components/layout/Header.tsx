@@ -29,7 +29,7 @@ interface Alert {
 }
 
 const sectionTitles: Record<string, string> = {
-  dashboard: 'Panel',
+  dashboard: 'Panel de campaña — Lima 2026',
   monitoring: 'Prensa — Lima Metropolitana',
   social: 'Redes sociales',
   race: 'Carrera — Alcaldía de Lima 2026',
