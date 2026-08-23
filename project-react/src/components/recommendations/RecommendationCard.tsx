@@ -18,6 +18,7 @@ import {
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { AIRecommendation } from '../../types/recommendations';
+import { fmtInt } from '../../utils/format';
 
 interface RecommendationCardProps {
   recommendation: AIRecommendation;
@@ -180,7 +181,7 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
             <div>
               <div className="text-xs text-gray-500">Presupuesto</div>
               <div className="text-sm font-medium text-gray-900 dark:text-white">
-                ${recommendation.estimatedBudget.min}K - ${recommendation.estimatedBudget.max}K
+                S/ {fmtInt(recommendation.estimatedBudget.min)} – {fmtInt(recommendation.estimatedBudget.max)}
               </div>
             </div>
           </div>

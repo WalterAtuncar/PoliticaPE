@@ -4,6 +4,7 @@ import { Calculator, DollarSign, BarChart3 } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { AIRecommendation } from '../../types/recommendations';
+import { fmtInt } from '../../utils/format';
 
 interface BudgetCalculatorProps {
   selectedRecommendations: AIRecommendation[];
@@ -61,7 +62,7 @@ export const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                 <span className="text-sm text-gray-600 dark:text-gray-400">Presupuesto Mínimo</span>
               </div>
               <span className="text-sm font-bold text-gray-900 dark:text-white">
-                ${totalMinBudget}K
+                S/ {fmtInt(totalMinBudget)}
               </span>
             </div>
 
@@ -71,7 +72,7 @@ export const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                 <span className="text-sm text-gray-600 dark:text-gray-400">Presupuesto Máximo</span>
               </div>
               <span className="text-sm font-bold text-gray-900 dark:text-white">
-                ${totalMaxBudget}K
+                S/ {fmtInt(totalMaxBudget)}
               </span>
             </div>
           </div>
@@ -146,7 +147,7 @@ export const BudgetCalculator: React.FC<BudgetCalculatorProps> = ({
                     {rec.title}
                   </span>
                   <span className="text-gray-600 dark:text-gray-400 font-medium">
-                    ${rec.estimatedBudget.min}-${rec.estimatedBudget.max}K
+                    S/ {fmtInt(rec.estimatedBudget.min)} – {fmtInt(rec.estimatedBudget.max)}
                   </span>
                 </div>
               ))}

@@ -4,6 +4,7 @@ import { BarChart3, TrendingUp, DollarSign, Clock, Target } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { Modal } from '../ui/Modal';
 import { AIRecommendation } from '../../types/recommendations';
+import { fmtInt } from '../../utils/format';
 
 interface StrategyComparatorProps {
   recommendations: AIRecommendation[];
@@ -53,7 +54,8 @@ export const StrategyComparator: React.FC<StrategyComparatorProps> = ({
       metric: 'Costo-Efectividad',
       ...recommendations.reduce((acc, rec, index) => ({
         ...acc,
-        [`strategy${index}`]: Math.max(0, 100 - (rec.estimatedBudget.max / 10)), // Inverse of budget
+        // Presupuesto en soles: S/ 1 000 000 (tope del filtro) equivale a eficiencia 0.
+        [`strategy${index}`]: Math.max(0, 100 - rec.estimatedBudget.max / 10000),
       }), {})
     },
   ];
@@ -208,7 +210,7 @@ export const StrategyComparator: React.FC<StrategyComparatorProps> = ({
                   <td className="py-2 px-3 font-medium text-gray-900 dark:text-white">Presupuesto</td>
                   {recommendations.map((rec, index) => (
                     <td key={index} className="py-2 px-3 text-gray-600 dark:text-gray-400">
-                      ${rec.estimatedBudget.min}K - ${rec.estimatedBudget.max}K
+                      S/ {fmtInt(rec.estimatedBudget.min)} – {fmtInt(rec.estimatedBudget.max)}
                     </td>
                   ))}
                 </tr>
