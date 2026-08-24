@@ -6,6 +6,13 @@ import { Modal } from '../ui/Modal';
 import { AIRecommendation } from '../../types/recommendations';
 import { fmtInt } from '../../utils/format';
 
+const PRIORITY_LABEL: Record<string, string> = {
+  critical: 'Crítica',
+  high: 'Alta',
+  medium: 'Media',
+  low: 'Baja',
+};
+
 interface StrategyComparatorProps {
   recommendations: AIRecommendation[];
   onClose: () => void;
@@ -100,7 +107,7 @@ export const StrategyComparator: React.FC<StrategyComparatorProps> = ({
                     rec.priority === 'high' ? 'text-orange-600' :
                     rec.priority === 'medium' ? 'text-yellow-600' : 'text-green-600'
                   }`}>
-                    {rec.priority.toUpperCase()}
+                    {PRIORITY_LABEL[rec.priority] ?? rec.priority}
                   </span>
                 </div>
               </div>

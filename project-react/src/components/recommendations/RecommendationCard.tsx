@@ -29,6 +29,13 @@ interface RecommendationCardProps {
   figureName?: string;
 }
 
+const PRIORITY_LABEL: Record<string, string> = {
+  critical: 'Crítica',
+  high: 'Alta',
+  medium: 'Media',
+  low: 'Baja',
+};
+
 const priorityColors = {
   critical: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
   high: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400',
@@ -103,7 +110,7 @@ export const RecommendationCard: React.FC<RecommendationCardProps> = ({
                   {recommendation.title}
                 </h3>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${priorityColors[recommendation.priority]}`}>
-                  {recommendation.priority.toUpperCase()}
+                  {PRIORITY_LABEL[recommendation.priority] ?? recommendation.priority}
                 </span>
                 <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[recommendation.status]}`}>
                   {statusLabels[recommendation.status]}
