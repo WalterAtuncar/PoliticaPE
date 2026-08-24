@@ -115,13 +115,32 @@ en español.
 Qué se borró: `AIGenerator`, `PoliticalFiguresManager` (sin imports) e `ImplementationTimeline`
 (cronograma ficticio de 24 semanas cuando la elección es en 6).
 
+## Barrido de pantallas (23-ago-2026)
+
+Plan en `docs/plan-barrido-pantallas/`; commits `dd347fc` (B-01) a `7f4116d` (B-03).
+
+Se borraron **89 archivos muertos (29 294 líneas)**: 12 carpetas presidenciales completas, 12 hooks
+sin uso —incluidos los de datos inventados como `useDemographics`— y los 7 módulos de tipos que solo
+se reexportaban entre sí. El método fue análisis de alcanzabilidad de imports desde las 7 pantallas
+del menú; el script queda en `docs/plan-barrido-pantallas/referencia/alcanzables.mjs` y puede
+re-ejecutarse en cualquier momento desde `project-react/` para detectar código muerto nuevo.
+
+El bundle **no bajó** (1 222 KB): Vite ya hacía tree-shaking, así que ese código nunca viajaba al
+navegador. La ganancia fue de mantenimiento y de riesgo (datos inventados que un refactor podía
+reconectar), no de peso.
+
+Redes pasó a **compuerta municipal**: solo considera publicaciones desde 2026-07-01, y como no hay
+scraping social activo muestra "Monitoreo de redes — pendiente de activación" con las alertas reales
+debajo. Se activa sola al configurar las claves. Sus filtros usan ahora los candidatos de la base y
+las 5 zonas de Lima, y el filtro de figura —que nunca se aplicaba— quedó cableado.
+
+También se quitó el buscador decorativo del header global (no tenía estado ni handler).
+
 ## Deuda conocida (no bloquea)
 - `ai_recommendations.target_region` es `varchar(100)` y el generador la desborda: el último distrito
   llega truncado ("Santiago de Sur" por "Santiago de Surco"). El frontend lo resuelve por prefijo
   (`src/utils/targetRegion.ts`), pero la causa de raíz es la columna corta o el prompt que genera
   listas largas. Ampliar la columna cuando se toque el esquema.
-- `src/data/geographicData.ts` es un mock nacional ("Peru departments") usado solo por
-  `GeographicPage`, pantalla fuera del menú desde S0-07. Borrar ambos cuando se confirme que no vuelven.
 
 - El motor de alertas corre en **modo prensa** (`ALERT_WINDOW_MINUTES=1440`, `ALERT_MIN_MENTIONS=3`,
   `ALERT_ATTACK_MIN=2`). Con la ventana de 60 min original nunca disparaba: el candidato recibe 2-7 notas

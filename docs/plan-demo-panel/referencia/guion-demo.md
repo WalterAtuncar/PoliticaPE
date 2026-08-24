@@ -84,6 +84,10 @@ completa, [15] recomendaciones para la candidatura, [S/ 1,4–2,7 millones] si s
 "Detectó la crisis, la explicó, dijo dónde ir y qué hacer. Todo con datos públicos, a [0,30 dólares] al día de
 IA. Lo que falta para tener la foto completa son las redes sociales: está construido, se enciende con dos claves."
 
+**Y demuéstralo**: clic en **Redes**. La pantalla dice "pendiente de activación" y explica qué aparecerá
+al poner las claves de X y YouTube — con las alertas reales latiendo debajo. No es una promesa, es un
+módulo terminado esperando una credencial.
+
 ## Si algo falla en vivo
 
 - Un widget en "No se pudo cargar": clic en "Reintentar". Si persiste, sigue con el siguiente; al final vuelve.
