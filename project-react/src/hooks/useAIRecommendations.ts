@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AIRecommendation, RecommendationsFilters, ROIMetrics } from '../types/recommendations';
+import { AIRecommendation, RecommendationsFilters, PortfolioMetrics } from '../types/recommendations';
 import { API_CONFIG, ENDPOINTS, getAuthHeaders } from '../config/api';
 
 function mapApiToRecommendation(item: any): AIRecommendation {
@@ -135,26 +135,32 @@ export const useAIRecommendations = (filters: RecommendationsFilters) => {
     }
   }, []);
 
-  const getROIMetrics = useCallback((): ROIMetrics => {
-    const implemented = recommendations.filter(rec =>
-      ['completed', 'in_progress'].includes(rec.status)
-    );
-    const completed = recommendations.filter(rec => rec.status === 'completed');
+  const getPortfolioMetrics = useCallback((): PortfolioMetrics => {
+    const total = recommendations.length;
+    const byPriority = { critical: 0, high: 0, medium: 0, low: 0 };
+    const byStatus: Record<string, number> = {};
+    let budgetMin = 0;
+    let budgetMax = 0;
+    let confidence = 0;
+    let roi = 0;
+
+    recommendations.forEach(rec => {
+      if (rec.priority in byPriority) byPriority[rec.priority as keyof typeof byPriority] += 1;
+      byStatus[rec.status] = (byStatus[rec.status] || 0) + 1;
+      budgetMin += rec.estimatedBudget?.min || 0;
+      budgetMax += rec.estimatedBudget?.max || 0;
+      confidence += rec.aiConfidence || 0;
+      roi += rec.projectedROI || 0;
+    });
 
     return {
-      totalRecommendations: recommendations.length,
-      implementedRecommendations: implemented.length,
-      averageROI:
-        completed.length > 0
-          ? completed.reduce((sum, rec) => sum + rec.projectedROI, 0) / completed.length
-          : 0,
-      successRate:
-        completed.length > 0
-          ? (completed.filter(rec => rec.userRating && rec.userRating >= 4).length / completed.length) * 100
-          : 0,
-      totalBudgetAllocated: implemented.reduce((sum, rec) => sum + rec.estimatedBudget.max, 0),
-      totalBudgetSpent: completed.reduce((sum, rec) => sum + rec.estimatedBudget.min, 0),
-      averageImplementationTime: 45,
+      total,
+      byPriority,
+      byStatus,
+      budgetMin,
+      budgetMax,
+      avgConfidence: total ? confidence / total : 0,
+      avgProjectedROI: total ? roi / total : 0,
     };
   }, [recommendations]);
 
@@ -164,7 +170,7 @@ export const useAIRecommendations = (filters: RecommendationsFilters) => {
     generateNewRecommendations,
     updateRecommendationStatus,
     rateRecommendation,
-    getROIMetrics,
+    getPortfolioMetrics,
     refetch: fetchRecommendations,
   };
 };

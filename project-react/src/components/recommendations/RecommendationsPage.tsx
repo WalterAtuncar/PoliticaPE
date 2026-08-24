@@ -60,7 +60,7 @@ export const RecommendationsPage: React.FC = () => {
     generateNewRecommendations,
     updateRecommendationStatus,
     rateRecommendation,
-    getROIMetrics,
+    getPortfolioMetrics,
   } = useAIRecommendations(filters);
 
   const filteredRecommendations = recommendations.filter(rec => {
@@ -266,7 +266,7 @@ export const RecommendationsPage: React.FC = () => {
             </div>
 
             <div className="col-span-12 xl:col-span-4 space-y-5">
-              <ROIDashboard metrics={getROIMetrics()} />
+              <ROIDashboard metrics={getPortfolioMetrics()} />
               <BudgetCalculator
                 selectedRecommendations={selectedRecommendationData}
                 onShowComparator={() => setShowComparator(true)}

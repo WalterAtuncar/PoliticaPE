@@ -66,14 +66,14 @@ export interface AIRecommendation {
   implementationProgress?: number;
 }
 
-export interface ROIMetrics {
-  totalRecommendations: number;
-  implementedRecommendations: number;
-  averageROI: number;
-  successRate: number;
-  totalBudgetAllocated: number;
-  totalBudgetSpent: number;
-  averageImplementationTime: number;
+export interface PortfolioMetrics {
+  total: number;
+  byPriority: { critical: number; high: number; medium: number; low: number };
+  byStatus: Record<string, number>;
+  budgetMin: number;
+  budgetMax: number;
+  avgConfidence: number;
+  avgProjectedROI: number;
 }
 
 export interface ImpactRegion {
