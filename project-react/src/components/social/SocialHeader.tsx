@@ -18,6 +18,8 @@ import {
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { SocialFilters } from '../../types/social';
+import { ZONES } from '../../data/limaDistricts';
+import { usePoliticalFigures } from '../../hooks/usePoliticalFigures';
 
 interface SocialHeaderProps {
   filters: SocialFilters;
@@ -36,23 +38,11 @@ const platforms = [
   { id: 'youtube', label: 'YouTube', icon: Youtube, color: '#FF0000' },
 ];
 
-const entities = [
-  { value: 'all', label: 'Todos' },
-  { value: 'dina-boluarte', label: 'Dina Boluarte' },
-  { value: 'keiko-fujimori', label: 'Keiko Fujimori' },
-  { value: 'pedro-castillo', label: 'Pedro Castillo' },
-  { value: 'fuerza-popular', label: 'Fuerza Popular' },
-  { value: 'peru-libre', label: 'Perú Libre' },
-  { value: 'accion-popular', label: 'Acción Popular' },
-];
 
-const regions = [
-  { value: 'all', label: 'Todo el Perú' },
-  { value: 'lima', label: 'Lima' },
-  { value: 'arequipa', label: 'Arequipa' },
-  { value: 'cusco', label: 'Cusco' },
-  { value: 'la-libertad', label: 'La Libertad' },
-  { value: 'piura', label: 'Piura' },
+
+const regionOptions = [
+  { value: 'all', label: 'Toda Lima' },
+  ...ZONES.map(z => ({ value: z as string, label: z as string })),
 ];
 
 const dateRanges = [
@@ -86,6 +76,18 @@ export const SocialHeader: React.FC<SocialHeaderProps> = ({
   onPlatformChange,
   onRefresh,
 }) => {
+  const { figures } = usePoliticalFigures();
+  // Las figuras vienen de la base (24 monitoreadas); la candidatura propia va primero.
+  const entityOptions = React.useMemo(() => {
+    const candidates = figures
+      .filter(f => f.is_active && (f.figure_role === 'candidate' || f.figure_role === 'incumbent'))
+      .sort((a, b) => Number(b.is_own_candidate ?? false) - Number(a.is_own_candidate ?? false));
+    return [
+      { value: 'all', label: 'Todas las figuras' },
+      ...candidates.map(f => ({ value: f.display_name, label: f.display_name })),
+    ];
+  }, [figures]);
+
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -204,7 +206,7 @@ export const SocialHeader: React.FC<SocialHeaderProps> = ({
                 onChange={(e) => onFilterChange({ entity: e.target.value })}
                 className="w-full bg-white/50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-600/50 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {entities.map((entity) => (
+                {entityOptions.map((entity) => (
                   <option key={entity.value} value={entity.value}>
                     {entity.label}
                   </option>
@@ -222,7 +224,7 @@ export const SocialHeader: React.FC<SocialHeaderProps> = ({
                   onChange={(e) => onFilterChange({ region: e.target.value })}
                   className="w-full appearance-none bg-white/50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-600/50 rounded-lg px-4 py-2 pr-8 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {regions.map((region) => (
+                  {regionOptions.map((region) => (
                     <option key={region.value} value={region.value}>
                       {region.label}
                     </option>

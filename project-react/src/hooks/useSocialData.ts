@@ -14,6 +14,19 @@ import {
   SocialFilters 
 } from '../types/social';
 
+/**
+ * Antes del pivote municipal la base guarda los posts de la campana presidencial (enero-mayo)
+ * mas ruido de scraping (tests de idiomas, iglesias, deportes). Nada de eso debe llegar a la UI
+ * municipal. Mismo corte que CLASSIFY_MIN_DATE en el backend.
+ */
+const MUNICIPAL_WINDOW_START = new Date('2026-07-01T00:00:00Z');
+
+const normalizeText = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+
 export const useSocialData = (filters: SocialFilters) => {
   const [allPosts, setAllPosts] = useState<SocialPost[]>([]);
   const [influencers] = useState<Influencer[]>([]);
@@ -88,6 +101,14 @@ export const useSocialData = (filters: SocialFilters) => {
       filtered = filtered.filter(p => p.region.toLowerCase().includes(currentFilters.region.toLowerCase()));
     }
 
+    // El filtro de figura nunca se aplicaba: era un control muerto en la cabecera.
+    if (currentFilters.entity && currentFilters.entity !== 'all') {
+      const needle = normalizeText(currentFilters.entity);
+      filtered = filtered.filter(
+        p => normalizeText(p.content).includes(needle) || normalizeText(p.author).includes(needle)
+      );
+    }
+
     if (currentFilters.keywords && currentFilters.keywords.length > 0) {
       const kws = currentFilters.keywords.filter(k => k.trim());
       if (kws.length > 0) {
@@ -100,7 +121,16 @@ export const useSocialData = (filters: SocialFilters) => {
     return filtered;
   }, []);
 
-  const posts = useMemo(() => filterPosts(allPosts, filters), [allPosts, filters, filterPosts]);
+  // Solo el contenido de la ventana municipal alimenta feed, influencers, hashtags y sentimiento.
+  const windowedPosts = useMemo(
+    () => allPosts.filter(p => p.timestamp >= MUNICIPAL_WINDOW_START),
+    [allPosts]
+  );
+
+  const posts = useMemo(
+    () => filterPosts(windowedPosts, filters),
+    [windowedPosts, filters, filterPosts]
+  );
 
   const metrics = useMemo((): SocialMetrics | null => {
     if (allPosts.length === 0) return null;
@@ -146,7 +176,7 @@ export const useSocialData = (filters: SocialFilters) => {
       sentimentByDemographics: { age: [], nse: [] },
       sentimentDrivers: { positive: [], negative: [] },
     };
-  }, [posts, allPosts.length]);
+  }, [posts, windowedPosts.length]);
 
   const fetchRealData = async (): Promise<boolean> => {
     try {
@@ -222,6 +252,7 @@ export const useSocialData = (filters: SocialFilters) => {
 
   return {
     posts,
+    totalInWindow: windowedPosts.length,
     metrics,
     influencers,
     hashtags,
