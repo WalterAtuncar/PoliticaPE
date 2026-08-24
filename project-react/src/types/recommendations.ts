@@ -29,7 +29,6 @@ export interface SocialAccount {
 
 export interface RecommendationsFilters {
   region: string;
-  demographic: string;
   priority: string;
   category: string;
   status: string;

@@ -9,7 +9,6 @@ import { RecommendationCard } from './RecommendationCard';
 import { StrategyComparator } from './StrategyComparator';
 import { ROIDashboard } from './ROIDashboard';
 import { ImpactMap } from './ImpactMap';
-import { ImplementationTimeline } from './ImplementationTimeline';
 import { BudgetCalculator } from './BudgetCalculator';
 import { RecommendationsFilters, AIRecommendation } from '../../types/recommendations';
 import { useAIRecommendations } from '../../hooks/useAIRecommendations';
@@ -17,10 +16,10 @@ import { usePoliticalFigures } from '../../hooks/usePoliticalFigures';
 import { useElectoralConfig } from '../../hooks/useElectoralConfig';
 import { Card } from '../ui/Card';
 import { Modal } from '../ui/Modal';
+import { matchesZone } from '../../utils/targetRegion';
 
 const initialFilters: RecommendationsFilters = {
   region: 'all',
-  demographic: 'all',
   priority: 'all',
   category: 'all',
   status: 'all',
@@ -67,7 +66,7 @@ export const RecommendationsPage: React.FC = () => {
   const filteredRecommendations = recommendations.filter(rec => {
     const matchesTab = () => activeTab === 'all' || rec.category === activeTab;
     return matchesTab() &&
-      (filters.region === 'all' || rec.targetRegion === filters.region) &&
+      matchesZone(rec.targetRegion, filters.region) &&
       (filters.priority === 'all' || rec.priority === filters.priority) &&
       (filters.status === 'all' || rec.status === filters.status) &&
       rec.aiConfidence >= filters.confidenceMin &&
@@ -275,12 +274,6 @@ export const RecommendationsPage: React.FC = () => {
               <ImpactMap recommendations={recommendations} />
             </div>
           </div>
-
-          <ImplementationTimeline
-            recommendations={recommendations.filter(rec =>
-              ['approved', 'in_progress', 'completed'].includes(rec.status)
-            )}
-          />
         </div>
       </div>
 

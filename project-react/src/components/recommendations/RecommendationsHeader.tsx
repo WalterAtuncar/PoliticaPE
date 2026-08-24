@@ -6,13 +6,13 @@ import {
   Filter,
   Download,
   MapPin,
-  Users,
   DollarSign,
   Target
 } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { RecommendationsFilters } from '../../types/recommendations';
+import { ZONES } from '../../data/limaDistricts';
 
 interface RecommendationsHeaderProps {
   filters: RecommendationsFilters;
@@ -21,30 +21,12 @@ interface RecommendationsHeaderProps {
   isGenerating: boolean;
 }
 
-const regions = [
-  { value: 'all', label: 'Todas las regiones' },
-  { value: 'Nacional', label: 'Nacional' },
-  { value: 'Lima', label: 'Lima' },
-  { value: 'Arequipa', label: 'Arequipa' },
-  { value: 'Cusco', label: 'Cusco' },
-  { value: 'La Libertad', label: 'La Libertad' },
-  { value: 'Piura', label: 'Piura' },
-  { value: 'Puno', label: 'Puno' },
-  { value: 'Ica', label: 'Ica' },
+const regionOptions = [
+  { value: 'all', label: 'Toda la cartera' },
+  ...ZONES.map(z => ({ value: z as string, label: z as string })),
+  { value: 'metro', label: 'Lima Metropolitana (toda la ciudad)' },
 ];
 
-const demographics = [
-  { value: 'all', label: 'Todos los segmentos' },
-  { value: '18-25', label: 'Jóvenes (18-25)' },
-  { value: '26-35', label: 'Adultos jóvenes (26-35)' },
-  { value: '36-50', label: 'Adultos (36-50)' },
-  { value: '50+', label: 'Adultos mayores (50+)' },
-  { value: 'nse-a', label: 'NSE A' },
-  { value: 'nse-b', label: 'NSE B' },
-  { value: 'nse-c', label: 'NSE C' },
-  { value: 'nse-d', label: 'NSE D' },
-  { value: 'nse-e', label: 'NSE E' },
-];
 
 const priorities = [
   { value: 'all', label: 'Todas las prioridades' },
@@ -101,7 +83,7 @@ export const RecommendationsHeader: React.FC<RecommendationsHeaderProps> = ({
                 onChange={(e) => updateFilter('region', e.target.value)}
                 className="appearance-none bg-white/50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-600/50 rounded-lg px-3 py-2 pr-8 text-sm font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 backdrop-blur-sm"
               >
-                {regions.map((region) => (
+                {regionOptions.map((region) => (
                   <option key={region.value} value={region.value}>
                     {region.label}
                   </option>
@@ -151,26 +133,6 @@ export const RecommendationsHeader: React.FC<RecommendationsHeaderProps> = ({
           className="mt-5 pt-5 border-t border-gray-200/50 dark:border-gray-600/50"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Segmento demográfico
-              </label>
-              <div className="relative">
-                <select
-                  value={filters.demographic}
-                  onChange={(e) => updateFilter('demographic', e.target.value)}
-                  className="w-full appearance-none bg-white/50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-600/50 rounded-lg px-4 py-2 pr-8 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  {demographics.map((demo) => (
-                    <option key={demo.value} value={demo.value}>
-                      {demo.label}
-                    </option>
-                  ))}
-                </select>
-                <Users className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Estado de implementación
