@@ -100,7 +100,28 @@ cd project-scrapping && python scripts/classify_backlog.py --max 300
 curl -s -X POST -H "Authorization: Bearer $TOK" "$B/race/brief/generate?send=false&force=true"
 ```
 
+## Recomendaciones IA (23-ago-2026)
+
+La pantalla seguía a medias tras el pivote: el backend generaba recomendaciones municipales
+correctas pero la presentación era presidencial. Plan en `docs/plan-reco-lima/`; commits `2b15003`
+(R-01) a `52d3a73` (R-05).
+
+Qué se arregló: montos en soles con formato es-PE (pintaban "$180000K"), eje de eficiencia del
+comparador (asumía miles, quedaba clavado en 0), mapa de impacto sobre los 43 distritos reales con
+parser de `target_region` (`src/utils/targetRegion.ts`), filtro por las 5 zonas de Lima (el nacional
+vaciaba la lista con cualquier opción), cartera honesta en lugar del ROI de ceros, chips de prioridad
+en español.
+
+Qué se borró: `AIGenerator`, `PoliticalFiguresManager` (sin imports) e `ImplementationTimeline`
+(cronograma ficticio de 24 semanas cuando la elección es en 6).
+
 ## Deuda conocida (no bloquea)
+- `ai_recommendations.target_region` es `varchar(100)` y el generador la desborda: el último distrito
+  llega truncado ("Santiago de Sur" por "Santiago de Surco"). El frontend lo resuelve por prefijo
+  (`src/utils/targetRegion.ts`), pero la causa de raíz es la columna corta o el prompt que genera
+  listas largas. Ampliar la columna cuando se toque el esquema.
+- `src/data/geographicData.ts` es un mock nacional ("Peru departments") usado solo por
+  `GeographicPage`, pantalla fuera del menú desde S0-07. Borrar ambos cuando se confirme que no vuelven.
 
 - El motor de alertas corre en **modo prensa** (`ALERT_WINDOW_MINUTES=1440`, `ALERT_MIN_MENTIONS=3`,
   `ALERT_ATTACK_MIN=2`). Con la ventana de 60 min original nunca disparaba: el candidato recibe 2-7 notas

@@ -66,6 +66,19 @@ IA y el distrito. Clic y se abre la nota original." Abre una.
 confianza: [Blindaje legal ante la exclusión — crítica], [Operación SJL — crítica], [...]. Cada una tiene
 pasos, KPIs y riesgos en la pantalla de Recomendaciones."
 
+## 9-bis. La pantalla Recomendaciones IA (1,5 min) — opcional si hay tiempo
+
+Clic en **Recomendaciones IA** en el menú. "Las tres que vieron en el panel salen de aquí: la cartera
+completa, [15] recomendaciones para la candidatura, [S/ 1,4–2,7 millones] si se ejecutara todo, con
+[81 %] de confianza media de la IA."
+
+- **Filtra por zona**: "¿Qué tenemos para Lima Norte?" → [7] recomendaciones. Cada zona tiene las suyas.
+- **Mapa de impacto**: "Dónde se concentra el trabajo propuesto. [18] de los 43 distritos tocados;
+  [San Martín de Porres] y [Santiago de Surco] los más trabajados. [4] recomendaciones aplican a toda
+  la ciudad y por eso no se pintan por distrito."
+- **Selecciona 2 o 3** con la casilla → la calculadora suma el presupuesto → "Comparar estrategias"
+  muestra el radar con confianza, ROI, eficiencia y alcance.
+
 ## 10. Cierre (30 s)
 
 "Detectó la crisis, la explicó, dijo dónde ir y qué hacer. Todo con datos públicos, a [0,30 dólares] al día de
