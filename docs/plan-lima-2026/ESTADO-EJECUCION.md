@@ -136,6 +136,43 @@ las 5 zonas de Lima, y el filtro de figura —que nunca se aplicaba— quedó ca
 
 También se quitó el buscador decorativo del header global (no tenía estado ni handler).
 
+
+## Repunte a Carlos Bruce (25-ago-2026)
+
+Decision de negocio de Walter: evaluar a que candidatura sirve la plataforma. Se repunto de
+**Rafael Lopez Aliaga a Carlos Bruce (Somos Peru)**. Commits `6b52234`, `ec077f9`, `0e7326a`.
+
+**El repunte costo lo que debia costar: nada de logica.** La arquitectura del pivote municipal ya
+resolvia la candidatura propia por `is_own_candidate` en la base o por `ec.OWN_CANDIDATE`. Solo habia
+5 menciones de Lopez Aliaga en todo el codigo de la app y ninguna era logica de negocio. El cambio
+completo fue: dos variables (`.env` + Railway), `seed_lima_2026.py --own "Carlos Bruce"` y redeploy.
+`OWN_PARTY_SLUG` resulto no leerse en ningun sitio; se deja por coherencia.
+
+**Un defecto real que el pivote anterior tapaba.** `useAIRecommendations` pedia `/recommendations`
+sin `figure_id`, asi que la pantalla mostraba las recomendaciones de TODAS las figuras. Con una sola
+figura con recomendaciones generadas nadie lo noto; al repuntar habrian aparecido las 15 de Lopez
+Aliaga como si fueran nuestras. Ahora filtra por la candidatura propia (mismo patron que ya usaba
+`useDashboard`) y la pantalla preselecciona esa figura al generar.
+
+**Las alertas tambien llevan encuadre.** La `suggested_response` se escribe una sola vez, al crear la
+alerta, con `OWN_CANDIDATE` dentro del prompt. Las 3 alertas high abiertas decian "nuestra candidatura"
+refiriendose a Lopez Aliaga. Se anadio `project-scrapping/scripts/regen_alert_responses.py`, que las
+regenera con la candidatura vigente; tras ejecutarlo recomiendan "no responder y monitorear, el
+desgaste recae en un tercero". **Correr este script siempre que cambie la candidatura propia.**
+
+Regenerado con Bruce como propia: 8 recomendaciones (SJL, Lima Norte, contraste con Lopez Aliaga,
+extorsion al transporte) y el brief del 25-ago. Las 15 recomendaciones de Lopez Aliaga se conservan
+como historico: ya no aparecen porque la pantalla filtra por figura.
+
+**Scraping de encuestas lanzado el 25-ago: 0 nuevas** en los 5 scrapers, sin errores. La ultima
+encuesta municipal sigue siendo IDICE del 22-ago (RLA 19,0 · Allison 17,7 · Bruce 16,5 en validos,
+±4,0: triple empate tecnico). El efecto de la exclusion declarada improcedente el 24-ago **no esta
+medido por ninguna encuesta todavia**.
+
+Notas del roster reescritas con datos verificados, porque alimentan los prompts del brief y de las
+recomendaciones: Bruce como CANDIDATURA PROPIA (3.o, tras 10 meses liderando de oct-2025 a jul-2026),
+Lopez Aliaga como RIVAL PRINCIPAL, Allison como RIVAL EN ASCENSO.
+
 ## Deuda conocida (no bloquea)
 - `ai_recommendations.target_region` es `varchar(100)` y el generador la desborda: el último distrito
   llega truncado ("Santiago de Sur" por "Santiago de Surco"). El frontend lo resuelve por prefijo
