@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brain, Sparkles, Zap, Target, Users as UsersIcon, AlertCircle } from 'lucide-react';
 import { ElectoralCountdown } from './ElectoralCountdown';
@@ -48,6 +48,13 @@ export const RecommendationsPage: React.FC = () => {
 
   const { figures, isLoading: figuresLoading, createFigure, updateFigure, deleteFigure } = usePoliticalFigures();
   const { config: electoralConfig } = useElectoralConfig();
+
+  // La pantalla solo muestra las recomendaciones de la candidatura propia, asi que
+  // preseleccionarla evita generar para un rival y que el resultado no aparezca.
+  const ownFigureId = figures.find(f => f.is_own_candidate)?.id;
+  useEffect(() => {
+    if (ownFigureId) setSelectedFigureIds(prev => (prev.length ? prev : [ownFigureId]));
+  }, [ownFigureId]);
 
   // Cerrada la ventana de propaganda, los focos de calle y pauta ya no son legales.
   const availableFocusAreas = focusAreaOptions.filter(

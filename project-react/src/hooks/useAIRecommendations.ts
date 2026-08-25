@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AIRecommendation, RecommendationsFilters, PortfolioMetrics } from '../types/recommendations';
 import { API_CONFIG, ENDPOINTS, getAuthHeaders } from '../config/api';
+import { usePoliticalFigures } from './usePoliticalFigures';
 
 function mapApiToRecommendation(item: any): AIRecommendation {
   return {
@@ -32,10 +33,24 @@ function mapApiToRecommendation(item: any): AIRecommendation {
 export const useAIRecommendations = (filters: RecommendationsFilters) => {
   const [recommendations, setRecommendations] = useState<AIRecommendation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const { figures } = usePoliticalFigures();
+
+  // Esta pantalla es la de NUESTRA campana: sin este filtro mostraba tambien las
+  // recomendaciones generadas para otras figuras (al repuntar a Bruce aparecian las
+  // 15 de Lopez Aliaga). El Panel ya filtraba asi en useDashboard.
+  const ownId = useMemo(
+    () => figures.find(f => f.is_own_candidate)?.id,
+    [figures]
+  );
 
   const fetchRecommendations = useCallback(async () => {
+    if (!ownId) {
+      setRecommendations([]);
+      return;
+    }
     try {
       const params = new URLSearchParams();
+      params.set('figure_id', ownId);
       if (filters.category !== 'all') params.set('category', filters.category);
       if (filters.status !== 'all') params.set('status', filters.status);
       params.set('limit', '100');
@@ -50,7 +65,7 @@ export const useAIRecommendations = (filters: RecommendationsFilters) => {
     } catch (e) {
       console.error('Error loading recommendations:', e);
     }
-  }, [filters.category, filters.status]);
+  }, [filters.category, filters.status, ownId]);
 
   useEffect(() => {
     fetchRecommendations();

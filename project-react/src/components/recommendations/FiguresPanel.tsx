@@ -264,7 +264,7 @@ export const FiguresPanel: React.FC<FiguresPanelProps> = ({
                         onChange={e => setKeywordInput(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddKeyword())}
                         className="flex-1 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-purple-500"
-                        placeholder="Ej: Rafael López Aliaga"
+                        placeholder="Ej: nombre o apodo del candidato"
                       />
                       <button onClick={handleAddKeyword} className="px-2.5 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg text-xs font-medium hover:bg-blue-200 dark:hover:bg-blue-900/50">
                         +

@@ -17,7 +17,9 @@ export const ManualPollForm: React.FC<Props> = ({ candidateNames, onSaved }) => 
   const [undecided, setUndecided] = useState('');
   const [pcts, setPcts] = useState<Record<string, string>>({});
 
-  const names = candidateNames.length ? candidateNames.slice(0, 10) : ['Rafael López Aliaga', 'Carlos Bruce'];
+  // Sin nombres desde la base no inventamos candidatos: el formulario queda vacio
+  // y avisa, en vez de sugerir una carrera que puede no ser la actual.
+  const names = candidateNames.slice(0, 10);
 
   const submit = async () => {
     const candidates = names
@@ -78,6 +80,11 @@ export const ManualPollForm: React.FC<Props> = ({ candidateNames, onSaved }) => 
             <input className={input} type="number" step="0.1" placeholder="% indecisos" value={undecided} onChange={e => setUndecided(e.target.value)} />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {names.length === 0 && (
+              <p className="col-span-full text-xs text-amber-600 dark:text-amber-400">
+                No hay candidatos cargados: siembra el padron de figuras antes de registrar una encuesta.
+              </p>
+            )}
             {names.map(n => (
               <div key={n}>
                 <label className="block text-[11px] text-gray-600 dark:text-gray-400 mb-0.5 truncate" title={n}>{n}</label>
